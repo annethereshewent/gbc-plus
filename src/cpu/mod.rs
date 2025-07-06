@@ -36,8 +36,7 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     bus: Bus,
-    cycles: usize,
-    ime: bool
+    cycles: usize
 }
 
 impl CPU {
@@ -56,11 +55,11 @@ impl CPU {
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
             cycles: 0,
-            ime: true
         }
     }
 
     pub fn step(&mut self) {
+        self.handle_interrupts();
         let opcode = self.bus.mem_read8(self.pc);
 
         println!("[Opcode: 0x{:x}] [Address: 0x{:x}]", opcode, self.pc);
@@ -72,6 +71,12 @@ impl CPU {
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
         self.bus.rom = bytes.to_vec();
+    }
+
+    pub fn handle_interrupts(&mut self) {
+        if self.bus.ime && (self.bus.IF.bits() & self.bus.ie.bits()) != 0 {
+            println!("interrupt happening! how exciting!");
+        }
     }
 
     pub fn hl(&self) -> u16 {

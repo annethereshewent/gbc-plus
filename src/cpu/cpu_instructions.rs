@@ -391,7 +391,7 @@ impl CPU {
     }
 
     pub fn di(&mut self) {
-        self.ime = false;
+        self.bus.ime = false;
     }
 
     pub fn call(&mut self, flags: JumpFlags) {
