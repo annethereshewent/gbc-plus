@@ -205,34 +205,42 @@ impl CPU {
         }
     }
 
-    pub fn add(&mut self, reg1: Register, reg2: Register) {
+    pub fn add_hl(&mut self, register: Register) {
+        todo!("add hl");
+    }
+
+    pub fn add(&mut self, register: Option<Register>) {
         todo!("add");
     }
 
-    pub fn adc(&mut self, reg1: Register, reg2: Register) {
+    pub fn adc(&mut self, register: Option<Register>) {
         todo!("adc");
     }
 
-    pub fn sub(&mut self, reg1: Register, reg2: Register) {
+    pub fn sub(&mut self, register: Option<Register>) {
         todo!("sub");
     }
 
-    pub fn sbc(&mut self, reg1: Register, reg2: Register) {
+    pub fn sbc(&mut self, register: Option<Register>) {
         todo!("sbc");
     }
 
-    pub fn and(&mut self, reg1: Register, reg2: Register) {
+    pub fn and(&mut self, register: Option<Register>) {
         todo!("and");
     }
 
-    pub fn xor(&mut self, reg1: Register, reg2: Register) {
-        let value2 = if reg2 == Register::HLPointer {
-            self.bus.mem_read8(self.hl())
+    pub fn xor(&mut self, register: Option<Register>) {
+        let value2 = if let Some(register) = register {
+            if register == Register::HLPointer {
+                self.bus.mem_read8(self.hl())
+            } else {
+                self.registers[register as usize]
+            }
         } else {
-            self.registers[reg2 as usize]
+            self.bus.mem_read8(self.pc)
         };
 
-        self.registers[reg1 as usize] = self.xor_(self.registers[reg1 as usize], value2);
+        self.registers[Register::A as usize] = self.xor_(self.registers[Register::A as usize], value2);
     }
 
     fn xor_(&mut self, val1: u8, val2: u8) -> u8 {
@@ -247,50 +255,22 @@ impl CPU {
 
     }
 
-    pub fn or(&mut self, reg1: Register, reg2: Register) {
+    pub fn or(&mut self, register: Option<Register>) {
         todo!("or");
     }
 
-    pub fn cp(&mut self, reg1: Register, reg2: Register) {
-        todo!("cp");
-    }
-
-    pub fn add_imm(&mut self) {
-        todo!("add_imm");
-    }
-
-    pub fn adc_imm(&mut self) {
-        todo!("adc_imm");
-    }
-
-    pub fn sub_imm(&mut self) {
-        todo!("sub_imm");
-    }
-
-    pub fn sbc_imm(&mut self) {
-        todo!("sbc_imm");
-    }
-
-    pub fn and_imm(&mut self) {
-        todo!("and_imm");
-    }
-
-    pub fn xor_imm(&mut self) {
-        todo!("xor_imm");
-    }
-
-    pub fn or_imm(&mut self) {
-        todo!("or_imm");
-    }
-
-    pub fn cp_imm(&mut self) {
+    pub fn cp(&mut self, register: Option<Register>) {
         let a_val = self.registers[Register::A as usize];
 
-        let imm = self.bus.mem_read8(self.pc);
+        let operand = if let Some(register) = register {
+            self.registers[register as usize]
+        } else {
+            self.bus.mem_read8(self.pc)
+        };
 
         self.pc += 1;
 
-        self.subtract(a_val, imm);
+        self.subtract(a_val, operand);
     }
 
     fn subtract(&mut self, val1: u8, val2: u8) -> u8 {
@@ -462,7 +442,7 @@ impl CPU {
                 1 => {
                     match q {
                         0 => self.ld_immediate(RP_TABLE[p as usize], LoadType::Normal),
-                        1 => self.add(Register::HL, RP_TABLE[p as usize]),
+                        1 => self.add_hl(RP_TABLE[p as usize]),
                         _ => unreachable!()
                     }
                 }
@@ -517,14 +497,14 @@ impl CPU {
             }
             2 => {
                 match ALU_TABLE[y as usize] {
-                    AluOp::ADD => self.add(Register::A, R_TABLE[z as usize]),
-                    AluOp::ADC => self.adc(Register::A, R_TABLE[z as usize]),
-                    AluOp::SUB => self.sub(Register::A, R_TABLE[z as usize]),
-                    AluOp::SBC => self.sbc(Register::A, R_TABLE[z as usize]),
-                    AluOp::AND => self.and(Register::A, R_TABLE[z as usize]),
-                    AluOp::CP => self.cp(Register::A, R_TABLE[z as usize]),
-                    AluOp::OR => self.or(Register::A, R_TABLE[z as usize]),
-                    AluOp::XOR => self.xor(Register::A, R_TABLE[z as usize])
+                    AluOp::ADD => self.add(Some(R_TABLE[z as usize])),
+                    AluOp::ADC => self.adc(Some(R_TABLE[z as usize])),
+                    AluOp::SUB => self.sub(Some(R_TABLE[z as usize])),
+                    AluOp::SBC => self.sbc(Some(R_TABLE[z as usize])),
+                    AluOp::AND => self.and(Some(R_TABLE[z as usize])),
+                    AluOp::CP => self.cp(Some(R_TABLE[z as usize])),
+                    AluOp::OR => self.or(Some(R_TABLE[z as usize])),
+                    AluOp::XOR => self.xor(Some(R_TABLE[z as usize]))
                 }
             }
             3 => {
@@ -582,14 +562,14 @@ impl CPU {
                     }
                     6 => {
                         match ALU_TABLE[y as usize] {
-                            AluOp::ADD => self.add_imm(),
-                            AluOp::ADC => self.adc_imm(),
-                            AluOp::SUB => self.sub_imm(),
-                            AluOp::SBC => self.sbc_imm(),
-                            AluOp::AND => self.and_imm(),
-                            AluOp::CP => self.cp_imm(),
-                            AluOp::OR => self.or_imm(),
-                            AluOp::XOR => self.xor_imm()
+                            AluOp::ADD => self.add(None),
+                            AluOp::ADC => self.adc(None),
+                            AluOp::SUB => self.sub(None),
+                            AluOp::SBC => self.sbc(None),
+                            AluOp::AND => self.and(None),
+                            AluOp::CP => self.cp(None),
+                            AluOp::OR => self.or(None),
+                            AluOp::XOR => self.xor(None)
                         }
                     }
                     7 => self.rst(y * 8),
