@@ -9,6 +9,29 @@ pub enum JumpFlags {
     C
 }
 
+
+impl JumpFlags {
+    pub fn new(val: u8) -> Self {
+        match val {
+            0 => Self::NZ,
+            1 => Self::Z,
+            2 => Self::NC,
+            3 => Self::C,
+            _ => unreachable!()
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::NoFlag => "".to_string(),
+            Self::C => "C".to_string(),
+            Self::NZ => "NZ".to_string(),
+            Self::Z => "Z".to_string(),
+            Self::NC => "NC".to_string(),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub enum IncrementMode {
     Increment,
@@ -25,18 +48,6 @@ pub enum AluOp {
     XOR,
     OR,
     CP
-}
-
-impl JumpFlags {
-    pub fn new(val: u8) -> Self {
-        match val {
-            0 => Self::NZ,
-            1 => Self::Z,
-            2 => Self::NC,
-            3 => Self::C,
-            _ => unreachable!()
-        }
-    }
 }
 
 pub const RP_TABLE: [Register; 4] = [
@@ -117,16 +128,11 @@ impl CPU {
             }
         };
 
-        println!("condition = {:?}", flag);
-
         let signed_imm = self.bus.mem_read8(self.pc) as i8;
 
         if condition_met {
             self.pc = ((self.pc as i32) + 1 + signed_imm as i32) as u16;
-
-            println!("[CPU] [JR] [New PC: 0x{:x}]", self.pc);
         } else {
-            println!("[CPU] [JR] [Not Met]");
             self.pc += 1;
         }
     }
@@ -187,8 +193,6 @@ impl CPU {
         };
 
         self.pc += 1;
-
-        println!("using value 0xff{:x}", offset);
 
         match load_type {
             LoadType::LeftPointer => {
@@ -320,7 +324,7 @@ impl CPU {
         }
     }
 
-    pub fn load_hl_displacement(&mut self) {
+    pub fn ld_hl_displacement(&mut self) {
         todo!("load_hl_displacement");
     }
 
@@ -332,10 +336,7 @@ impl CPU {
         if r1 as usize > 6 {
             self.dec_register16(r1);
         } else {
-            println!("register {:?} = 0x{:x}", r1, self.registers[r1 as usize]);
             let result = self.registers[r1 as usize] - 1;
-
-            println!("result = {result}");
 
             self.f.set(FlagRegister::ZERO, result == 0);
             self.f.set(FlagRegister::SUBTRACT, true);
@@ -533,7 +534,7 @@ impl CPU {
                         4 => self.ld_upper(Register::A, LoadType::LeftPointer, false),
                         5 => self.add_sp(),
                         6 => self.ld_upper(Register::A, LoadType::RightPointer, false),
-                        7 => self.load_hl_displacement(),
+                        7 => self.ld_hl_displacement(),
                         _ => unreachable!()
                     }
                     1 => match q {
@@ -558,7 +559,7 @@ impl CPU {
                     3 => match y {
                         0 => self.jp(JumpFlags::NoFlag),
                         1 => {
-                            // TODO: CB instructions
+                            todo!("CB instructions");
                         }
                         6 => self.di(),
                         7 => self.ei(),

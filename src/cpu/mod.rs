@@ -3,6 +3,7 @@ use bus::Bus;
 
 pub mod bus;
 pub mod cpu_instructions;
+pub mod disassembler;
 
 bitflags! {
     pub struct FlagRegister: u8 {
@@ -55,9 +56,9 @@ impl CPU {
         self.handle_interrupts();
         let opcode = self.bus.mem_read8(self.pc);
 
-        println!("[Opcode: 0x{:x}] [Address: 0x{:x}]", opcode, self.pc);
-
         self.pc += 1;
+
+        println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc, self.disassemble(opcode));
 
         self.decode_instruction(opcode);
     }

@@ -7,8 +7,6 @@ pub mod cpu;
 
 
 fn main() {
-    println!("ayyy lmao");
-
     let mut cpu = CPU::new();
 
     let args: Vec<String> = env::args().collect();
