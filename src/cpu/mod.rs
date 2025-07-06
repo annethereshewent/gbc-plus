@@ -1,9 +1,11 @@
 use bitflags::bitflags;
 use bus::Bus;
+use timer::Timer;
 
 pub mod bus;
 pub mod cpu_instructions;
 pub mod disassembler;
+pub mod timer;
 
 bitflags! {
     pub struct FlagRegister: u8 {
@@ -37,7 +39,7 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     bus: Bus,
-    cycles: usize
+    timer: Timer
 }
 
 impl CPU {
@@ -48,7 +50,7 @@ impl CPU {
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
-            cycles: 0,
+            timer: Timer::new()
         }
     }
 
@@ -60,7 +62,11 @@ impl CPU {
 
         println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc, self.disassemble(opcode));
 
-        self.decode_instruction(opcode);
+        let cycles = self.decode_instruction(opcode);
+
+        self.bus.ppu.tick(cycles);
+        self.timer.tick(cycles);
+
     }
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
