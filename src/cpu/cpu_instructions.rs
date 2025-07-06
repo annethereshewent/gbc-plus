@@ -191,6 +191,8 @@ impl CPU {
 
         self.pc += 1;
 
+        println!("using value 0xff{:x}", offset);
+
         match load_type {
             LoadType::LeftPointer => {
                 self.bus.mem_write8(0xff00 + offset as u16, self.registers[reg1 as usize]);
@@ -229,7 +231,19 @@ impl CPU {
             self.registers[reg2 as usize]
         };
 
-        self.registers[reg1 as usize] = self.registers[reg1 as usize] ^ value2;
+        self.registers[reg1 as usize] = self.xor_(self.registers[reg1 as usize], value2);
+    }
+
+    fn xor_(&mut self, val1: u8, val2: u8) -> u8 {
+        let result = val1 ^ val2;
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+        self.f.set(FlagRegister::CARRY, false);
+        self.f.set(FlagRegister::ZERO, result == 0);
+
+        result
+
     }
 
     pub fn or(&mut self, reg1: Register, reg2: Register) {
@@ -269,7 +283,26 @@ impl CPU {
     }
 
     pub fn cp_imm(&mut self) {
-        todo!("cp_imm");
+        let a_val = self.registers[Register::A as usize];
+
+        let imm = self.bus.mem_read8(self.pc);
+
+        self.pc += 1;
+
+        self.subtract(a_val, imm);
+    }
+
+    fn subtract(&mut self, val1: u8, val2: u8) -> u8 {
+        let result = val1 - val2;
+
+        let half_carry = (result & 0xf) > (val1 & 0xf);
+
+        self.f.set(FlagRegister::HALF_CARRY, half_carry);
+        self.f.set(FlagRegister::CARRY, result > val1);
+        self.f.set(FlagRegister::SUBTRACT, true);
+        self.f.set(FlagRegister::ZERO, result == 0);
+
+        result
     }
 
     pub fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) {
@@ -308,7 +341,13 @@ impl CPU {
                 _ => panic!("invalid option given to dec: {:?}", r1)
             }
         } else {
-            self.registers[r1 as usize] -= 1;
+            let result = self.registers[r1 as usize] - 1;
+
+            self.f.set(FlagRegister::ZERO, result == 0);
+            self.f.set(FlagRegister::SUBTRACT, true);
+            self.f.set(FlagRegister::HALF_CARRY, (result & 0xf) > (self.registers[r1 as usize] & 0xf));
+
+            self.registers[r1 as usize] = result;
         }
     }
 

@@ -1,15 +1,20 @@
+use gpu::{lcd_control_register::LCDControlRegister, lcd_status_register::LCDStatusRegister, GPU};
 use interrupt_register::InterruptRegister;
 
 
 
 pub mod interrupt_register;
+pub mod gpu;
+pub mod cartridge;
 
 pub struct Bus {
     pub rom: Vec<u8>,
     wram: Box<[u8]>,
+    hram: Box<[u8]>,
     pub ime: bool,
     pub IF: InterruptRegister,
-    pub ie: InterruptRegister
+    pub ie: InterruptRegister,
+    pub gpu: GPU
 }
 
 impl Bus {
@@ -17,15 +22,18 @@ impl Bus {
         Self {
             rom: Vec::new(),
             wram: vec![0; 0x2000].into_boxed_slice(),
+            hram: vec![0; 0x7f].into_boxed_slice(),
             IF: InterruptRegister::from_bits_retain(0),
             ie: InterruptRegister::from_bits_retain(0),
-            ime: true
+            ime: true,
+            gpu: GPU::new()
         }
     }
 
     pub fn mem_read8(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x3fff => self.rom[address as usize],
+            0xff44 => self.gpu.line_y,
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
         }
     }
@@ -39,8 +47,15 @@ impl Bus {
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
+            0xa000..=0xbfff => todo!("external cartridge RAM"),
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
+            0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
+            0xff40 => self.gpu.lcdc = LCDControlRegister::from_bits_retain(value),
+            0xff41 => self.gpu.stat = LCDStatusRegister::from_bits_truncate(value),
+            0xff42 => self.gpu.scy = value,
+            0xff43 => self.gpu.scx = value,
+            0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
             _ => panic!("(mem_write8): invalid address given: 0x{:x}", address)
         }
