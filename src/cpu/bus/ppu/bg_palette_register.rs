@@ -31,7 +31,7 @@ impl BGPaletteRegister {
         }
     }
 
-    fn get_id_color(value: u8) -> BGColor {
+    pub fn get_id_color(value: u8) -> BGColor {
         match value {
             0 => BGColor::White,
             1 => BGColor::LightGray,
