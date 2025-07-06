@@ -157,12 +157,7 @@ impl CPU {
         match load_type {
             LoadType::Normal => {
                 if reg1 as usize > 6 {
-                    match reg1 {
-                        Register::BC => self.set_bc(immediate),
-                        Register::DE => self.set_de(immediate),
-                        Register::HL => self.set_hl(immediate),
-                        _ => panic!("invalid option given: {:?}", reg1)
-                    }
+                    self.set_register16(reg1, immediate);
                 } else {
                     self.registers[reg1 as usize] = immediate as u8;
                 }
@@ -308,12 +303,11 @@ impl CPU {
     }
 
     pub fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) {
-        println!("hl = {:x}, value = {:x}", self.hl(), self.registers[r1 as usize]);
         self.bus.mem_write8(self.hl(), self.registers[r1 as usize]);
 
         match increment_mode {
-            IncrementMode::Decrement => self.set_hl(self.hl() - 1),
-            IncrementMode::Increment => self.set_hl(self.hl() + 1)
+            IncrementMode::Decrement => self.dec_register16(Register::HL),
+            IncrementMode::Increment => self.inc_register16(Register::HL)
         }
     }
 
@@ -321,8 +315,8 @@ impl CPU {
         self.registers[r1 as usize] = self.bus.mem_read8(self.hl());
 
         match increment_mode {
-            IncrementMode::Decrement => self.set_hl(self.hl() - 1),
-            IncrementMode::Increment => self.set_hl(self.hl() + 1)
+            IncrementMode::Decrement => self.dec_register16(Register::HL),
+            IncrementMode::Increment => self.inc_register16(Register::HL)
         }
     }
 
@@ -336,13 +330,7 @@ impl CPU {
 
     pub fn dec(&mut self, r1: Register) {
         if r1 as usize > 6 {
-            match r1 {
-                Register::BC => self.set_bc(self.bc() - 1),
-                Register::DE => self.set_de(self.de() - 1),
-                Register::HL => self.set_hl(self.hl() - 1),
-                Register::SP => self.sp -= 1,
-                _ => panic!("invalid option given to dec: {:?}", r1)
-            }
+            self.dec_register16(r1);
         } else {
             println!("register {:?} = 0x{:x}", r1, self.registers[r1 as usize]);
             let result = self.registers[r1 as usize] - 1;

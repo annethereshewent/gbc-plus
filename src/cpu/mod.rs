@@ -22,12 +22,12 @@ pub enum Register {
     E = 4,
     H = 5,
     L = 6,
-    AF = 7,
-    BC = 9,
-    DE = 11,
-    HL = 13,
-    SP = 15,
-    HLPointer = 16
+    BC = 8,
+    DE = 10,
+    HL = 12,
+    SP = 13,
+    HLPointer = 14,
+    AF = 15
 }
 
 pub struct CPU {
@@ -42,13 +42,6 @@ pub struct CPU {
 impl CPU {
     pub fn new() -> CPU {
         CPU {
-            // a: 0x1,
-            // b: 0,
-            // c: 0x13,
-            // d: 0,
-            // e: 0xd8,
-            // h: 0x1,
-            // l: 0x4d,
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
             sp: 0xfffe,
@@ -79,30 +72,32 @@ impl CPU {
         }
     }
 
+    pub fn set_register16(&mut self, r1: Register, val: u16) {
+        let base = r1 as usize - 7;
+
+        self.registers[base] = (val >> 8) as u8;
+        self.registers[base + 1] = val as u8;
+    }
+
+    pub fn dec_register16(&mut self, r1: Register) {
+        let base = r1 as usize - 7;
+
+        let result = ((self.registers[base] as u16) << 8 | self.registers[base + 1] as u16) - 1;
+
+        self.registers[base] = (result >> 8) as u8;
+        self.registers[base + 1] = result as u8;
+    }
+
+    pub fn inc_register16(&mut self, r1: Register) {
+        let base = r1 as usize - 7;
+
+        let result = ((self.registers[base] as u16) << 8 | self.registers[base + 1] as u16) + 1;
+
+        self.registers[base] = (result >> 8) as u8;
+        self.registers[base + 1] = result as u8;
+    }
+
     pub fn hl(&self) -> u16 {
         (self.registers[Register::H as usize] as u16) << 8 | self.registers[Register::L as usize] as u16
-    }
-
-    pub fn bc(&self) -> u16 {
-        (self.registers[Register::B as usize] as u16) << 8 | self.registers[Register::C as usize] as u16
-    }
-
-    pub fn de(&self) -> u16 {
-        (self.registers[Register::D as usize] as u16) << 8 | self.registers[Register::E as usize] as u16
-    }
-
-    pub fn set_bc(&mut self, value: u16) {
-        self.registers[Register::B as usize] = (value >> 8) as u8;
-        self.registers[Register::C as usize] = value as u8;
-    }
-
-    pub fn set_de(&mut self, value: u16) {
-        self.registers[Register::D as usize] = (value >> 8) as u8;
-        self.registers[Register::E as usize] = value as u8;
-    }
-
-    pub fn set_hl(&mut self, value: u16) {
-        self.registers[Register::H as usize] = (value >> 8) as u8;
-        self.registers[Register::L as usize] = value as u8;
     }
 }
