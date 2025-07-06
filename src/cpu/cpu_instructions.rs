@@ -1,7 +1,7 @@
-use super::{Register, CPU};
+use super::{FlagRegister, Register, CPU};
 
 #[derive(Copy, Clone)]
-enum JumpFlags {
+pub enum JumpFlags {
     NoFlag,
     NZ,
     Z,
@@ -9,12 +9,14 @@ enum JumpFlags {
     C
 }
 
-enum IncrementMode {
+#[derive(Copy, Clone)]
+pub enum IncrementMode {
     Increment,
     Decrement
 }
 
-enum AluOp {
+#[derive(Copy, Clone)]
+pub enum AluOp {
     ADD,
     ADC,
     SUB,
@@ -80,7 +82,8 @@ pub const RP2_TABLE: [Register; 4] = [
     Register::AF
 ];
 
-enum LoadType {
+#[derive(Copy, Clone, Debug)]
+pub enum LoadType {
     Normal,
     LeftPointer,
     RightPointer
@@ -92,207 +95,315 @@ impl CPU {
     }
 
     pub fn stop(&mut self) {
-
+        todo!("stop command");
     }
 
     pub fn jr(&mut self, flag: JumpFlags) {
-        match flag {
+        let condition_met = match flag {
             JumpFlags::NoFlag => {
-
+                true
             }
             JumpFlags:: NZ => {
-
+                !self.f.contains(FlagRegister::ZERO)
             }
             JumpFlags::Z => {
-
+                self.f.contains(FlagRegister::ZERO)
             }
             JumpFlags::NC => {
-
+                !self.f.contains(FlagRegister::CARRY)
             }
             JumpFlags::C => {
-
+                self.f.contains(FlagRegister::CARRY)
             }
+        };
+
+        let signed_imm = self.bus.mem_read8(self.pc) as i8;
+
+        if condition_met {
+            self.pc = ((self.pc as i32) + 1 + signed_imm as i32) as u16;
+
+            println!("[CPU] [JR] [New PC: 0x{:x}]", self.pc);
+        } else {
+            println!("[CPU] [JR] [Not Met]");
+            self.pc += 1;
         }
     }
 
     pub fn ld_registers(&mut self, reg1: Register, reg2: Register, load_type: LoadType) {
-
+        todo!("ld_registers");
     }
 
     pub fn ld_immediate_sp(&mut self) {
-
+        todo!("ld_immediate_sp");
     }
 
     pub fn ld_immediate(&mut self, reg1: Register, load_type: LoadType) {
+        let immediate = if reg1 as usize > 6 {
+            // 16 bit value
+            let val = self.bus.mem_read16(self.pc);
+            self.pc += 2;
 
+            val
+        } else {
+            // 8 bit value
+            let val = self.bus.mem_read8(self.pc) as u16;
+            self.pc += 1;
+
+            val
+        };
+
+        match load_type {
+            LoadType::Normal => {
+                if reg1 as usize > 6 {
+                    match reg1 {
+                        Register::BC => self.set_bc(immediate),
+                        Register::DE => self.set_de(immediate),
+                        Register::HL => self.set_hl(immediate),
+                        _ => panic!("invalid option given: {:?}", reg1)
+                    }
+                } else {
+                    self.registers[reg1 as usize] = immediate as u8;
+                }
+            }
+            LoadType::LeftPointer => {
+                if reg1 as usize > 6 {
+                    panic!("invalid register given to ld_immediate with LeftPointer: {:?}", reg1);
+                } else {
+                    self.bus.mem_write8(immediate, self.registers[reg1 as usize]);
+                }
+            }
+            LoadType::RightPointer => {
+                if reg1 as usize > 6 {
+                    panic!("invalid register given to ld_immediate with RightPointer: {:?}", reg1);
+                } else {
+                    self.registers[reg1 as usize] = self.bus.mem_read8(immediate);
+                }
+            }
+        }
     }
 
     pub fn ld_upper(&mut self, reg1: Register, load_type: LoadType, use_c: bool) {
+        let offset = if use_c {
+            self.registers[Register::C as usize]
+        } else {
+            self.bus.mem_read8(self.pc)
+        };
 
+        self.pc += 1;
+
+        match load_type {
+            LoadType::LeftPointer => {
+                self.bus.mem_write8(0xff00 + offset as u16, self.registers[reg1 as usize]);
+            }
+            LoadType::RightPointer => {
+                self.registers[reg1 as usize] = self.bus.mem_read8(0xff00 + offset as u16);
+            }
+            _ => panic!("invalid load type for ld_upper given: {:?}", load_type)
+        }
     }
 
     pub fn add(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("add");
     }
 
     pub fn adc(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("adc");
     }
 
     pub fn sub(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("sub");
     }
 
     pub fn sbc(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("sbc");
     }
 
     pub fn and(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("and");
     }
 
     pub fn xor(&mut self, reg1: Register, reg2: Register) {
+        let value2 = if reg2 == Register::HLPointer {
+            self.bus.mem_read8(self.hl())
+        } else {
+            self.registers[reg2 as usize]
+        };
 
+        self.registers[reg1 as usize] = self.registers[reg1 as usize] ^ value2;
     }
 
     pub fn or(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("or");
     }
 
     pub fn cp(&mut self, reg1: Register, reg2: Register) {
-
+        todo!("cp");
     }
 
     pub fn add_imm(&mut self) {
-
+        todo!("add_imm");
     }
 
     pub fn adc_imm(&mut self) {
-
+        todo!("adc_imm");
     }
 
     pub fn sub_imm(&mut self) {
-
+        todo!("sub_imm");
     }
 
     pub fn sbc_imm(&mut self) {
-
+        todo!("sbc_imm");
     }
 
     pub fn and_imm(&mut self) {
-
+        todo!("and_imm");
     }
 
     pub fn xor_imm(&mut self) {
-
+        todo!("xor_imm");
     }
 
     pub fn or_imm(&mut self) {
-
+        todo!("or_imm");
     }
 
     pub fn cp_imm(&mut self) {
-
+        todo!("cp_imm");
     }
 
-    pub fn store_hl(&mut self, r1: Register, increment_mode: IncrementMode) {
+    pub fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) {
+        self.bus.mem_write8(self.hl(), self.registers[r1 as usize]);
 
+        match increment_mode {
+            IncrementMode::Decrement => self.set_hl(self.hl() - 1),
+            IncrementMode::Increment => self.set_hl(self.hl() + 1)
+        }
     }
 
-    pub fn load_hl(&mut self, r1: Register, increment_mode: IncrementMode) {
+    pub fn load_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) {
+        self.registers[r1 as usize] = self.bus.mem_read8(self.hl());
 
+        match increment_mode {
+            IncrementMode::Decrement => self.set_hl(self.hl() - 1),
+            IncrementMode::Increment => self.set_hl(self.hl() + 1)
+        }
     }
 
     pub fn load_hl_displacement(&mut self) {
-
+        todo!("load_hl_displacement");
     }
 
     pub fn inc(&mut self, r1: Register) {
-
+        todo!("inc");
     }
 
     pub fn dec(&mut self, r1: Register) {
-
+        if r1 as usize > 6 {
+            match r1 {
+                Register::BC => self.set_bc(self.bc() - 1),
+                Register::DE => self.set_de(self.de() - 1),
+                Register::HL => self.set_hl(self.hl() - 1),
+                Register::SP => self.sp -= 1,
+                _ => panic!("invalid option given to dec: {:?}", r1)
+            }
+        } else {
+            self.registers[r1 as usize] -= 1;
+        }
     }
 
     pub fn rlca(&mut self) {
-
+        todo!("rlca");
     }
 
     pub fn rrca(&mut self) {
-
+        todo!("rrca");
     }
 
     pub fn rra(&mut self) {
-
+        todo!("rra");
     }
 
     pub fn rla(&mut self) {
-
+        todo!("rla");
     }
 
     pub fn daa(&mut self) {
-
+        todo!("daa");
     }
 
     pub fn cpl(&mut self) {
-
+        todo!("cpl");
     }
 
     pub fn scf(&mut self) {
-
+        todo!("scf");
     }
 
     pub fn ccf(&mut self) {
-
+        todo!("ccf");
     }
 
     pub fn halt(&mut self) {
-
+        todo!("halt");
     }
 
     pub fn ret(&mut self, flags: JumpFlags) {
-
+        todo!("ret");
     }
 
     pub fn add_sp(&mut self) {
-
+        todo!("add_sp");
     }
 
     pub fn pop(&mut self, r1: Register) {
-
+        todo!("pop");
     }
 
     pub fn reti(&mut self) {
-
+        todo!("reti");
     }
 
     pub fn jp_hl(&mut self) {
-
+        todo!("jp_hl");
     }
 
     pub fn jp(&mut self, flags: JumpFlags) {
+        let condition_met = match flags {
+            JumpFlags::NoFlag => true,
+            JumpFlags::NC => !self.f.contains(FlagRegister::CARRY),
+            JumpFlags::Z => self.f.contains(FlagRegister::ZERO),
+            JumpFlags::NZ => !self.f.contains(FlagRegister::ZERO),
+            JumpFlags::C => self.f.contains(FlagRegister::CARRY)
+        };
 
+        let address = self.bus.mem_read16(self.pc);
+
+        if condition_met {
+            self.pc = address;
+        } else {
+            self.pc += 2;
+        }
     }
 
     pub fn ei(&mut self) {
-
+        todo!("ei");
     }
 
     pub fn di(&mut self) {
-
+        self.ime = false;
     }
 
     pub fn call(&mut self, flags: JumpFlags) {
-
+        todo!("call");
     }
 
     pub fn push(&mut self, r1: Register) {
-
+        todo!("push");
     }
 
     pub fn rst(&mut self, y: u8) {
-
+        todo!("rst");
     }
 
     pub fn decode_instruction(&mut self, instruction: u8) {
@@ -326,15 +437,15 @@ impl CPU {
                         0 => match p {
                             0 => self.ld_registers(Register::BC, Register::A, LoadType::LeftPointer),
                             1 => self.ld_registers(Register::DE, Register::A, LoadType::LeftPointer),
-                            2 => self.store_hl(Register::A, IncrementMode::Increment),
-                            3 => self.store_hl(Register::A, IncrementMode::Decrement),
+                            2 => self.store_hl_ptr(Register::A, IncrementMode::Increment),
+                            3 => self.store_hl_ptr(Register::A, IncrementMode::Decrement),
                             _ => unreachable!()
                         }
                         1 => match p {
                             0 => self.ld_registers(Register::A, Register::BC, LoadType::RightPointer),
                             1 => self.ld_registers(Register::A, Register::DE, LoadType::RightPointer),
-                            2 => self.load_hl(Register::A, IncrementMode::Increment),
-                            3 => self.load_hl(Register::A, IncrementMode::Decrement),
+                            2 => self.load_hl_ptr(Register::A, IncrementMode::Increment),
+                            3 => self.load_hl_ptr(Register::A, IncrementMode::Decrement),
                             _ => unreachable!()
                         }
                         _ => unreachable!()

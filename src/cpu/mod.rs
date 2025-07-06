@@ -13,22 +13,21 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Register {
     A = 0,
-    F = 1,
-    B = 2,
-    C = 3,
-    D = 4,
-    E = 5,
-    H = 6,
-    L = 7,
-    AF = 8,
-    BC = 10,
-    DE = 12,
-    HL = 14,
-    SP = 16,
-    HLPointer = 17
+    B = 1,
+    C = 2,
+    D = 3,
+    E = 4,
+    H = 5,
+    L = 6,
+    AF = 7,
+    BC = 9,
+    DE = 11,
+    HL = 13,
+    SP = 15,
+    HLPointer = 16
 }
 
 pub struct CPU {
@@ -37,7 +36,8 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     bus: Bus,
-    cycles: usize
+    cycles: usize,
+    ime: bool
 }
 
 impl CPU {
@@ -55,7 +55,8 @@ impl CPU {
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
-            cycles: 0
+            cycles: 0,
+            ime: true
         }
     }
 
@@ -71,5 +72,32 @@ impl CPU {
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
         self.bus.rom = bytes.to_vec();
+    }
+
+    pub fn hl(&self) -> u16 {
+        (self.registers[Register::H as usize] as u16) << 8 | self.registers[Register::L as usize] as u16
+    }
+
+    pub fn bc(&self) -> u16 {
+        (self.registers[Register::B as usize] as u16) << 8 | self.registers[Register::C as usize] as u16
+    }
+
+    pub fn de(&self) -> u16 {
+        (self.registers[Register::D as usize] as u16) << 8 | self.registers[Register::E as usize] as u16
+    }
+
+    pub fn set_bc(&mut self, value: u16) {
+        self.registers[Register::B as usize] = (value >> 8) as u8;
+        self.registers[Register::C as usize] = value as u8;
+    }
+
+    pub fn set_de(&mut self, value: u16) {
+        self.registers[Register::D as usize] = (value >> 8) as u8;
+        self.registers[Register::E as usize] = value as u8;
+    }
+
+    pub fn set_hl(&mut self, value: u16) {
+        self.registers[Register::H as usize] = (value >> 8) as u8;
+        self.registers[Register::L as usize] = value as u8;
     }
 }
