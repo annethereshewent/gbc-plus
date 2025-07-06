@@ -69,7 +69,7 @@ impl CPU {
 
     pub fn handle_interrupts(&mut self) {
         if self.bus.ime && (self.bus.IF.bits() & self.bus.ie.bits()) != 0 {
-            println!("interrupt happening! how exciting!");
+            panic!("interrupt happening! how exciting!");
         }
     }
 
