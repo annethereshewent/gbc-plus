@@ -9,7 +9,8 @@ pub struct GPU {
     pub scx: u8,
     pub stat: LCDStatusRegister,
     pub lcdc: LCDControlRegister,
-    pub line_y: u8
+    pub line_y: u8,
+    pub vram: Box<[u8]>
 }
 
 impl GPU {
@@ -19,7 +20,8 @@ impl GPU {
             scx: 0,
             stat: LCDStatusRegister::from_bits_truncate(0),
             lcdc: LCDControlRegister::from_bits_retain(0),
-            line_y: 0
+            line_y: 0,
+            vram: vec![0; 0x2000].into_boxed_slice()
         }
     }
 }

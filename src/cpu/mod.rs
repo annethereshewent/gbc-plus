@@ -70,7 +70,7 @@ impl CPU {
     }
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
-        self.bus.rom = bytes.to_vec();
+        self.bus.cartridge.rom = bytes.to_vec();
     }
 
     pub fn handle_interrupts(&mut self) {

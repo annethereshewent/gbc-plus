@@ -1,6 +1,6 @@
 use super::{FlagRegister, Register, CPU};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum JumpFlags {
     NoFlag,
     NZ,
@@ -116,6 +116,8 @@ impl CPU {
                 self.f.contains(FlagRegister::CARRY)
             }
         };
+
+        println!("condition = {:?}", flag);
 
         let signed_imm = self.bus.mem_read8(self.pc) as i8;
 
@@ -306,6 +308,7 @@ impl CPU {
     }
 
     pub fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) {
+        println!("hl = {:x}, value = {:x}", self.hl(), self.registers[r1 as usize]);
         self.bus.mem_write8(self.hl(), self.registers[r1 as usize]);
 
         match increment_mode {
@@ -341,7 +344,10 @@ impl CPU {
                 _ => panic!("invalid option given to dec: {:?}", r1)
             }
         } else {
+            println!("register {:?} = 0x{:x}", r1, self.registers[r1 as usize]);
             let result = self.registers[r1 as usize] - 1;
+
+            println!("result = {result}");
 
             self.f.set(FlagRegister::ZERO, result == 0);
             self.f.set(FlagRegister::SUBTRACT, true);
@@ -497,9 +503,9 @@ impl CPU {
                         _ => unreachable!()
                     }
                 }
-                4 => self.inc(R_TABLE[p as usize]),
-                5 => self.dec(R_TABLE[p as usize]),
-                6 => self.ld_immediate(R_TABLE[p as usize], LoadType::Normal),
+                4 => self.inc(R_TABLE[y as usize]),
+                5 => self.dec(R_TABLE[y as usize]),
+                6 => self.ld_immediate(R_TABLE[y as usize], LoadType::Normal),
                 7 => match y {
                     0 => self.rlca(),
                     1 => self.rrca(),

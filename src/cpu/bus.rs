@@ -1,3 +1,4 @@
+use cartridge::Cartridge;
 use gpu::{lcd_control_register::LCDControlRegister, lcd_status_register::LCDStatusRegister, GPU};
 use interrupt_register::InterruptRegister;
 
@@ -8,7 +9,7 @@ pub mod gpu;
 pub mod cartridge;
 
 pub struct Bus {
-    pub rom: Vec<u8>,
+    pub cartridge: Cartridge,
     wram: Box<[u8]>,
     hram: Box<[u8]>,
     pub ime: bool,
@@ -20,7 +21,7 @@ pub struct Bus {
 impl Bus {
     pub fn new() -> Self {
         Self {
-            rom: Vec::new(),
+            cartridge: Cartridge::new(),
             wram: vec![0; 0x2000].into_boxed_slice(),
             hram: vec![0; 0x7f].into_boxed_slice(),
             IF: InterruptRegister::from_bits_retain(0),
@@ -32,7 +33,7 @@ impl Bus {
 
     pub fn mem_read8(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x3fff => self.rom[address as usize],
+            0x0000..=0x3fff => self.cartridge.rom[address as usize],
             0xff44 => self.gpu.line_y,
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
         }
@@ -40,14 +41,17 @@ impl Bus {
 
     pub fn mem_read16(&self, address: u16) -> u16 {
         match address {
-            0x0000..=0x3fff => unsafe { *(&self.rom[address as usize] as *const u8 as *const u16) },
+            0x0000..=0x3fff => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) },
             _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
         }
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
-            0xa000..=0xbfff => todo!("external cartridge RAM"),
+            0x0000..=0x3fff => (), // TODO: ROM bank switching
+            0x4000..=0x7fff => (), // TODO: ROM bank switching
+            0x8000..=0x9fff => self.gpu.vram[(address - 0x8000) as usize] = value,
+            0xa000..=0xbfff => self.cartridge.write_ram(address - 0xa000, value),
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
             0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
