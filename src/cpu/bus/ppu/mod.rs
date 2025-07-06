@@ -1,8 +1,10 @@
+use bg_palette_register::BGPaletteRegister;
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
 
 pub mod lcd_status_register;
 pub mod lcd_control_register;
+pub mod bg_palette_register;
 
 const MODE2_CYCLES: usize = 80;
 const MODE3_CYCLES: usize = 172;
@@ -26,6 +28,7 @@ pub struct PPU {
     pub line_y: u8,
     pub vram: Box<[u8]>,
     pub cycles: usize,
+    pub bgp: BGPaletteRegister,
     mode: LCDMode
 }
 
@@ -39,7 +42,8 @@ impl PPU {
             mode: LCDMode::OAMScan,
             line_y: 0,
             vram: vec![0; 0x2000].into_boxed_slice(),
-            cycles: 0
+            cycles: 0,
+            bgp: BGPaletteRegister::new()
         }
     }
 

@@ -57,6 +57,7 @@ impl Bus {
             0xff41 => self.ppu.stat = LCDStatusRegister::from_bits_truncate(value),
             0xff42 => self.ppu.scy = value,
             0xff43 => self.ppu.scx = value,
+            0xff47 => self.ppu.bgp.write(value),
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
             _ => panic!("(mem_write8): invalid address given: 0x{:x}", address)
