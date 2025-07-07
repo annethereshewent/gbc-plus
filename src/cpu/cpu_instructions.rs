@@ -531,7 +531,9 @@ impl CPU {
     }
 
     pub fn ei(&mut self) -> usize {
-        todo!("ei");
+        self.bus.ime = true;
+
+        4
     }
 
     pub fn di(&mut self) -> usize {

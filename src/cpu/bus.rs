@@ -72,6 +72,7 @@ impl Bus {
             0xff14 => self.apu.nr14.write(value),
             0xff17 => self.apu.nr22.write(value),
             0xff19 => self.apu.nr24.write(value),
+            0xff1a => self.apu.write_dac_enable(value),
             0xff21 => self.apu.nr42.write(value),
             0xff23 => self.apu.nr44.write(value),
             0xff24 => self.apu.nr50.write(value),

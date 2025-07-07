@@ -84,8 +84,8 @@ impl PPU {
     }
 
     fn handle_vblank(&mut self) {
-        if self.cycles >= 456 {
-            self.cycles -= 456;
+        if self.cycles >= MODE1_CYCLES {
+            self.cycles -= MODE1_CYCLES;
 
             self.line_y += 1;
 

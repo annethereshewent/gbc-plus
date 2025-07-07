@@ -18,7 +18,8 @@ pub struct APU {
     pub nr14: ChannelPeriodHighControlRegister,
     pub nr24: ChannelPeriodHighControlRegister,
     pub nr44: Channel4ControlRegister,
-    pub nr10: ChannelSweepRegister
+    pub nr10: ChannelSweepRegister,
+    pub dac_enable: bool
 }
 
 impl APU {
@@ -33,7 +34,17 @@ impl APU {
             nr14: ChannelPeriodHighControlRegister::new(),
             nr24: ChannelPeriodHighControlRegister::new(),
             nr44: Channel4ControlRegister::new(),
-            nr10: ChannelSweepRegister::new()
+            nr10: ChannelSweepRegister::new(),
+            dac_enable: false
+        }
+    }
+
+    pub fn write_dac_enable(&mut self, value: u8) {
+        let previous_enable = self.dac_enable;
+        self.dac_enable = (value >> 7) & 0x1 == 1;
+
+        if previous_enable && !self.dac_enable {
+            todo!("disable channel 3")
         }
     }
 }
