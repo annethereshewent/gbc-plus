@@ -27,9 +27,7 @@ impl CPU {
     }
 
     fn diss_jp(&self, flag: JumpFlags) -> String {
-        let displacement = self.bus.mem_read8(self.pc) as i8;
-
-        let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 1);
+        let address = self.bus.mem_read16(self.pc);
 
         let condition_met = match flag {
             JumpFlags::C => self.f.contains(FlagRegister::CARRY),
@@ -39,7 +37,7 @@ impl CPU {
             JumpFlags::NC => !self.f.contains(FlagRegister::CARRY),
         };
 
-        format!("JP {} {operand} (branch: {})", flag.to_string(), if condition_met { "yes" } else { "no" })
+        format!("JP {} 0x{:x} (branch: {})", flag.to_string(), address, if condition_met { "yes" } else { "no" })
     }
 
     fn diss_ld_immediate(&self, reg1: Register, load_type: LoadType) -> String {
