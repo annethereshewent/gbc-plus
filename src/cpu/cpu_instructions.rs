@@ -234,10 +234,12 @@ impl CPU {
         let (offset, cycles) = if use_c {
             (self.registers[Register::C as usize], 8)
         } else {
-            (self.bus.mem_read8(self.pc), 12)
-        };
+            let (offset, cycles) = (self.bus.mem_read8(self.pc), 12);
 
-        self.pc += 1;
+            self.pc += 1;
+
+            (offset, cycles)
+        };
 
         match load_type {
             LoadType::LeftPointer => {

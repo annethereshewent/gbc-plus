@@ -62,6 +62,16 @@ impl Bus {
         }
     }
 
+    pub fn handle_dma(&mut self, value: u8) {
+        let address = (value as u16) << 8;
+
+        for i in (0..0xa0) {
+            self.mem_write8(0xfe00 + i, self.mem_read8(address + i));
+        }
+
+        // TODO: add cycles, probably need to refactor this code
+    }
+
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x3fff => (), // TODO: ROM bank switching
@@ -89,6 +99,7 @@ impl Bus {
             0xff41 => self.ppu.stat = LCDStatusRegister::from_bits_truncate(value),
             0xff42 => self.ppu.scy = value,
             0xff43 => self.ppu.scx = value,
+            0xff46 => self.handle_dma(value),
             0xff47 => self.ppu.bgp.write(value),
             0xff48 => self.ppu.obp0.write(value),
             0xff49 => self.ppu.obp1.write(value),
