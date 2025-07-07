@@ -54,6 +54,20 @@ impl CPU {
         }
     }
 
+    pub fn push_to_stack(&mut self, value: u16) {
+        self.sp -= 2;
+
+        self.bus.mem_write16(self.sp, value);
+    }
+
+    pub fn pop_from_stack(&mut self) -> u16 {
+        let value = self.bus.mem_read16(self.sp);
+
+        self.sp += 2;
+
+        value
+    }
+
     pub fn step(&mut self) {
         self.handle_interrupts();
         let opcode = self.bus.mem_read8(self.pc);

@@ -1,6 +1,6 @@
 use super::{FlagRegister, Register, CPU};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum JumpFlags {
     NoFlag,
     NZ,
@@ -144,7 +144,17 @@ impl CPU {
     }
 
     pub fn ld_registers(&mut self, reg1: Register, reg2: Register, load_type: LoadType) -> usize {
-        todo!("ld_registers");
+        let cycles = if reg1 == Register::SP {
+            self.sp = self.hl();
+
+            8
+        } else {
+            self.registers[reg1 as usize] = self.registers[reg2 as usize];
+
+            4
+        };
+
+        cycles
     }
 
     pub fn ld_immediate_sp(&mut self) -> usize {
@@ -295,7 +305,36 @@ impl CPU {
     }
 
     pub fn or(&mut self, register: Option<Register>) -> usize {
-        todo!("or");
+
+        let cycles = if let Some(register) = register {
+            if register == Register::HLPointer {
+                let value = self.bus.mem_read8(self.hl());
+
+                let result = self.registers[Register::A as usize] | value;
+
+                self.bus.mem_write8(self.hl(), result);
+                8
+            } else {
+
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] | self.registers[register as usize];
+
+
+                self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+                self.f.set(FlagRegister::SUBTRACT, false);
+                self.f.set(FlagRegister::HALF_CARRY, false);
+                self.f.set(FlagRegister::CARRY, false);
+                4
+            }
+        } else {
+            let value = self.bus.mem_read8(self.pc);
+            self.pc += 1;
+
+            self.registers[Register::A as usize] = self.registers[Register::A as usize] | value;
+
+            8
+        };
+
+        cycles
     }
 
     pub fn cp(&mut self, register: Option<Register>) -> usize {
@@ -426,7 +465,29 @@ impl CPU {
     }
 
     pub fn ret(&mut self, flags: JumpFlags) -> usize {
-        todo!("ret");
+        let condition_met = match flags {
+            JumpFlags::NoFlag => true,
+            JumpFlags::C => self.f.contains(FlagRegister::CARRY),
+            JumpFlags::NC => !self.f.contains(FlagRegister::CARRY),
+            JumpFlags::Z => self.f.contains(FlagRegister::ZERO),
+            JumpFlags::NZ => !self.f.contains(FlagRegister::ZERO)
+        };
+
+        let cycles = if condition_met {
+            if flags == JumpFlags::NoFlag {
+                16
+            } else {
+                20
+            }
+        } else {
+            8
+        };
+
+        if condition_met {
+            self.pc = self.pop_from_stack();
+        }
+
+        cycles
     }
 
     pub fn add_sp(&mut self) -> usize {
@@ -480,7 +541,15 @@ impl CPU {
     }
 
     pub fn call(&mut self, flags: JumpFlags) -> usize {
-        todo!("call");
+        let address = self.bus.mem_read16(self.pc);
+
+        self.pc += 2;
+
+        self.push_to_stack(self.pc);
+
+        self.pc = address;
+
+        24
     }
 
     pub fn push(&mut self, r1: Register) -> usize {

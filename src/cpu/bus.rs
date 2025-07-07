@@ -35,7 +35,7 @@ impl Bus {
 
     pub fn mem_read8(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x3fff => self.cartridge.rom[address as usize],
+            0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
             0xff44 => self.ppu.line_y,
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
         }
@@ -43,8 +43,16 @@ impl Bus {
 
     pub fn mem_read16(&self, address: u16) -> u16 {
         match address {
-            0x0000..=0x3fff => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) },
+            0x0000..=0x7fff => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }, // TODO: implement banks
+            0xc000..=0xdfff => unsafe { *(&self.wram[(address - 0xc000) as usize] as *const u8 as *const u16) },
             _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
+        }
+    }
+
+    pub fn mem_write16(&mut self, address: u16, value: u16) {
+        match address {
+            0xc000..=0xdfff => unsafe { *(&mut self.wram[(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
+            _ => panic!("(mem_write16): invalid address given: 0x{:x}", address)
         }
     }
 
@@ -55,8 +63,17 @@ impl Bus {
             0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize] = value,
             0xa000..=0xbfff => self.cartridge.write_ram(address - 0xa000, value),
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
+            0xfe00..=0xfe9f => self.ppu.write_oam(address, value),
+            0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
             0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
+            0xff10 => self.apu.nr10.write(value),
+            0xff12 => self.apu.nr12.write(value),
+            0xff14 => self.apu.nr14.write(value),
+            0xff17 => self.apu.nr22.write(value),
+            0xff19 => self.apu.nr24.write(value),
+            0xff21 => self.apu.nr42.write(value),
+            0xff23 => self.apu.nr44.write(value),
             0xff24 => self.apu.nr50.write(value),
             0xff25 => self.apu.nr51 = SoundPanningRegister::from_bits_retain(value),
             0xff26 => self.apu.nr52.write(value),
@@ -67,6 +84,7 @@ impl Bus {
             0xff47 => self.ppu.bgp.write(value),
             0xff48 => self.ppu.obp0.write(value),
             0xff49 => self.ppu.obp1.write(value),
+            0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
             _ => panic!("(mem_write8): invalid address given: 0x{:x}", address)

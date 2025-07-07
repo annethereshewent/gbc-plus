@@ -130,7 +130,7 @@ impl CPU {
     }
 
     fn diss_ret(&self, cond: JumpFlags) -> String {
-        format!("RET {:?}", cond)
+        format!("RET {}", cond.to_string())
     }
 
     fn diss_add_sp(&self) -> String {
@@ -158,7 +158,8 @@ impl CPU {
     }
 
     fn diss_call(&self, cond: JumpFlags) -> String {
-        format!("CALL {:?}", cond)
+        let address = self.bus.mem_read16(self.pc);
+        format!("CALL {} 0x{:x}", cond.to_string(), address)
     }
 
     pub fn disassemble(&self, instruction: u8) -> String {

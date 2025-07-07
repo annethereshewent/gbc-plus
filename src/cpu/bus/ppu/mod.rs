@@ -1,12 +1,14 @@
 use bg_palette_register::BGPaletteRegister;
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
+use oam_entry::OAMEntry;
 use obj_palette_register::ObjPaletteRegister;
 
 pub mod lcd_status_register;
 pub mod lcd_control_register;
 pub mod bg_palette_register;
 pub mod obj_palette_register;
+pub mod oam_entry;
 
 const MODE2_CYCLES: usize = 80;
 const MODE3_CYCLES: usize = 172;
@@ -33,7 +35,8 @@ pub struct PPU {
     pub bgp: BGPaletteRegister,
     mode: LCDMode,
     pub obp0: ObjPaletteRegister,
-    pub obp1: ObjPaletteRegister
+    pub obp1: ObjPaletteRegister,
+    pub oam: [OAMEntry; 0xa0]
 }
 
 impl PPU {
@@ -49,7 +52,8 @@ impl PPU {
             cycles: 0,
             bgp: BGPaletteRegister::new(),
             obp0: ObjPaletteRegister::new(),
-            obp1: ObjPaletteRegister::new()
+            obp1: ObjPaletteRegister::new(),
+            oam: [OAMEntry::new(); 0xa0]
         }
     }
 
@@ -117,6 +121,22 @@ impl PPU {
         } else if !previous_enable && self.lcdc.contains(LCDControlRegister::LCD_AND_PPU_ENABLE) {
             // set to mode 2
             self.mode = LCDMode::OAMScan;
+        }
+    }
+
+    pub fn write_oam(&mut self, address: u16, value: u8) {
+        let oam_index = (address - 0xfe00) / 4;
+
+        let offset = (address - 0xfe00) & 0x3;
+
+        let oam = &mut self.oam[oam_index as  usize];
+
+        match offset {
+            0 => oam.y_position = value,
+            1 => oam.x_position = value,
+            2 => oam.tile_index = value,
+            3 => oam.attributes = value,
+            _ => unreachable!()
         }
     }
 }
