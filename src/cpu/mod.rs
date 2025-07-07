@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bitflags::bitflags;
 use bus::{interrupt_register::InterruptRegister, Bus};
 use timer::Timer;
@@ -39,7 +41,8 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     bus: Bus,
-    timer: Timer
+    timer: Timer,
+    found: HashSet<u16>
 }
 
 impl CPU {
@@ -50,7 +53,8 @@ impl CPU {
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
-            timer: Timer::new()
+            timer: Timer::new(),
+            found: HashSet::new()
         }
     }
 
@@ -74,7 +78,10 @@ impl CPU {
 
         self.pc += 1;
 
-        println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
+        if !self.found.contains(&(self.pc - 1)) {
+            println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
+            self.found.insert(self.pc - 1);
+        }
 
         let cycles = self.decode_instruction(opcode);
 
