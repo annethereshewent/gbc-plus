@@ -13,7 +13,7 @@ impl CPU {
     fn diss_jr(&self, flag: JumpFlags) -> String {
         let displacement = self.bus.mem_read8(self.pc) as i8;
 
-        let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 2);
+        let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 1);
 
         let condition_met = match flag {
             JumpFlags::C => self.f.contains(FlagRegister::CARRY),
@@ -29,7 +29,7 @@ impl CPU {
     fn diss_jp(&self, flag: JumpFlags) -> String {
         let displacement = self.bus.mem_read8(self.pc) as i8;
 
-        let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 2);
+        let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 1);
 
         let condition_met = match flag {
             JumpFlags::C => self.f.contains(FlagRegister::CARRY),
