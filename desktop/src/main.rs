@@ -62,6 +62,14 @@ fn main() {
             cpu.step();
         }
 
+        cpu.bus.ppu.frame_finished = false;
+
+        texture.update(None, &cpu.bus.ppu.picture.data, SCREEN_WIDTH as usize * 3).unwrap();
+
+        canvas.copy(&texture, None, None).unwrap();
+
+        canvas.present();
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => std::process::exit(0),

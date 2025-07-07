@@ -1,8 +1,9 @@
-use bg_palette_register::BGPaletteRegister;
+use bg_palette_register::{BGColor, BGPaletteRegister};
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
 use oam_entry::OAMEntry;
 use obj_palette_register::ObjPaletteRegister;
+use picture::{Color, Picture};
 
 use super::interrupt_register::InterruptRegister;
 
@@ -11,6 +12,7 @@ pub mod lcd_control_register;
 pub mod bg_palette_register;
 pub mod obj_palette_register;
 pub mod oam_entry;
+pub mod picture;
 
 const MODE2_CYCLES: usize = 80;
 const MODE3_CYCLES: usize = 172;
@@ -44,7 +46,8 @@ pub struct PPU {
     pub obp0: ObjPaletteRegister,
     pub obp1: ObjPaletteRegister,
     pub oam: [OAMEntry; 0xa0],
-    pub frame_finished: bool
+    pub frame_finished: bool,
+    pub picture: Picture
 }
 
 impl PPU {
@@ -64,7 +67,8 @@ impl PPU {
             obp0: ObjPaletteRegister::new(),
             obp1: ObjPaletteRegister::new(),
             oam: [OAMEntry::new(); 0xa0],
-            frame_finished: false
+            frame_finished: false,
+            picture: Picture::new()
         }
     }
 
@@ -103,6 +107,89 @@ impl PPU {
         }
     }
 
+    fn draw_line(&mut self) {
+        self.draw_background();
+        self.draw_objects();
+    }
+
+    fn draw_background(&mut self) {
+        let base_tilemap_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_TILEMAP) {
+            0x9800
+        } else {
+            0x9c00
+        };
+
+        let base_tile_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_AND_WINDOW_TILES) {
+            0x9000
+        } else {
+            0x8000
+        };
+
+        let scroll_x = self.scx;
+        let scroll_y = self.scy;
+        let y = self.line_y;
+
+        let base_tile = ((scroll_y as usize + y as usize) / 8) * 32 + scroll_x as usize / 8;
+
+        // println!("base_tile = {base_tile}");
+
+        for x in 0..SCREEN_WIDTH {
+            if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
+                let tile_number = base_tile + x / 8;
+
+                let tilemap_address = base_tilemap_address as usize + tile_number;
+
+                let tile_id = self.vram_read8(tilemap_address);
+
+                let x_in_tile = (x as usize + scroll_x as usize) % 8;
+                let y_in_tile = (y as usize + scroll_y as usize) % 8;
+
+                let tile_address = if base_tile_address == 0x8000 {
+                    base_tile_address + tile_id as usize * 16 + y_in_tile * 2
+                } else {
+                    let offset = (tile_id as i32 - 128) * 16 + y_in_tile as i32 * 2;
+
+                    (base_tile_address as i32 + offset) as usize
+                };
+
+                let lower_byte = self.vram_read8(tile_address);
+                let upper_byte = self.vram_read8(tile_address + 1);
+
+                let palette_index = ((upper_byte >> (7 - x_in_tile)) & 0x1) << 1 | (lower_byte >> (7 - x_in_tile)) & 0x1;
+
+                let color = self.bgp.indexes[palette_index as usize];
+
+                let pixel = match color {
+                    BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
+                    BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
+                    BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
+                    BGColor::Black => Color::new(0x15, 0x56, 0x15)
+                };
+
+                self.picture.set_pixel(x, y as usize, pixel);
+            } else {
+                let color = self.bgp.indexes[0];
+
+                let pixel = match color {
+                    BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
+                    BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
+                    BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
+                    BGColor::Black => Color::new(0x15, 0x56, 0x15)
+                };
+
+                self.picture.set_pixel(x, y as usize, pixel);
+            }
+        }
+    }
+
+    fn vram_read8(&self, address: usize) -> u8 {
+        self.vram[address - 0x8000]
+    }
+
+    fn draw_objects(&mut self) {
+
+    }
+
     fn handle_vblank(&mut self, interrupt_register: &mut InterruptRegister) {
         if self.cycles >= MODE1_CYCLES {
             self.cycles -= MODE1_CYCLES;
@@ -136,6 +223,8 @@ impl PPU {
             if self.stat.contains(LCDStatusRegister::MODE0) {
                 interrupt_register.set(InterruptRegister::LCD, true);
             }
+
+            self.draw_line();
 
             self.mode = LCDMode::HBlank;
         }

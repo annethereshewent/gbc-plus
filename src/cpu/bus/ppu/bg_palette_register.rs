@@ -1,4 +1,6 @@
 
+
+#[derive(Copy, Clone)]
 pub enum BGColor {
     White = 0,
     LightGray = 1,
@@ -7,27 +9,20 @@ pub enum BGColor {
 }
 
 pub struct BGPaletteRegister {
-    pub id0: BGColor,
-    pub id1: BGColor,
-    pub id2: BGColor,
-    pub id3: BGColor
+    pub indexes: [BGColor; 4]
 }
 
 
 impl BGPaletteRegister {
     pub fn write(&mut self, value: u8) {
-        self.id0 = Self::get_id_color(value & 0x3);
-        self.id1 = Self::get_id_color((value >> 2) & 0x3);
-        self.id2 = Self::get_id_color((value >> 4) & 0x3);
-        self.id3 = Self::get_id_color((value >> 6) & 0x3);
+        for i in 0..self.indexes.len() {
+            self.indexes[i] = Self::get_id_color((value >> (i * 2)) & 0x3);
+        }
     }
 
     pub fn new() -> Self {
         Self {
-            id0: BGColor::White,
-            id1: BGColor::White,
-            id2: BGColor::White,
-            id3: BGColor::White
+            indexes: [BGColor::White; 4]
         }
     }
 
