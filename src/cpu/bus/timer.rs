@@ -13,11 +13,11 @@ impl TimerControl {
 }
 
 pub struct Timer {
-    div: u8,
-    tima: u8,
-    tma: u8,
-    tac: TimerControl,
-    interval: usize
+    pub div: u8,
+    pub tima: u8,
+    pub tma: u8,
+    pub tac: TimerControl,
+    pub interval: usize
 }
 
 impl Timer {

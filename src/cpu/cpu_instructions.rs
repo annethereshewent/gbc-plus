@@ -501,7 +501,9 @@ impl CPU {
     }
 
     pub fn cpl(&mut self) -> usize {
-        todo!("cpl");
+        self.registers[Register::A as usize] = !self.registers[Register::A as usize];
+
+        4
     }
 
     pub fn scf(&mut self) -> usize {
@@ -551,11 +553,22 @@ impl CPU {
     }
 
     pub fn pop(&mut self, r1: Register) -> usize {
-        todo!("pop");
+        let value = self.pop_from_stack();
+
+        if r1 == Register::AF {
+            self.f = FlagRegister::from_bits_retain(value as u8);
+            self.registers[Register::A as usize] = (value >> 8) as u8;
+        } else {
+            self.set_register16(r1, value);
+        }
+
+        12
     }
 
     pub fn reti(&mut self) -> usize {
-        todo!("reti");
+        self.bus.ime = true;
+
+        self.ret(JumpFlags::NoFlag)
     }
 
     pub fn jp_hl(&mut self) -> usize {

@@ -27,6 +27,8 @@ pub enum LCDMode {
 pub struct PPU {
     pub scy: u8,
     pub scx: u8,
+    pub wx: u8,
+    pub wy: u8,
     pub stat: LCDStatusRegister,
     pub lcdc: LCDControlRegister,
     pub line_y: u8,
@@ -44,6 +46,8 @@ impl PPU {
         Self {
             scy: 0,
             scx: 0,
+            wy: 0,
+            wx: 0,
             stat: LCDStatusRegister::from_bits_truncate(0),
             lcdc: LCDControlRegister::from_bits_retain(0),
             mode: LCDMode::OAMScan,

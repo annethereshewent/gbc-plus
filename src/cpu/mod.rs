@@ -2,12 +2,10 @@ use std::collections::HashSet;
 
 use bitflags::bitflags;
 use bus::{interrupt_register::InterruptRegister, Bus};
-use timer::Timer;
 
 pub mod bus;
 pub mod cpu_instructions;
 pub mod disassembler;
-pub mod timer;
 
 bitflags! {
     pub struct FlagRegister: u8 {
@@ -41,7 +39,6 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     bus: Bus,
-    timer: Timer,
     found: HashSet<u16>
 }
 
@@ -53,7 +50,6 @@ impl CPU {
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
-            timer: Timer::new(),
             found: HashSet::new()
         }
     }
@@ -85,18 +81,12 @@ impl CPU {
 
         let cycles = self.decode_instruction(opcode);
 
-        self.bus.ppu.tick(cycles);
-        self.timer.tick(cycles);
+        self.bus.tick(cycles);
 
     }
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
         self.bus.cartridge.rom = bytes.to_vec();
-    }
-
-    pub fn tick(&mut self, cycles: usize) {
-        self.timer.tick(cycles);
-        self.bus.ppu.tick(cycles);
     }
 
     pub fn handle_interrupts(&mut self) {
@@ -108,11 +98,11 @@ impl CPU {
 
             let temp = InterruptRegister::from_bits_retain(fired_interrupts);
 
-            self.tick(8);
+            self.bus.tick(8);
 
             self.push_to_stack(self.pc);
 
-            self.tick(8);
+            self.bus.tick(8);
 
             if temp.contains(InterruptRegister::VBLANK) {
                 self.pc = 0x40;
@@ -126,7 +116,7 @@ impl CPU {
                 self.pc = 0x60;
             }
 
-            self.tick(4);
+            self.bus.tick(4);
         }
     }
 

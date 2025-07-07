@@ -3,11 +3,13 @@ use cartridge::Cartridge;
 use joypad::Joypad;
 use ppu::{lcd_status_register::LCDStatusRegister, PPU};
 use interrupt_register::InterruptRegister;
+use timer::Timer;
 
 pub mod interrupt_register;
 pub mod ppu;
 pub mod cartridge;
 pub mod apu;
+pub mod timer;
 pub mod joypad;
 
 pub struct Bus {
@@ -19,7 +21,8 @@ pub struct Bus {
     pub ie: InterruptRegister,
     pub ppu: PPU,
     pub apu: APU,
-    pub joypad: Joypad
+    pub joypad: Joypad,
+    pub timer: Timer,
 }
 
 impl Bus {
@@ -33,14 +36,22 @@ impl Bus {
             ime: true,
             ppu: PPU::new(),
             apu: APU::new(),
-            joypad: Joypad::new()
+            joypad: Joypad::new(),
+            timer: Timer::new()
         }
     }
+
+    pub fn tick(&mut self, cycles: usize) {
+        self.timer.tick(cycles);
+        self.ppu.tick(cycles);
+    }
+
 
     pub fn mem_read8(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
+            0xff00 => self.joypad.read(),
             0xff44 => self.ppu.line_y,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
@@ -70,6 +81,7 @@ impl Bus {
         }
 
         // TODO: add cycles, probably need to refactor this code
+        self.tick(640);
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
@@ -83,6 +95,7 @@ impl Bus {
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
             0xff00 => self.joypad.write(value),
             0xff01..=0xff02 => (), // Serial ports, ignore!
+            0xff06 => self.timer.tma = value,
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
             0xff10 => self.apu.nr10.write(value),
             0xff12 => self.apu.nr12.write(value),
@@ -103,6 +116,8 @@ impl Bus {
             0xff47 => self.ppu.bgp.write(value),
             0xff48 => self.ppu.obp0.write(value),
             0xff49 => self.ppu.obp1.write(value),
+            0xff4a => self.ppu.wy = value,
+            0xff4b => self.ppu.wx = value,
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
