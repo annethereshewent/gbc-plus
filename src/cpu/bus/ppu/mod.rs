@@ -17,6 +17,9 @@ const MODE3_CYCLES: usize = 172;
 const MODE0_CYCLES: usize = 204;
 const MODE1_CYCLES: usize = 456;
 
+pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_HEIGHT: usize = 144;
+
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum LCDMode {
@@ -40,7 +43,8 @@ pub struct PPU {
     mode: LCDMode,
     pub obp0: ObjPaletteRegister,
     pub obp1: ObjPaletteRegister,
-    pub oam: [OAMEntry; 0xa0]
+    pub oam: [OAMEntry; 0xa0],
+    pub frame_finished: bool
 }
 
 impl PPU {
@@ -59,7 +63,8 @@ impl PPU {
             bgp: BGPaletteRegister::new(),
             obp0: ObjPaletteRegister::new(),
             obp1: ObjPaletteRegister::new(),
-            oam: [OAMEntry::new(); 0xa0]
+            oam: [OAMEntry::new(); 0xa0],
+            frame_finished: false
         }
     }
 
@@ -108,6 +113,8 @@ impl PPU {
                 if self.stat.contains(LCDStatusRegister::MODE2) {
                     interrupt_register.set(InterruptRegister::LCD, true);
                 }
+                self.frame_finished = true;
+
                 self.mode = LCDMode::OAMScan;
                 self.line_y = 0;
             }

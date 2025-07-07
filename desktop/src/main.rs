@@ -1,0 +1,84 @@
+use std::{env, fs};
+
+extern crate gbc_plus;
+
+use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
+use sdl2::{audio::AudioSpecDesired, event::Event, pixels::PixelFormatEnum};
+
+fn main() {
+    let mut cpu = CPU::new();
+
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        panic!("syntax: ./gbc-plus <rom name>");
+    }
+
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+
+    let game_controller_subsystem = sdl_context.game_controller().unwrap();
+
+    let available = game_controller_subsystem
+        .num_joysticks()
+        .map_err(|e| format!("can't enumerate joysticks: {}", e)).unwrap();
+
+    let _controller = (0..available)
+        .find_map(|id| {
+        match game_controller_subsystem.open(id) {
+            Ok(c) => {
+                Some(c)
+            }
+            Err(_) => {
+                None
+            }
+        }
+    });
+
+    let window = video_subsystem
+        .window("GBC+", (SCREEN_WIDTH * 3) as u32, (SCREEN_HEIGHT * 3) as u32)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+    canvas.set_scale(3.0, 3.0).unwrap();
+
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    let creator = canvas.texture_creator();
+    let mut texture = creator
+        .create_texture_target(PixelFormatEnum::RGB24, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
+        .unwrap();
+
+    let rom_path = &args[1];
+
+    let rom_bytes = fs::read(rom_path).unwrap();
+
+    cpu.load_rom(&rom_bytes);
+
+    loop {
+        while !cpu.bus.ppu.frame_finished {
+            cpu.step();
+        }
+
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => std::process::exit(0),
+                Event::KeyDown { keycode, .. } => {
+
+                }
+                Event::KeyUp { keycode, .. } => {
+
+                }
+                Event::JoyButtonDown { button_idx, .. } => {
+
+                }
+                Event::JoyButtonUp { button_idx, .. } => {
+
+                }
+                _ => { /* do nothing */ }
+            }
+        }
+    }
+}

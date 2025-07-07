@@ -1,0 +1,10 @@
+[package]
+name = "gbc-plus-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.gbc-plus]
+path = "../"
+
+[dependencies]
+sdl2 = "0.37"
