@@ -273,35 +273,61 @@ impl CPU {
     }
 
     pub fn and(&mut self, register: Option<Register>) -> usize {
-        todo!("and");
-    }
-
-    pub fn xor(&mut self, register: Option<Register>) -> usize {
-        let (value2, cycles) = if let Some(register) = register {
+        let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
-                (self.bus.mem_read8(self.hl()), 8)
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] & self.bus.mem_read8(self.hl());
+
+                8
             } else {
-                (self.registers[register as usize], 4)
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] & self.registers[register as usize];
+
+                self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+                self.f.set(FlagRegister::SUBTRACT, false);
+                self.f.set(FlagRegister::HALF_CARRY, true);
+                self.f.set(FlagRegister::CARRY, false);
+
+                4
             }
         } else {
-            (self.bus.mem_read8(self.pc), 8)
-        };
+            let value = self.bus.mem_read8(self.pc);
 
-        self.registers[Register::A as usize] = self.xor_(self.registers[Register::A as usize], value2);
+            self.pc += 1;
+
+            self.registers[Register::A as usize] = self.registers[Register::A as usize] & value;
+
+            8
+        };
 
         cycles
     }
 
-    fn xor_(&mut self, val1: u8, val2: u8) -> u8 {
-        let result = val1 ^ val2;
+    pub fn xor(&mut self, register: Option<Register>) -> usize {
+        let cycles = if let Some(register) = register {
+            if register == Register::HLPointer {
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] ^ self.bus.mem_read8(self.hl());
 
-        self.f.set(FlagRegister::SUBTRACT, false);
-        self.f.set(FlagRegister::HALF_CARRY, false);
-        self.f.set(FlagRegister::CARRY, false);
-        self.f.set(FlagRegister::ZERO, result == 0);
+                8
+            } else {
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] ^ self.registers[register as usize];
 
-        result
+                self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+                self.f.set(FlagRegister::SUBTRACT, false);
+                self.f.set(FlagRegister::HALF_CARRY, false);
+                self.f.set(FlagRegister::CARRY, false);
 
+                4
+            }
+        } else {
+            let value = self.bus.mem_read8(self.pc);
+
+            self.pc += 1;
+
+            self.registers[Register::A as usize] = self.registers[Register::A as usize] ^ value;
+
+            8
+        };
+
+        cycles
     }
 
     pub fn or(&mut self, register: Option<Register>) -> usize {
@@ -397,7 +423,31 @@ impl CPU {
     }
 
     pub fn inc(&mut self, r1: Register) -> usize {
-        todo!("inc");
+        let cycles = if r1 as usize > 6 {
+            if r1 != Register::HLPointer {
+                self.inc_register16(r1);
+
+                8
+            } else {
+                let val = self.bus.mem_read8(self.hl());
+
+                self.bus.mem_write8(self.hl(), val + 1);
+
+                12
+            }
+        } else {
+            let result = self.registers[r1 as usize] + 1;
+
+            self.f.set(FlagRegister::ZERO, result == 0);
+            self.f.set(FlagRegister::SUBTRACT, true);
+            self.f.set(FlagRegister::HALF_CARRY, (result & 0xf) > (self.registers[r1 as usize] & 0xf));
+
+            self.registers[r1 as usize] = result;
+
+            4
+        };
+
+        cycles
     }
 
     pub fn dec(&mut self, r1: Register) -> usize {
@@ -453,11 +503,15 @@ impl CPU {
     }
 
     pub fn scf(&mut self) -> usize {
-        todo!("scf");
+        self.f.set(FlagRegister::CARRY, !self.f.contains(FlagRegister::CARRY));
+
+        4
     }
 
     pub fn ccf(&mut self) -> usize {
-        todo!("ccf");
+        self.f.set(FlagRegister::CARRY, false);
+
+        4
     }
 
     pub fn halt(&mut self) -> usize {
@@ -555,7 +609,14 @@ impl CPU {
     }
 
     pub fn push(&mut self, r1: Register) -> usize {
-        todo!("push");
+        let value = if r1 == Register::AF {
+            (self.registers[Register::A as usize] as u16) << 8 | self.f.bits() as u16
+        } else {
+            self.get_register16(r1)
+        };
+        self.push_to_stack(value);
+
+        16
     }
 
     pub fn rst(&mut self, y: u8) -> usize {

@@ -1,5 +1,6 @@
 use apu::{sound_panning_register::SoundPanningRegister, APU};
 use cartridge::Cartridge;
+use joypad::Joypad;
 use ppu::{lcd_status_register::LCDStatusRegister, PPU};
 use interrupt_register::InterruptRegister;
 
@@ -7,6 +8,7 @@ pub mod interrupt_register;
 pub mod ppu;
 pub mod cartridge;
 pub mod apu;
+pub mod joypad;
 
 pub struct Bus {
     pub cartridge: Cartridge,
@@ -16,7 +18,8 @@ pub struct Bus {
     pub IF: InterruptRegister,
     pub ie: InterruptRegister,
     pub ppu: PPU,
-    pub apu: APU
+    pub apu: APU,
+    pub joypad: Joypad
 }
 
 impl Bus {
@@ -29,14 +32,17 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new()
+            apu: APU::new(),
+            joypad: Joypad::new()
         }
     }
 
     pub fn mem_read8(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
+            0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff44 => self.ppu.line_y,
+            0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
         }
     }
@@ -65,6 +71,7 @@ impl Bus {
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
             0xfe00..=0xfe9f => self.ppu.write_oam(address, value),
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
+            0xff00 => self.joypad.write(value),
             0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
             0xff10 => self.apu.nr10.write(value),

@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use bus::Bus;
+use bus::{interrupt_register::InterruptRegister, Bus};
 use timer::Timer;
 
 pub mod bus;
@@ -74,7 +74,7 @@ impl CPU {
 
         self.pc += 1;
 
-        println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc, self.disassemble(opcode));
+        println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
 
         let cycles = self.decode_instruction(opcode);
 
@@ -87,9 +87,39 @@ impl CPU {
         self.bus.cartridge.rom = bytes.to_vec();
     }
 
+    pub fn tick(&mut self, cycles: usize) {
+        self.timer.tick(cycles);
+        self.bus.ppu.tick(cycles);
+    }
+
     pub fn handle_interrupts(&mut self) {
-        if self.bus.ime && (self.bus.IF.bits() & self.bus.ie.bits()) != 0 {
-            panic!("interrupt happening! how exciting!");
+        let fired_interrupts = self.bus.IF.bits() & self.bus.ie.bits();
+        if self.bus.ime && fired_interrupts != 0 {
+            println!("interrupt is happening!");
+            self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !fired_interrupts);
+            self.bus.ime = false;
+
+            let temp = InterruptRegister::from_bits_retain(fired_interrupts);
+
+            self.tick(8);
+
+            self.push_to_stack(self.pc);
+
+            self.tick(8);
+
+            if temp.contains(InterruptRegister::VBLANK) {
+                self.pc = 0x40;
+            } else if temp.contains(InterruptRegister::LCD) {
+                self.pc = 0x48;
+            } else if temp.contains(InterruptRegister::TIMER) {
+                self.pc = 0x50;
+            } else if temp.contains(InterruptRegister::SERIAL) {
+                self.pc = 0x58;
+            } else if temp.contains(InterruptRegister::JOYPAD) {
+                self.pc = 0x60;
+            }
+
+            self.tick(4);
         }
     }
 
@@ -98,6 +128,12 @@ impl CPU {
 
         self.registers[base] = (val >> 8) as u8;
         self.registers[base + 1] = val as u8;
+    }
+
+    pub fn get_register16(&mut self, r1: Register) -> u16 {
+        let base = r1 as usize - 7;
+
+        (self.registers[base] as u16) << 8 | self.registers[base + 1] as u16
     }
 
     pub fn dec_register16(&mut self, r1: Register) {
