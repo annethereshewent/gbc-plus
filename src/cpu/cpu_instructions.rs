@@ -823,7 +823,32 @@ impl CPU {
     }
 
     fn srl(&mut self, r1: Register) -> usize {
-        todo!("srl");
+        let (result, cycles, carry) = if r1 == Register::HLPointer {
+            let value = self.bus.mem_read8(self.hl());
+
+            let carry = value & 0b1 == 1;
+
+            let result = value >> 1;
+
+            self.bus.mem_write8(self.hl(), result);
+
+            (result, 16, carry)
+        } else {
+            let carry = self.registers[r1 as usize] & 0b1 == 1;
+
+            let result = self.registers[r1 as usize] >> 1;
+
+            self.registers[r1 as usize] = result;
+
+            (result, 8, carry)
+        };
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+        self.f.set(FlagRegister::ZERO, result == 0);
+        self.f.set(FlagRegister::CARRY, carry);
+
+        cycles
     }
 
     fn sra(&mut self, r1: Register) -> usize {

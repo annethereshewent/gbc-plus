@@ -74,7 +74,7 @@ impl CPU {
 
         self.pc += 1;
 
-        if !self.found.contains(&(self.pc - 1)) || opcode == 0xe0 || opcode == 0xe2 {
+        if !self.found.contains(&(self.pc - 1)) {
             println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
             self.found.insert(self.pc - 1);
         }
@@ -92,10 +92,10 @@ impl CPU {
     pub fn handle_interrupts(&mut self) {
         let fired_interrupts = self.bus.IF.bits() & self.bus.ie.bits();
         if self.bus.ime && fired_interrupts != 0 {
-            println!("interrupt is happening!");
             self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !fired_interrupts);
             self.bus.ime = false;
 
+            // use the InterruptRegister struct to determine what interrupt fired
             let temp = InterruptRegister::from_bits_retain(fired_interrupts);
 
             self.bus.tick(8);
