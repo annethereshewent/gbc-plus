@@ -52,8 +52,10 @@ impl Bus {
             0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
+            0xff40 => self.ppu.lcdc.bits(),
             0xff44 => self.ppu.line_y,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
+            0xffff => self.ie.bits(),
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
         }
     }

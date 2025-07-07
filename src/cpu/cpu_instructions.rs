@@ -50,6 +50,33 @@ pub enum AluOp {
     CP
 }
 
+pub enum CBOp {
+    RLC = 0,
+    RRC = 1,
+    RL = 2,
+    RR = 3,
+    SLA = 4,
+    SRA = 5,
+    SWAP = 6,
+    SRL = 7
+}
+
+impl CBOp {
+    pub fn new(value: u8) -> Self {
+        match value {
+            0 => CBOp::RLC,
+            1 => CBOp::RRC,
+            2 => CBOp::RL,
+            3 => CBOp::RR,
+            4 => CBOp::SLA,
+            5 => CBOp::SRA,
+            6 => CBOp::SWAP,
+            7 => CBOp::SRL,
+            _ => unreachable!()
+        }
+    }
+}
+
 pub const RP_TABLE: [Register; 4] = [
     Register::BC,
     Register::DE,
@@ -101,15 +128,15 @@ pub enum LoadType {
 }
 
 impl CPU {
-    pub fn nop(&mut self) -> usize {
+    fn nop(&mut self) -> usize {
         4
     }
 
-    pub fn stop(&mut self) -> usize {
+    fn stop(&mut self) -> usize {
         todo!("stop command");
     }
 
-    pub fn jr(&mut self, flag: JumpFlags) -> usize {
+    fn jr(&mut self, flag: JumpFlags) -> usize {
         let condition_met = match flag {
             JumpFlags::NoFlag => {
                 true
@@ -143,25 +170,55 @@ impl CPU {
         cycles
     }
 
-    pub fn ld_registers(&mut self, reg1: Register, reg2: Register, load_type: LoadType) -> usize {
-        let cycles = if reg1 == Register::SP {
+    fn ld_registers(&mut self, reg1: Register, reg2: Register, load_type: LoadType) -> usize {
+        if reg1 == Register::SP {
             self.sp = self.hl();
 
             8
         } else {
-            self.registers[reg1 as usize] = self.registers[reg2 as usize];
+            if reg1 == Register::HLPointer {
+                let value = self.registers[reg2 as usize];
 
-            4
-        };
+                self.bus.mem_write8(self.hl(), value);
 
-        cycles
+                8
+            } else if reg2 == Register::HLPointer {
+                let value = self.bus.mem_read8(self.hl());
+
+                self.registers[reg1 as usize] = value;
+
+                8
+            } else {
+                match load_type {
+                    LoadType::Normal => {
+                        self.registers[reg1 as usize] = self.registers[reg2 as usize];
+
+                        4
+                    }
+                    LoadType::LeftPointer => {
+                        let value = self.get_register16(reg1);
+                        self.bus.mem_write8(value, self.registers[reg2 as usize]);
+
+                        8
+                    }
+                    LoadType::RightPointer => {
+                        let address = self.get_register16(reg2);
+                        let value = self.bus.mem_read8(address);
+
+                        self.registers[reg1 as usize] = value;
+
+                        8
+                    }
+                }
+            }
+        }
     }
 
-    pub fn ld_immediate_sp(&mut self) -> usize {
+    fn ld_immediate_sp(&mut self) -> usize {
         todo!("ld_immediate_sp");
     }
 
-    pub fn ld_immediate(&mut self, reg1: Register, load_type: LoadType) -> usize {
+    fn ld_immediate(&mut self, reg1: Register, load_type: LoadType) -> usize {
         let (immediate, cycles) = if reg1 != Register::HLPointer && reg1 != Register::SP {
             if reg1 as usize > 6 || load_type != LoadType::Normal {
                 // 16 bit value
@@ -230,7 +287,7 @@ impl CPU {
         cycles
     }
 
-    pub fn ld_upper(&mut self, reg1: Register, load_type: LoadType, use_c: bool) -> usize {
+    fn ld_upper(&mut self, reg1: Register, load_type: LoadType, use_c: bool) -> usize {
         let (offset, cycles) = if use_c {
             (self.registers[Register::C as usize], 8)
         } else {
@@ -254,27 +311,61 @@ impl CPU {
         cycles
     }
 
-    pub fn add_hl(&mut self, register: Register) -> usize {
-        todo!("add hl");
+    fn add_hl(&mut self, register: Register) -> usize {
+        let old_hl = self.hl();
+        let result = self.hl() + self.get_register16(register);
+
+        self.set_register16(Register::HL, result);
+
+        self.f.set(FlagRegister::ZERO, result == 0);
+        self.f.set(FlagRegister::CARRY, result < old_hl);
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::HALF_CARRY, (result & 0xfff) < (old_hl & 0xfff));
+
+        8
     }
 
-    pub fn add(&mut self, register: Option<Register>) -> usize {
-        todo!("add");
+    fn add(&mut self, register: Option<Register>) -> usize {
+        if let Some(register) = register {
+            if register == Register::HLPointer {
+                self.registers[Register::A as usize] += self.bus.mem_read8(self.hl());
+
+                8
+            } else {
+                let old_a = self.registers[Register::A as usize];
+                self.registers[Register::A as usize] += self.registers[register as usize];
+
+                self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+                self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] < old_a);
+                self.f.set(FlagRegister::SUBTRACT, false);
+                self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) < (old_a & 0xf));
+
+                4
+            }
+        } else {
+            let value = self.bus.mem_read8(self.pc);
+
+            self.pc += 1;
+
+            self.registers[Register::A as usize] += value;
+
+            8
+        }
     }
 
-    pub fn adc(&mut self, register: Option<Register>) -> usize {
+    fn adc(&mut self, register: Option<Register>) -> usize {
         todo!("adc");
     }
 
-    pub fn sub(&mut self, register: Option<Register>) -> usize {
+    fn sub(&mut self, register: Option<Register>) -> usize {
         todo!("sub");
     }
 
-    pub fn sbc(&mut self, register: Option<Register>) -> usize {
+    fn sbc(&mut self, register: Option<Register>) -> usize {
         todo!("sbc");
     }
 
-    pub fn and(&mut self, register: Option<Register>) -> usize {
+    fn and(&mut self, register: Option<Register>) -> usize {
         let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
                 self.registers[Register::A as usize] = self.registers[Register::A as usize] & self.bus.mem_read8(self.hl());
@@ -303,7 +394,7 @@ impl CPU {
         cycles
     }
 
-    pub fn xor(&mut self, register: Option<Register>) -> usize {
+    fn xor(&mut self, register: Option<Register>) -> usize {
         let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
                 self.registers[Register::A as usize] = self.registers[Register::A as usize] ^ self.bus.mem_read8(self.hl());
@@ -332,7 +423,7 @@ impl CPU {
         cycles
     }
 
-    pub fn or(&mut self, register: Option<Register>) -> usize {
+    fn or(&mut self, register: Option<Register>) -> usize {
 
         let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
@@ -365,7 +456,7 @@ impl CPU {
         cycles
     }
 
-    pub fn cp(&mut self, register: Option<Register>) -> usize {
+    fn cp(&mut self, register: Option<Register>) -> usize {
         let a_val = self.registers[Register::A as usize];
 
         let (operand, cycles) = if let Some(register) = register {
@@ -398,7 +489,7 @@ impl CPU {
         result
     }
 
-    pub fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) -> usize {
+    fn store_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) -> usize {
         self.bus.mem_write8(self.hl(), self.registers[r1 as usize]);
 
         match increment_mode {
@@ -409,7 +500,7 @@ impl CPU {
         4
     }
 
-    pub fn load_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) -> usize {
+    fn load_hl_ptr(&mut self, r1: Register, increment_mode: IncrementMode) -> usize {
         self.registers[r1 as usize] = self.bus.mem_read8(self.hl());
 
         match increment_mode {
@@ -420,11 +511,11 @@ impl CPU {
         4
     }
 
-    pub fn ld_hl_displacement(&mut self) -> usize {
+    fn ld_hl_displacement(&mut self) -> usize {
         todo!("load_hl_displacement");
     }
 
-    pub fn inc(&mut self, r1: Register) -> usize {
+    fn inc(&mut self, r1: Register) -> usize {
         let cycles = if r1 as usize > 6 {
             if r1 != Register::HLPointer {
                 self.inc_register16(r1);
@@ -452,7 +543,7 @@ impl CPU {
         cycles
     }
 
-    pub fn dec(&mut self, r1: Register) -> usize {
+    fn dec(&mut self, r1: Register) -> usize {
         let cycles = if r1 as usize > 6 {
             if r1 != Register::HLPointer {
                 self.dec_register16(r1);
@@ -480,49 +571,49 @@ impl CPU {
         cycles
     }
 
-    pub fn rlca(&mut self) -> usize {
+    fn rlca(&mut self) -> usize {
         todo!("rlca");
     }
 
-    pub fn rrca(&mut self) -> usize {
+    fn rrca(&mut self) -> usize {
         todo!("rrca");
     }
 
-    pub fn rra(&mut self) -> usize {
+    fn rra(&mut self) -> usize {
         todo!("rra");
     }
 
-    pub fn rla(&mut self) -> usize {
+    fn rla(&mut self) -> usize {
         todo!("rla");
     }
 
-    pub fn daa(&mut self) -> usize {
+    fn daa(&mut self) -> usize {
         todo!("daa");
     }
 
-    pub fn cpl(&mut self) -> usize {
+    fn cpl(&mut self) -> usize {
         self.registers[Register::A as usize] = !self.registers[Register::A as usize];
 
         4
     }
 
-    pub fn scf(&mut self) -> usize {
+    fn scf(&mut self) -> usize {
         self.f.set(FlagRegister::CARRY, !self.f.contains(FlagRegister::CARRY));
 
         4
     }
 
-    pub fn ccf(&mut self) -> usize {
+    fn ccf(&mut self) -> usize {
         self.f.set(FlagRegister::CARRY, false);
 
         4
     }
 
-    pub fn halt(&mut self) -> usize {
+    fn halt(&mut self) -> usize {
         todo!("halt");
     }
 
-    pub fn ret(&mut self, flags: JumpFlags) -> usize {
+    fn ret(&mut self, flags: JumpFlags) -> usize {
         let condition_met = match flags {
             JumpFlags::NoFlag => true,
             JumpFlags::C => self.f.contains(FlagRegister::CARRY),
@@ -548,11 +639,11 @@ impl CPU {
         cycles
     }
 
-    pub fn add_sp(&mut self) -> usize {
+    fn add_sp(&mut self) -> usize {
         todo!("add_sp");
     }
 
-    pub fn pop(&mut self, r1: Register) -> usize {
+    fn pop(&mut self, r1: Register) -> usize {
         let value = self.pop_from_stack();
 
         if r1 == Register::AF {
@@ -565,17 +656,20 @@ impl CPU {
         12
     }
 
-    pub fn reti(&mut self) -> usize {
+    fn reti(&mut self) -> usize {
         self.bus.ime = true;
 
         self.ret(JumpFlags::NoFlag)
     }
 
-    pub fn jp_hl(&mut self) -> usize {
-        todo!("jp_hl");
+    fn jp_hl(&mut self) -> usize {
+
+        self.pc = self.hl();
+
+        4
     }
 
-    pub fn jp(&mut self, flags: JumpFlags) -> usize {
+    fn jp(&mut self, flags: JumpFlags) -> usize {
         let condition_met = match flags {
             JumpFlags::NoFlag => true,
             JumpFlags::NC => !self.f.contains(FlagRegister::CARRY),
@@ -599,19 +693,19 @@ impl CPU {
         cycles
     }
 
-    pub fn ei(&mut self) -> usize {
+    fn ei(&mut self) -> usize {
         self.bus.ime = true;
 
         4
     }
 
-    pub fn di(&mut self) -> usize {
+    fn di(&mut self) -> usize {
         self.bus.ime = false;
 
         4
     }
 
-    pub fn call(&mut self, flags: JumpFlags) -> usize {
+    fn call(&mut self, flags: JumpFlags) -> usize {
         let address = self.bus.mem_read16(self.pc);
 
         self.pc += 2;
@@ -623,7 +717,7 @@ impl CPU {
         24
     }
 
-    pub fn push(&mut self, r1: Register) -> usize {
+    fn push(&mut self, r1: Register) -> usize {
         let value = if r1 == Register::AF {
             (self.registers[Register::A as usize] as u16) << 8 | self.f.bits() as u16
         } else {
@@ -634,10 +728,88 @@ impl CPU {
         16
     }
 
-    pub fn rst(&mut self, y: u8) -> usize {
-        todo!("rst");
+    fn rst(&mut self, y: u8) -> usize {
+        self.push_to_stack(self.pc);
+
+        self.pc = y as u16;
+
+        16
     }
 
+    fn bit(&mut self, bit: u8, r1: Register) -> usize {
+        todo!("bit");
+    }
+
+    fn res(&mut self, bit: u8, r1: Register) -> usize {
+        if r1 == Register::HLPointer {
+            let mut value = self.bus.mem_read8(self.hl());
+
+            value &= !(1 << bit);
+
+            self.bus.mem_write8(self.hl(), value);
+
+            16
+        } else {
+            self.registers[r1 as usize] &= !(1 << bit);
+            8
+        }
+    }
+
+    fn set(&mut self, bit: u8, r1: Register) -> usize {
+        todo!("set");
+    }
+
+    fn rl(&mut self, r1: Register) -> usize {
+        todo!("rl");
+    }
+
+    fn srl(&mut self, r1: Register) -> usize {
+        todo!("srl");
+    }
+
+    fn sra(&mut self, r1: Register) -> usize {
+        todo!("sra");
+    }
+
+    fn rlc(&mut self, r1: Register) -> usize {
+        todo!("rlc");
+    }
+
+    fn rrc(&mut self, r1: Register) -> usize {
+        todo!("rrc");
+    }
+
+    fn sla(&mut self, r1: Register) -> usize {
+        todo!("sla");
+    }
+
+    fn rr(&mut self, r1: Register) -> usize {
+        todo!("rr");
+    }
+
+    fn swap(&mut self, r1: Register) -> usize {
+        let cycles = if r1 != Register::HLPointer {
+            let upper = (self.registers[r1 as usize] >> 4) & 0xf;
+            let lower = self.registers[r1 as usize] & 0xf;
+
+            self.registers[r1 as usize] = (lower << 4) | upper;
+
+            self.f.set(FlagRegister::ZERO, self.registers[r1 as usize] == 0);
+            self.f.set(FlagRegister::CARRY, false);
+            self.f.set(FlagRegister::SUBTRACT, false);
+            self.f.set(FlagRegister::HALF_CARRY, false);
+
+            8
+        } else {
+            todo!("swap (HL)");
+
+            16
+        };
+
+        cycles
+    }
+
+    // see: https://archive.gbdev.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html
     pub fn decode_instruction(&mut self, instruction: u8) -> usize {
         let z = instruction & 0x7;
         let q = (instruction >> 3) & 1;
@@ -757,7 +929,10 @@ impl CPU {
                     3 => match y {
                         0 => self.jp(JumpFlags::NoFlag),
                         1 => {
-                            todo!("CB instructions");
+                            let cb_opcode = self.bus.mem_read8(self.pc);
+                            self.pc += 1;
+
+                            self.decode_cb_instruction(cb_opcode)
                         }
                         6 => self.di(),
                         7 => self.ei(),
@@ -794,6 +969,30 @@ impl CPU {
                     _ => unreachable!()
                 }
             }
+            _ => unreachable!()
+        }
+    }
+
+    // see: https://archive.gbdev.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html#cb
+    fn decode_cb_instruction(&mut self, instruction: u8) -> usize {
+        let z = instruction & 0x7;
+        let y = (instruction >> 3) & 0x7;
+        let x = (instruction >> 6) & 0x3;
+
+        match x {
+            0 => match CBOp::new(y) {
+                CBOp::RL => self.rl(R_TABLE[z as usize]),
+                CBOp::RLC => self.rlc(R_TABLE[z as usize]),
+                CBOp::RR => self.rr(R_TABLE[z as usize]),
+                CBOp::RRC => self.rrc(R_TABLE[z as usize]),
+                CBOp::SLA => self.sla(R_TABLE[z as usize]),
+                CBOp::SRA => self.sra(R_TABLE[z as usize]),
+                CBOp::SRL => self.srl(R_TABLE[z as usize]),
+                CBOp::SWAP => self.swap(R_TABLE[z as usize])
+            }
+            1 => self.bit(y, R_TABLE[z as usize]),
+            2 => self.res(y, R_TABLE[z as usize]),
+            3 => self.set(y, R_TABLE[z as usize]),
             _ => unreachable!()
         }
     }

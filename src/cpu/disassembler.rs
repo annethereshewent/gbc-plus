@@ -1,6 +1,6 @@
 use crate::cpu::FlagRegister;
 
-use super::{cpu_instructions::{AluOp, IncrementMode, JumpFlags, LoadType, ALU_TABLE, CC_TABLE, RP2_TABLE, RP_TABLE, R_TABLE}, Register, CPU};
+use super::{cpu_instructions::{AluOp, CBOp, IncrementMode, JumpFlags, LoadType, ALU_TABLE, CC_TABLE, RP2_TABLE, RP_TABLE, R_TABLE}, Register, CPU};
 
 impl CPU {
 
@@ -162,6 +162,50 @@ impl CPU {
         format!("CALL {} 0x{:x}", cond.to_string(), address)
     }
 
+    fn diss_bit(&self, bit: u8, r1: Register) -> String {
+        format!("BIT {bit}, {:?}", r1)
+    }
+
+    fn diss_res(&self, bit: u8, r1: Register) -> String {
+        format!("RES {bit}, {:?}", r1)
+    }
+
+    fn diss_set(&self, bit: u8, r1: Register) -> String {
+        format!("SET {bit}, {:?}", r1)
+    }
+
+    fn diss_rl(&self, r1: Register) -> String {
+        format!("RL {:?}", r1)
+    }
+
+    fn diss_srl(&self, r1: Register) -> String {
+        format!("SRL {:?}", r1)
+    }
+
+    fn diss_sra(&self, r1: Register) -> String {
+        format!("SRA {:?}", r1)
+    }
+
+    fn diss_rlc(&self, r1: Register) -> String {
+        format!("RLC {:?}", r1)
+    }
+
+    fn diss_rrc(&self, r1: Register) -> String {
+       format!("RRC {:?}", r1)
+    }
+
+    fn diss_sla(&self, r1: Register) -> String {
+       format!("SLA {:?}", r1)
+    }
+
+    fn diss_rr(&self, r1: Register) -> String {
+        format!("RR {:?}", r1)
+    }
+
+    fn diss_swap(&self, r1: Register) -> String {
+        format!("SWAP {:?}", r1)
+    }
+
     pub fn disassemble(&self, instruction: u8) -> String {
         let z = instruction & 0x7;
         let q = (instruction >> 3) & 1;
@@ -281,7 +325,9 @@ impl CPU {
                     3 => match y {
                         0 => self.diss_jp(JumpFlags::NoFlag),
                         1 => {
-                            todo!("CB instructions")
+                            let cb_opcode = self.bus.mem_read8(self.pc);
+
+                            self.disassemble_cb(cb_opcode)
                         }
                         6 => "DI".to_string(),
                         7 => "EI".to_string(),
@@ -318,6 +364,29 @@ impl CPU {
                     _ => unreachable!()
                 }
             }
+            _ => unreachable!()
+        }
+    }
+
+    fn disassemble_cb(&self, instruction: u8) -> String {
+        let z = instruction & 0x7;
+        let y = (instruction >> 3) & 0x7;
+        let x = (instruction >> 6) & 0x3;
+
+        match x {
+            0 => match CBOp::new(y) {
+                CBOp::RL => self.diss_rl(R_TABLE[z as usize]),
+                CBOp::RLC => self.diss_rlc(R_TABLE[z as usize]),
+                CBOp::RR => self.diss_rr(R_TABLE[z as usize]),
+                CBOp::RRC => self.diss_rrc(R_TABLE[z as usize]),
+                CBOp::SLA => self.diss_sla(R_TABLE[z as usize]),
+                CBOp::SRA => self.diss_sra(R_TABLE[z as usize]),
+                CBOp::SRL => self.diss_srl(R_TABLE[z as usize]),
+                CBOp::SWAP => self.diss_swap(R_TABLE[z as usize])
+            }
+            1 => self.diss_bit(y, R_TABLE[z as usize]),
+            2 => self.diss_res(y, R_TABLE[z as usize]),
+            3 => self.diss_set(y, R_TABLE[z as usize]),
             _ => unreachable!()
         }
     }
