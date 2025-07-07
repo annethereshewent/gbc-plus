@@ -53,7 +53,16 @@ impl CPU {
 
                 format!("LD {:?}, 0x{:x}", reg1, immediate)
             }
-            _ => todo!("diss_ld_immediate, pointer loads")
+            LoadType::LeftPointer => {
+                let immediate = self.bus.mem_read16(self.pc);
+
+                format!("LD (0x{:x}), {:?}", immediate, reg1)
+            }
+            LoadType::RightPointer => {
+                let immediate = self.bus.mem_read16(self.pc);
+
+                format!("LD {:?}, (0x{:x})", reg1, immediate)
+            }
         }
     }
 

@@ -152,46 +152,67 @@ impl CPU {
     }
 
     pub fn ld_immediate(&mut self, reg1: Register, load_type: LoadType) -> usize {
-        let (immediate, cycles) = if reg1 as usize > 6 || load_type != LoadType::Normal {
-            // 16 bit value
-            let val = self.bus.mem_read16(self.pc);
-            self.pc += 2;
+        let (immediate, cycles) = if reg1 != Register::HLPointer && reg1 != Register::SP {
+            if reg1 as usize > 6 || load_type != LoadType::Normal {
+                // 16 bit value
+                let val = self.bus.mem_read16(self.pc);
+                self.pc += 2;
 
-            let cycles = if load_type == LoadType::Normal {
-                12
+                let cycles = if load_type == LoadType::Normal {
+                    12
+                } else {
+                    16
+                };
+
+                (val, cycles)
             } else {
-                16
-            };
+                // 8 bit value
+                let val = self.bus.mem_read8(self.pc) as u16;
+                self.pc += 1;
 
-            (val, cycles)
-        } else  {
-            // 8 bit value
-            let val = self.bus.mem_read8(self.pc) as u16;
-            self.pc += 1;
+                (val, 8)
+            }
+        } else {
+            if reg1 == Register::HLPointer {
+                let immediate = self.bus.mem_read8(self.pc);
+                self.pc += 1;
 
-            (val, 8)
+                (immediate as u16, 12)
+            } else {
+                let immediate = self.bus.mem_read16(self.pc);
+                self.pc += 2;
+
+                (immediate, 12)
+            }
         };
 
-        match load_type {
-            LoadType::Normal => {
-                if reg1 as usize > 6 {
-                    self.set_register16(reg1, immediate);
-                } else {
-                    self.registers[reg1 as usize] = immediate as u8;
+
+        if reg1 == Register::HLPointer {
+            self.bus.mem_write8(self.hl(), immediate as u8);
+        } else if reg1 == Register::SP {
+            self.sp = immediate;
+        } else {
+            match load_type {
+                LoadType::Normal => {
+                    if reg1 as usize > 6 {
+                        self.set_register16(reg1, immediate);
+                    } else {
+                        self.registers[reg1 as usize] = immediate as u8;
+                    }
                 }
-            }
-            LoadType::LeftPointer => {
-                if reg1 as usize > 6 {
-                    panic!("invalid register given to ld_immediate with LeftPointer: {:?}", reg1);
-                } else {
-                    self.bus.mem_write8(immediate, self.registers[reg1 as usize]);
+                LoadType::LeftPointer => {
+                    if reg1 as usize > 6 {
+                        panic!("invalid register given to ld_immediate with LeftPointer: {:?}", reg1);
+                    } else {
+                        self.bus.mem_write8(immediate, self.registers[reg1 as usize]);
+                    }
                 }
-            }
-            LoadType::RightPointer => {
-                if reg1 as usize > 6 {
-                    panic!("invalid register given to ld_immediate with RightPointer: {:?}", reg1);
-                } else {
-                    self.registers[reg1 as usize] = self.bus.mem_read8(immediate);
+                LoadType::RightPointer => {
+                    if reg1 as usize > 6 {
+                        panic!("invalid register given to ld_immediate with RightPointer: {:?}", reg1);
+                    } else {
+                        self.registers[reg1 as usize] = self.bus.mem_read8(immediate);
+                    }
                 }
             }
         }

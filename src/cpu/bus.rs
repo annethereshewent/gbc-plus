@@ -1,10 +1,12 @@
+use apu::{sound_panning_register::SoundPanningRegister, APU};
 use cartridge::Cartridge;
-use ppu::{lcd_control_register::LCDControlRegister, lcd_status_register::LCDStatusRegister, PPU};
+use ppu::{lcd_status_register::LCDStatusRegister, PPU};
 use interrupt_register::InterruptRegister;
 
 pub mod interrupt_register;
 pub mod ppu;
 pub mod cartridge;
+pub mod apu;
 
 pub struct Bus {
     pub cartridge: Cartridge,
@@ -13,7 +15,8 @@ pub struct Bus {
     pub ime: bool,
     pub IF: InterruptRegister,
     pub ie: InterruptRegister,
-    pub ppu: PPU
+    pub ppu: PPU,
+    pub apu: APU
 }
 
 impl Bus {
@@ -25,7 +28,8 @@ impl Bus {
             IF: InterruptRegister::from_bits_retain(0),
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
-            ppu: PPU::new()
+            ppu: PPU::new(),
+            apu: APU::new()
         }
     }
 
@@ -53,6 +57,9 @@ impl Bus {
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
             0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
+            0xff24 => self.apu.nr50.write(value),
+            0xff25 => self.apu.nr51 = SoundPanningRegister::from_bits_retain(value),
+            0xff26 => self.apu.nr52.write(value),
             0xff40 => self.ppu.update_lcdc(value),
             0xff41 => self.ppu.stat = LCDStatusRegister::from_bits_truncate(value),
             0xff42 => self.ppu.scy = value,

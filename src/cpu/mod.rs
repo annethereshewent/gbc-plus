@@ -28,9 +28,9 @@ pub enum Register {
     BC = 8,
     DE = 10,
     HL = 12,
-    SP = 13,
-    HLPointer = 14,
-    AF = 15
+    SP = 14,
+    HLPointer = 15,
+    AF = 16
 }
 
 pub struct CPU {
