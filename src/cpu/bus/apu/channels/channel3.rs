@@ -74,34 +74,25 @@ impl Channel3 {
         self.frequency_timer = (2048 - self.period as isize) * 2;
     }
 
-    fn tick_length(&mut self, cycles: usize) {
-        self.length_cycles += cycles;
-
+    pub fn tick_length(&mut self) {
         if self.nr34.length_enable {
-            if self.length_cycles >= LENGTH_CYCLES_NEEDED {
-                self.length_cycles -= LENGTH_CYCLES_NEEDED;
+            if self.current_timer > 0 {
+                self.current_timer += 1;
 
-                if self.current_timer > 0 {
-                    self.current_timer += 1;
+                if self.current_timer >= 256 {
+                    self.current_timer = self.length as usize;
 
-                    if self.current_timer >= 256 {
-                        self.current_timer = self.length as usize;
+                    self.enabled = false;
 
-                        self.enabled = false;
-
-                    }
                 }
             }
         }
     }
 
     pub fn tick(&mut self, cycles: usize) {
-
         if self.nr34.trigger {
             self.restart_channel();
         }
-
-        self.tick_length(cycles);
 
         self.frequency_timer -= cycles as isize;
 

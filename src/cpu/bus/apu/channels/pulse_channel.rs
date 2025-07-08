@@ -91,75 +91,55 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
-    fn tick_envelope(&mut self, cycles: usize) {
-        let envelope_cycles_needed = CLOCK_SPEED / 64;
+    pub fn tick_envelope(&mut self) {
+        self.envelope_timer -= 1;
 
-        self.envelope_cycles += cycles;
+        if self.envelope_timer == 0 {
+            self.envelope_timer = self.nrx2.sweep_pace as usize;
+            if self.nrx2.env_dir == EnvelopeDirection::Decrease {
+                if self.current_volume != 0 {
+                    self.current_volume -= 1;
+                }
+            } else {
+                if self.current_volume != 15 {
+                    self.current_volume += 1;
+                }
+            }
+        }
 
-        if self.nrx2.sweep_pace > 0 && self.envelope_cycles >= envelope_cycles_needed {
-            self.envelope_cycles -= envelope_cycles_needed;
+    }
 
-            self.envelope_timer -= 1;
+    pub fn tick_length(&mut self) {
+        if self.nrx4.length_enable {
+            self.current_timer += 1;
 
-            if self.envelope_timer == 0 {
-                self.envelope_timer = self.nrx2.sweep_pace as usize;
-                if self.nrx2.env_dir == EnvelopeDirection::Decrease {
-                    if self.current_volume != 0 {
-                        self.current_volume -= 1;
+            if self.current_timer >= 64 {
+                self.enabled = false;
+                self.current_timer = 0;
+                self.length_cycles = 0;
+            }
+        }
+    }
+
+    pub fn tick_sweep(&mut self) {
+        if let Some(nrx0) = &mut self.nrx0 {
+            if self.sweep_enabled {
+                let operand = self.period >> nrx0.step;
+
+                if nrx0.direction == SweepDirection::Addition {
+                    let new_period = self.period + operand;
+
+                    if new_period < 0x7ff {
+                        self.period = new_period
+                    } else {
+                        self.enabled = false;
                     }
                 } else {
-                    if self.current_volume != 15 {
-                        self.current_volume += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    fn tick_length(&mut self, cycles: usize) {
-        self.length_cycles += cycles;
-
-        if self.nrx4.length_enable {
-            if self.length_cycles >= LENGTH_CYCLES_NEEDED {
-                self.length_cycles -= LENGTH_CYCLES_NEEDED;
-
-                self.current_timer += 1;
-
-                if self.current_timer >= 64 {
-                    self.enabled = false;
-                    self.current_timer = 0;
-                    self.length_cycles = 0;
-                }
-            }
-        }
-    }
-
-    fn tick_sweep(&mut self, cycles: usize) {
-        if let Some(nrx0) = &mut self.nrx0 {
-            let sweep_cycles_needed = nrx0.pace as usize * TICKS_PER_ITERATION;
-            self.sweep_cycles += cycles;
-
-            if self.sweep_cycles >= sweep_cycles_needed {
-                self.sweep_cycles -= sweep_cycles_needed;
-
-                if self.sweep_enabled {
-                    let operand = self.period >> nrx0.step;
-
-                    if nrx0.direction == SweepDirection::Addition {
-                        let new_period = self.period + operand;
-
-                        if new_period < 0x7ff {
-                            self.period = new_period
+                    if self.period > 0 {
+                        if operand <= self.period {
+                            self.period = self.period - operand
                         } else {
-                            self.enabled = false;
-                        }
-                    } else {
-                        if self.period > 0 {
-                            if operand <= self.period {
-                                self.period = self.period - operand
-                            } else {
-                                self.period = 0;
-                            }
+                            self.period = 0;
                         }
                     }
                 }
@@ -191,12 +171,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
         if self.nrx4.trigger {
             self.restart_channel();
-        }
-
-        self.tick_envelope(cycles);
-        self.tick_length(cycles);
-        if self.nrx0.is_some() {
-            self.tick_sweep(cycles);
         }
 
         if self.frequency_timer <= 0 {
