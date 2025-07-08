@@ -81,7 +81,6 @@ impl PPU {
                 LCDMode::VBlank => self.handle_vblank(interrupt_register),
                 LCDMode::OAMScan => self.handle_oam_scan(),
                 LCDMode::HDraw => self.handle_hdraw(interrupt_register),
-                _ => unreachable!()
             }
         }
     }

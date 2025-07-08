@@ -904,13 +904,27 @@ impl CPU {
     fn call(&mut self, flags: JumpFlags) -> usize {
         let address = self.bus.mem_read16(self.pc);
 
+        let condition = match flags {
+            JumpFlags::NoFlag => true,
+            JumpFlags::C => self.f.contains(FlagRegister::CARRY),
+            JumpFlags::NC => !self.f.contains(FlagRegister::CARRY),
+            JumpFlags::Z => self.f.contains(FlagRegister::ZERO),
+            JumpFlags::NZ => !self.f.contains(FlagRegister::ZERO)
+        };
+
         self.pc += 2;
 
-        self.push_to_stack(self.pc);
+        let cycles = if condition {
+            self.push_to_stack(self.pc);
 
-        self.pc = address;
+            self.pc = address;
 
-        24
+            24
+        } else {
+            18
+        };
+
+        cycles
     }
 
     fn push(&mut self, r1: Register) -> usize {
