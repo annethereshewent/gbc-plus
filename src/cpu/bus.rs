@@ -53,7 +53,9 @@ impl Bus {
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
             0xff40 => self.ppu.lcdc.bits(),
+            0xff41 => self.ppu.stat.bits(),
             0xff44 => self.ppu.line_y,
+            0xff4d => 0, // GBC, TODO
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
@@ -98,6 +100,7 @@ impl Bus {
             0xff00 => self.joypad.write(value),
             0xff01..=0xff02 => (), // Serial ports, ignore!
             0xff06 => self.timer.tma = value,
+            0xff07 => self.timer.update_tac(value),
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
             0xff10 => self.apu.nr10.write(value),
             0xff11 => self.apu.nr11.write(value),
@@ -131,6 +134,9 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
+            0xff68..=0xff69 => (), // ignore this for now lmao
+            0xff4d => (), // GBC, TODO
+            0xff4f => (), // GBC, TODO
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),

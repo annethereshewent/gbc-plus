@@ -40,7 +40,8 @@ pub struct CPU {
     f: FlagRegister,
     pub bus: Bus,
     found: HashSet<u16>,
-    debug_on: bool
+    debug_on: bool,
+    is_halted: bool
 }
 
 impl CPU {
@@ -52,7 +53,8 @@ impl CPU {
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
             found: HashSet::new(),
-            debug_on: false
+            debug_on: false,
+            is_halted: false
         }
     }
 
@@ -72,6 +74,13 @@ impl CPU {
 
     pub fn step(&mut self) {
         self.handle_interrupts();
+
+        if self.is_halted {
+            self.bus.tick(4);
+
+            return;
+        }
+
         let opcode = self.bus.mem_read8(self.pc);
 
         self.pc += 1;
@@ -93,32 +102,40 @@ impl CPU {
 
     pub fn handle_interrupts(&mut self) {
         let fired_interrupts = self.bus.IF.bits() & self.bus.ie.bits();
-        if self.bus.ime && fired_interrupts != 0 {
-            self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !fired_interrupts);
-            self.bus.ime = false;
+        if self.bus.ime {
+            if fired_interrupts != 0 {
+                self.is_halted = false;
 
-            // use the InterruptRegister struct to determine what interrupt fired
-            let temp = InterruptRegister::from_bits_retain(fired_interrupts);
+                self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !fired_interrupts);
+                self.bus.ime = false;
 
-            self.bus.tick(8);
+                // use the InterruptRegister struct to determine what interrupt fired
+                let temp = InterruptRegister::from_bits_retain(fired_interrupts);
 
-            self.push_to_stack(self.pc);
+                self.bus.tick(8);
 
-            self.bus.tick(8);
+                self.push_to_stack(self.pc);
 
-            if temp.contains(InterruptRegister::VBLANK) {
-                self.pc = 0x40;
-            } else if temp.contains(InterruptRegister::LCD) {
-                self.pc = 0x48;
-            } else if temp.contains(InterruptRegister::TIMER) {
-                self.pc = 0x50;
-            } else if temp.contains(InterruptRegister::SERIAL) {
-                self.pc = 0x58;
-            } else if temp.contains(InterruptRegister::JOYPAD) {
-                self.pc = 0x60;
+                self.bus.tick(8);
+
+                if temp.contains(InterruptRegister::VBLANK) {
+                    self.pc = 0x40;
+                } else if temp.contains(InterruptRegister::LCD) {
+                    self.pc = 0x48;
+                } else if temp.contains(InterruptRegister::TIMER) {
+                    self.pc = 0x50;
+                } else if temp.contains(InterruptRegister::SERIAL) {
+                    self.pc = 0x58;
+                } else if temp.contains(InterruptRegister::JOYPAD) {
+                    self.pc = 0x60;
+                }
+
+                self.bus.tick(4);
             }
-
-            self.bus.tick(4);
+        } else if self.is_halted {
+            if self.bus.IF.bits() & self.bus.ie.bits() != 0 {
+                self.is_halted = false;
+            }
         }
     }
 

@@ -133,9 +133,7 @@ impl PPU {
 
         // println!("base_tile = {base_tile}");
 
-        let mut step_by = 8 - (scroll_x as usize % 8);
-
-        for x in (0..SCREEN_WIDTH).step_by(step_by) {
+        for x in (0..SCREEN_WIDTH) {
             if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
                 let tile_number = base_tile + x / 8;
 
@@ -157,22 +155,19 @@ impl PPU {
                 let lower_byte = self.vram_read8(tile_address);
                 let upper_byte = self.vram_read8(tile_address + 1);
 
-                for i in x_in_tile..8 {
-                    let palette_index = (upper_byte >> (7 - i) & 0x1) << 1 | lower_byte >> (7 - i) & 0x1;
 
-                    let color = self.bgp.indexes[palette_index as usize];
+                let palette_index = (upper_byte >> (7 - x_in_tile) & 0x1) << 1 | lower_byte >> (7 - x_in_tile) & 0x1;
 
-                    let pixel = match color {
-                        BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
-                        BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
-                        BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
-                        BGColor::Black => Color::new(0x15, 0x56, 0x15)
-                    };
+                let color = self.bgp.indexes[palette_index as usize];
 
-                    self.picture.set_pixel(x + i, y as usize, pixel);
-                }
+                let pixel = match color {
+                    BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
+                    BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
+                    BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
+                    BGColor::Black => Color::new(0x15, 0x56, 0x15)
+                };
 
-                step_by = 8 - x_in_tile as usize;
+                self.picture.set_pixel(x, y as usize, pixel);
             } else {
                 let color = self.bgp.indexes[0];
 

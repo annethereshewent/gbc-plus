@@ -133,7 +133,9 @@ impl CPU {
     }
 
     fn stop(&mut self) -> usize {
-        todo!("stop command");
+        // NOP, TODO: actually implement for GBC
+
+        0
     }
 
     fn jr(&mut self, flag: JumpFlags) -> usize {
@@ -215,7 +217,13 @@ impl CPU {
     }
 
     fn ld_immediate_sp(&mut self) -> usize {
-        todo!("ld_immediate_sp");
+        let address = self.bus.mem_read16(self.pc);
+
+        self.pc += 2;
+
+        self.bus.mem_write16(address, self.sp);
+
+        20
     }
 
     fn ld_immediate(&mut self, reg1: Register, load_type: LoadType) -> usize {
@@ -313,7 +321,7 @@ impl CPU {
 
     fn add_hl(&mut self, register: Register) -> usize {
         let old_hl = self.hl();
-        let result = self.hl() + self.get_register16(register);
+        let result = self.hl() + if register == Register::SP { self.sp } else { self.get_register16(register) };
 
         self.set_register16(Register::HL, result);
 
@@ -387,11 +395,64 @@ impl CPU {
     }
 
     fn sub(&mut self, register: Option<Register>) -> usize {
-        todo!("sub");
+        let old_a = self.registers[Register::A as usize];
+        let cycles = if let Some(register) = register {
+            if register == Register::HLPointer {
+                self.registers[Register::A as usize] -= self.bus.mem_read8(self.hl());
+
+                8
+            } else {
+
+                self.registers[Register::A as usize] -= self.registers[register as usize];
+
+                4
+            }
+        } else {
+            let value = self.bus.mem_read8(self.pc);
+
+            self.pc += 1;
+
+            self.registers[Register::A as usize] -= value;
+
+            8
+        };
+
+        self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+        self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] > old_a);
+        self.f.set(FlagRegister::SUBTRACT, true);
+        self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) > (old_a & 0xf));
+
+        cycles
     }
 
     fn sbc(&mut self, register: Option<Register>) -> usize {
-        todo!("sbc");
+        let old_a = self.registers[Register::A as usize];
+        let cycles = if let Some(register) = register {
+            if register == Register::HLPointer {
+                self.registers[Register::A as usize] -= self.bus.mem_read8(self.hl()) - self.f.contains(FlagRegister::CARRY) as u8;
+
+                8
+            } else {
+                self.registers[Register::A as usize] -= self.registers[register as usize] - self.f.contains(FlagRegister::CARRY) as u8;
+
+                4
+            }
+        } else {
+            let operand = self.bus.mem_read8(self.pc);
+
+            self.pc += 1;
+
+            self.registers[Register::A as usize] -= operand - self.f.contains(FlagRegister::CARRY) as u8;
+
+            8
+        };
+
+        self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+        self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] > old_a);
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) > (old_a & 0xf));
+
+        cycles
     }
 
     fn and(&mut self, register: Option<Register>) -> usize {
@@ -543,16 +604,33 @@ impl CPU {
     }
 
     fn ld_hl_displacement(&mut self) -> usize {
-        todo!("load_hl_displacement");
+        let displacement = self.bus.mem_read8(self.pc) as i8 as i16;
+
+        let old_sp = self.sp;
+
+        self.pc += 1;
+
+        let result = (self.sp as i32 + displacement as i32) as u16;
+
+        self.set_register16(Register::HL, result);
+
+        let (carry, half_carry) = if displacement < 0 {
+            ((old_sp as u8) < (self.sp as u8), (old_sp & 0xf) < (self.sp & 0xf))
+        } else {
+            ((old_sp as u8) > (self.sp as u8), (old_sp & 0xf) > (self.sp & 0xf))
+        };
+
+        self.f.set(FlagRegister::ZERO, false);
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::HALF_CARRY, half_carry);
+        self.f.set(FlagRegister::CARRY, carry);
+
+        12
     }
 
     fn inc(&mut self, r1: Register) -> usize {
         let cycles = if r1 as usize > 6 {
-            if r1 != Register::HLPointer {
-                self.inc_register16(r1);
-
-                8
-            } else {
+            if r1 == Register::HLPointer {
                 let old_value = self.bus.mem_read8(self.hl());
 
                 let result = old_value + 1;
@@ -564,6 +642,14 @@ impl CPU {
                 self.f.set(FlagRegister::HALF_CARRY, (result & 0xf) < (old_value & 0xf));
 
                 12
+            } else if r1 == Register::SP {
+                self.sp += 1;
+
+                8
+            } else {
+                self.inc_register16(r1);
+
+                8
             }
         } else {
             let result = self.registers[r1 as usize] + 1;
@@ -582,11 +668,7 @@ impl CPU {
 
     fn dec(&mut self, r1: Register) -> usize {
         let cycles = if r1 as usize > 6 {
-            if r1 != Register::HLPointer {
-                self.dec_register16(r1);
-
-                8
-            } else {
+            if r1 == Register::HLPointer {
                 let old_value = self.bus.mem_read8(self.hl());
                 let result = old_value - 1;
 
@@ -597,6 +679,14 @@ impl CPU {
                 self.f.set(FlagRegister::HALF_CARRY, (result & 0xf) > (old_value & 0xf));
 
                 12
+            } else if r1 == Register::SP {
+                self.sp -= 1;
+
+                8
+            } else {
+                self.dec_register16(r1);
+
+                8
             }
         } else {
             let result = self.registers[r1 as usize] - 1;
@@ -631,7 +721,18 @@ impl CPU {
     }
 
     fn rra(&mut self) -> usize {
-        todo!("rra");
+        let rotate_bit = self.registers[Register::A as usize] & 0x1;
+
+        let carry = rotate_bit == 1;
+
+        self.registers[Register::A as usize] = (self.registers[Register::A as usize] >> 1) | ((self.f.contains(FlagRegister::CARRY) as u8) << 7);
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, carry);
+        self.f.set(FlagRegister::ZERO, false);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+        4
     }
 
     fn rla(&mut self) -> usize {
@@ -639,7 +740,30 @@ impl CPU {
     }
 
     fn daa(&mut self) -> usize {
-        todo!("daa");
+        let mut adj = 0;
+        if self.f.contains(FlagRegister::SUBTRACT) {
+            if self.f.contains(FlagRegister::HALF_CARRY) {
+                adj += 0x6;
+            }
+
+            if self.f.contains(FlagRegister::CARRY) {
+                adj += 0x60;
+            }
+
+            self.registers[Register::A as usize] -= adj;
+        } else {
+            if self.f.contains(FlagRegister::HALF_CARRY) || (self.registers[Register::A as usize] & 0xf) > 0x9 {
+                adj += 0x6;
+            }
+
+            if self.f.contains(FlagRegister::CARRY) || self.registers[Register::A as usize] > 0x99 {
+                adj += 0x60;
+            }
+
+            self.registers[Register::A as usize] += adj;
+        }
+
+        4
     }
 
     fn cpl(&mut self) -> usize {
@@ -661,7 +785,9 @@ impl CPU {
     }
 
     fn halt(&mut self) -> usize {
-        todo!("halt");
+        self.is_halted = true;
+
+        0
     }
 
     fn ret(&mut self, flags: JumpFlags) -> usize {
@@ -691,7 +817,26 @@ impl CPU {
     }
 
     fn add_sp(&mut self) -> usize {
-        todo!("add_sp");
+        let displacement = self.bus.mem_read8(self.pc) as i8 as i16;
+
+        self.pc += 1;
+
+        let old_sp = self.sp;
+
+        self.sp = (self.sp as i32 + displacement as i32) as u16;
+
+        let (carry, half_carry) = if displacement < 0 {
+            ((old_sp as u8) < (self.sp as u8),  (old_sp & 0xf) < (self.sp & 0xf))
+        } else {
+            ((old_sp as u8) > (self.sp as u8),  (old_sp & 0xf) > (self.sp & 0xf))
+        };
+
+        self.f.set(FlagRegister::ZERO, false);
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, carry);
+        self.f.set(FlagRegister::HALF_CARRY, half_carry);
+
+        16
     }
 
     fn pop(&mut self, r1: Register) -> usize {
@@ -817,7 +962,19 @@ impl CPU {
     }
 
     fn set(&mut self, bit: u8, r1: Register) -> usize {
-        todo!("set");
+        if r1 == Register::HLPointer {
+            let mut value = self.bus.mem_read8(self.hl());
+
+            value |= 1 << bit;
+
+            self.bus.mem_write8(self.hl(), value);
+
+            16
+        } else {
+            self.registers[r1 as usize] |= 1 << bit;
+
+            8
+        }
     }
 
     fn rl(&mut self, r1: Register) -> usize {
@@ -894,7 +1051,35 @@ impl CPU {
     }
 
     fn rr(&mut self, r1: Register) -> usize {
-        todo!("rr");
+        let (result, cycles, carry) = if r1 == Register::HL {
+            let mut value = self.bus.mem_read8(self.hl());
+
+            let carry_bit = value & 0x1;
+            let carry = carry_bit == 1;
+
+            value = (value >> 1) | ((self.f.contains(FlagRegister::CARRY) as u8) << 7);
+
+            self.bus.mem_write8(self.hl(), value);
+
+
+
+            (value, 16, carry)
+        } else {
+            let rotate_bit = self.registers[r1 as usize] & 0x1;
+
+            let carry = rotate_bit == 1;
+
+            self.registers[r1 as usize] = (self.registers[r1 as usize] >> 1) | ((self.f.contains(FlagRegister::CARRY) as u8) << 7);
+
+            (self.registers[r1 as usize], 8, carry)
+        };
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, carry);
+        self.f.set(FlagRegister::ZERO, result == 0);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+        cycles
     }
 
     fn swap(&mut self, r1: Register) -> usize {
