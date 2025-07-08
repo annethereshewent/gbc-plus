@@ -39,7 +39,8 @@ pub struct CPU {
     sp: u16,
     f: FlagRegister,
     pub bus: Bus,
-    found: HashSet<u16>
+    found: HashSet<u16>,
+    debug_on: bool
 }
 
 impl CPU {
@@ -50,7 +51,8 @@ impl CPU {
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
             bus: Bus::new(),
-            found: HashSet::new()
+            found: HashSet::new(),
+            debug_on: false
         }
     }
 

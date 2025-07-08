@@ -79,7 +79,7 @@ impl CPU {
     }
     fn diss_ld_registers(&self, reg1: Register, reg2: Register, load_type: LoadType) -> String {
         match load_type {
-            LoadType::LeftPointer => format!("LD ({:?}, {:?}", reg1, reg2),
+            LoadType::LeftPointer => format!("LD ({:?}), {:?}", reg1, reg2),
             LoadType::Normal => format!("LD {:?}, {:?}", reg1, reg2),
             LoadType::RightPointer => format!("LD {:?} ({:?})", reg1, reg2)
         }

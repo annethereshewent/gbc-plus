@@ -495,10 +495,12 @@ impl CPU {
                 (self.registers[register as usize], 4)
             }
         } else {
-            (self.bus.mem_read8(self.pc), 8)
-        };
+            let (operand, cycles) = (self.bus.mem_read8(self.pc), 8);
 
-        self.pc += 1;
+            self.pc += 1;
+
+            (operand, cycles)
+        };
 
         self.subtract(a_val, operand);
 
@@ -647,13 +649,13 @@ impl CPU {
     }
 
     fn scf(&mut self) -> usize {
-        self.f.set(FlagRegister::CARRY, !self.f.contains(FlagRegister::CARRY));
+        self.f.set(FlagRegister::CARRY, true);
 
         4
     }
 
     fn ccf(&mut self) -> usize {
-        self.f.set(FlagRegister::CARRY, false);
+        self.f.set(FlagRegister::CARRY, !self.f.contains(FlagRegister::CARRY));
 
         4
     }

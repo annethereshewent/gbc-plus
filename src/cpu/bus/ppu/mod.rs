@@ -133,7 +133,9 @@ impl PPU {
 
         // println!("base_tile = {base_tile}");
 
-        for x in (0..SCREEN_WIDTH).step_by(8) {
+        let mut step_by = 8 - (scroll_x as usize % 8);
+
+        for x in (0..SCREEN_WIDTH).step_by(step_by) {
             if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
                 let tile_number = base_tile + x / 8;
 
@@ -169,6 +171,8 @@ impl PPU {
 
                     self.picture.set_pixel(x + i, y as usize, pixel);
                 }
+
+                step_by = 8 - x_in_tile as usize;
             } else {
                 let color = self.bgp.indexes[0];
 
