@@ -49,6 +49,25 @@ impl APU {
         }
     }
 
+    fn generate_samples(&mut self) {
+        let ch1_sample = self.channel1.generate_sample();
+        let ch2_sample = self.channel2.generate_sample();
+
+        let sample = (ch1_sample + ch2_sample) / 2.0;
+
+        let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
+        let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
+
+        let mut audio_buffer = self.audio_buffer.lock().unwrap();
+
+        if audio_buffer.len() < NUM_SAMPLES {
+            audio_buffer.push_back(left_sample);
+        }
+        if audio_buffer.len() < NUM_SAMPLES {
+            audio_buffer.push_back(right_sample);
+        }
+    }
+
     pub fn tick(&mut self, cycles: usize) {
         self.channel1.tick(cycles);
         self.channel2.tick(cycles);
@@ -60,21 +79,8 @@ impl APU {
         if self.cycles >= TICKS_PER_SAMPLE {
             self.cycles -= TICKS_PER_SAMPLE;
 
-            let ch1_sample = self.channel1.generate_sample();
-            let ch2_sample = self.channel2.generate_sample();
-
-            let sample = (ch1_sample + ch2_sample) / 2.0;
-
-            let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
-            let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
-
-            let mut audio_buffer = self.audio_buffer.lock().unwrap();
-
-            if audio_buffer.len() < NUM_SAMPLES {
-                audio_buffer.push_back(left_sample);
-            }
-            if audio_buffer.len() < NUM_SAMPLES {
-                audio_buffer.push_back(right_sample);
+            if self.nr52.audio_on {
+                self.generate_samples();
             }
         }
     }
