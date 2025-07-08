@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::{HashSet, VecDeque}, sync::{Arc, Mutex}};
 
 use bitflags::bitflags;
 use bus::{interrupt_register::InterruptRegister, Bus};
@@ -6,6 +6,8 @@ use bus::{interrupt_register::InterruptRegister, Bus};
 pub mod bus;
 pub mod cpu_instructions;
 pub mod disassembler;
+
+pub const CLOCK_SPEED: usize = 4194304;
 
 bitflags! {
     pub struct FlagRegister: u8 {
@@ -45,13 +47,13 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new() -> CPU {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> CPU {
         CPU {
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
-            bus: Bus::new(),
+            bus: Bus::new(audio_buffer),
             found: HashSet::new(),
             debug_on: false,
             is_halted: false

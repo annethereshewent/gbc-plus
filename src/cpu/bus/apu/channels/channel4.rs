@@ -18,4 +18,12 @@ impl Channel4 {
             length: 0
         }
     }
+
+    pub fn write_control(&mut self, value: u8) {
+        self.nr44.write(value);
+    }
+
+    pub fn tick(&mut self, cycles: usize) {
+
+    }
 }

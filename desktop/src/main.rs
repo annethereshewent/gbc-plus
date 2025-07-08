@@ -1,12 +1,50 @@
-use std::{env, fs};
+use std::{collections::VecDeque, env, fs, sync::{Arc, Mutex}};
 
 extern crate gbc_plus;
 
 use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
-use sdl2::{audio::AudioSpecDesired, event::Event, pixels::PixelFormatEnum};
+use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, pixels::PixelFormatEnum};
+
+pub struct GbcAudioCallback {
+    pub audio_samples: Arc<Mutex<VecDeque<f32>>>
+}
+
+impl AudioCallback for GbcAudioCallback {
+    type Channel = f32;
+
+    fn callback(&mut self, buf: &mut [Self::Channel]) {
+        let mut audio_samples = self.audio_samples.lock().unwrap();
+        let len = audio_samples.len();
+
+        let mut left_sample: f32 = 0.0;
+        let mut right_sample: f32 = 0.0;
+
+        if len > 2 {
+            left_sample = audio_samples[len - 2];
+            right_sample = audio_samples[len - 1];
+        }
+
+        let mut is_left_sample = true;
+
+
+        for b in buf.iter_mut() {
+            *b = if let Some(sample) = audio_samples.pop_front() {
+                sample
+            } else {
+                if is_left_sample {
+                    left_sample
+                } else {
+                    right_sample
+                }
+            };
+            is_left_sample = !is_left_sample;
+        }
+    }
+}
 
 fn main() {
-    let mut cpu = CPU::new();
+    let audio_buffer = Arc::new(Mutex::new(VecDeque::<f32>::new()));
+    let mut cpu = CPU::new(audio_buffer.clone());
 
     let args: Vec<String> = env::args().collect();
 
@@ -34,6 +72,22 @@ fn main() {
             }
         }
     });
+
+    let audio_subsystem = sdl_context.audio().unwrap();
+
+    let spec = AudioSpecDesired {
+      freq: Some(44100),
+      channels: Some(2),
+      samples: Some(8192)
+    };
+
+    let device = audio_subsystem.open_playback(
+        None,
+        &spec,
+        |_| GbcAudioCallback { audio_samples: audio_buffer.clone() }
+    ).unwrap();
+
+    device.resume();
 
     let window = video_subsystem
         .window("GBC+", (SCREEN_WIDTH * 3) as u32, (SCREEN_HEIGHT * 3) as u32)

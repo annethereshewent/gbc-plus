@@ -1,9 +1,9 @@
 pub struct AudioMasterRegister {
-    ch1_on: bool,
-    ch2_on: bool,
-    ch3_on: bool,
-    ch4_on: bool,
-    audio_on: bool
+    pub ch1_on: bool,
+    pub ch2_on: bool,
+    pub ch3_on: bool,
+    pub ch4_on: bool,
+    pub audio_on: bool
 }
 
 impl AudioMasterRegister {

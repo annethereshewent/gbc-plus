@@ -1,3 +1,5 @@
+use std::{collections::VecDeque, sync::{Arc, Mutex}};
+
 use apu::{sound_panning_register::SoundPanningRegister, APU};
 use cartridge::Cartridge;
 use joypad::Joypad;
@@ -26,7 +28,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new() -> Self {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
         Self {
             cartridge: Cartridge::new(),
             wram: vec![0; 0x2000].into_boxed_slice(),
@@ -35,7 +37,7 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new(),
+            apu: APU::new(audio_buffer),
             joypad: Joypad::new(),
             timer: Timer::new()
         }
@@ -44,6 +46,7 @@ impl Bus {
     pub fn tick(&mut self, cycles: usize) {
         self.timer.tick(cycles, &mut self.IF);
         self.ppu.tick(cycles, &mut self.IF);
+        self.apu.tick(cycles);
     }
 
 
@@ -81,7 +84,7 @@ impl Bus {
     pub fn handle_dma(&mut self, value: u8) {
         let address = (value as u16) << 8;
 
-        for i in (0..0xa0) {
+        for i in 0..0xa0 {
             self.mem_write8(0xfe00 + i, self.mem_read8(address + i));
         }
 
@@ -104,24 +107,33 @@ impl Bus {
             0xff06 => self.timer.tma = value,
             0xff07 => self.timer.update_tac(value),
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
-            0xff10 => self.apu.channel1.nr10.write(value),
-            0xff11 => self.apu.channel1.nr11.write(value),
-            0xff12 => self.apu.channel1.nr12.write(value),
-            0xff13 => self.apu.channel1.period_lo = value,
-            0xff14 => self.apu.channel1.nr14.write(value),
-            0xff16 => self.apu.channel2.nr21.write(value),
-            0xff17 => self.apu.channel2.nr22.write(value),
-            0xff18 => self.apu.channel2.period_lo = value,
-            0xff19 => self.apu.channel2.nr24.write(value),
-            0xff1a => self.apu.write_dac_enable(value),
+            0xff10 => self.apu.channel1.write_sweep(value),
+            0xff11 => self.apu.channel1.write_length_register(value),
+            0xff12 => self.apu.channel1.write_volume_register(value),
+            0xff13 => {
+                self.apu.channel1.period &= 0x700;
+                self.apu.channel1.period |= value as u16;
+            }
+            0xff14 => self.apu.channel1.write_period_high_control(value),
+            0xff16 => self.apu.channel2.write_length_register(value),
+            0xff17 => self.apu.channel2.write_volume_register(value),
+            0xff18 => {
+                self.apu.channel2.period &= 0x700;
+                self.apu.channel2.period |= value as u16;
+            }
+            0xff19 => self.apu.channel2.write_period_high_control(value),
+            0xff1a => self.apu.channel3.write_dac_enable(value),
             0xff1b => self.apu.channel3.length = value,
             0xff1c => self.apu.channel3.output = (value >> 5) & 0x3,
-            0xff1d => self.apu.channel3.period_lo = value,
-            0xff1e => self.apu.channel3.nr34.write(value),
+            0xff1d => {
+                self.apu.channel3.period &= 0x700;
+                self.apu.channel3.period |= value as u16;
+            }
+            0xff1e => self.apu.channel3.write_period_high_control(value),
             0xff20 => self.apu.channel4.length = value & 0x3f,
             0xff21 => self.apu.channel4.nr42.write(value),
             0xff22 => self.apu.channel4.nr43.write(value),
-            0xff23 => self.apu.channel4.nr44.write(value),
+            0xff23 => self.apu.channel4.write_control(value),
             0xff24 => self.apu.nr50.write(value),
             0xff25 => self.apu.nr51 = SoundPanningRegister::from_bits_retain(value),
             0xff26 => self.apu.nr52.write(value),
