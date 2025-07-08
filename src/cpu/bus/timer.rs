@@ -36,19 +36,21 @@ impl Timer {
     }
 
     pub fn tick(&mut self, cycles: usize, interrupt_register: &mut InterruptRegister) {
-        self.cycles += cycles;
+        if self.tac.contains(TimerControl::ENABLE) {
+            self.cycles += cycles;
 
-        if self.cycles >= self.interval {
-            self.cycles -= self.interval;
+            if self.cycles >= self.interval {
+                self.cycles -= self.interval;
 
-            let (result, overflow) = self.tima.overflowing_add(1);
+                let (result, overflow) = self.tima.overflowing_add(1);
 
-            self.tima = result;
+                self.tima = result;
 
-            if overflow {
-                self.tima = self.tma;
-                // request interrupt
-                interrupt_register.set(InterruptRegister::TIMER, true);
+                if overflow {
+                    self.tima = self.tma;
+                    // request interrupt
+                    interrupt_register.set(InterruptRegister::TIMER, true);
+                }
             }
         }
     }

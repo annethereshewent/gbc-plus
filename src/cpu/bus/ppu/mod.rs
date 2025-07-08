@@ -120,7 +120,7 @@ impl PPU {
         };
 
         let base_tile_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_AND_WINDOW_TILES) {
-            0x9000
+            0x8800
         } else {
             0x8000
         };
@@ -133,7 +133,7 @@ impl PPU {
 
         // println!("base_tile = {base_tile}");
 
-        for x in (0..SCREEN_WIDTH) {
+        for x in 0..SCREEN_WIDTH {
             if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
                 let tile_number = base_tile + x / 8;
 
@@ -147,7 +147,7 @@ impl PPU {
                 let tile_address = if base_tile_address == 0x8000 {
                     base_tile_address + tile_id as usize * 16 + y_in_tile * 2
                 } else {
-                    let offset = (tile_id as i32 - 128) * 16 + y_in_tile as i32 * 2;
+                    let offset = (tile_id as i8 as i32 + 128) * 16 + y_in_tile as i32 * 2;
 
                     (base_tile_address as i32 + offset) as usize
                 };
