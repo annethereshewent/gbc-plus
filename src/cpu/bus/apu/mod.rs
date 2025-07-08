@@ -2,8 +2,7 @@ use std::{collections::VecDeque, sync::{Arc, Mutex}};
 
 use audio_master_register::AudioMasterRegister;
 use channels::{
-    channel1::Channel1,
-    channel2::Channel2,
+    pulse_channel::PulseChannel,
     channel3::Channel3,
     channel4::Channel4,
 };
@@ -25,8 +24,8 @@ pub struct APU {
     pub nr51: SoundPanningRegister,
     pub nr50: MasterVolumeVinRegister,
     pub wave_ram: [u8; 16],
-    pub channel1: Channel1,
-    pub channel2: Channel2,
+    pub channel1: PulseChannel<true>,
+    pub channel2: PulseChannel<false>,
     pub channel3: Channel3,
     pub channel4: Channel4,
     cycles: usize,
@@ -40,8 +39,8 @@ impl APU {
             nr51: SoundPanningRegister::from_bits_retain(0),
             nr50: MasterVolumeVinRegister::new(),
             wave_ram: [0; 16],
-            channel1: Channel1::new(),
-            channel2: Channel2::new(),
+            channel1: PulseChannel::new(),
+            channel2: PulseChannel::new(),
             channel3: Channel3::new(),
             channel4: Channel4::new(),
             cycles: 0,

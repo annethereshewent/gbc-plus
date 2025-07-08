@@ -5,7 +5,6 @@ pub mod channel_sweep_register;
 pub mod channel_length_duty_register;
 pub mod channel_freq_random_register;
 
-pub mod channel1;
-pub mod channel2;
+pub mod pulse_channel;
 pub mod channel3;
 pub mod channel4;
