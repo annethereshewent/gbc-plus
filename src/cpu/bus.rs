@@ -42,7 +42,7 @@ impl Bus {
     }
 
     pub fn tick(&mut self, cycles: usize) {
-        self.timer.tick(cycles);
+        self.timer.tick(cycles, &mut self.IF);
         self.ppu.tick(cycles, &mut self.IF);
     }
 

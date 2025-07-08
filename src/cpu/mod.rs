@@ -76,10 +76,10 @@ impl CPU {
 
         self.pc += 1;
 
-        if !self.found.contains(&(self.pc - 1)) {
-            println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
-            self.found.insert(self.pc - 1);
-        }
+        // if !self.found.contains(&(self.pc - 1)) {
+        //     println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
+        //     self.found.insert(self.pc - 1);
+        // }
 
         let cycles = self.decode_instruction(opcode);
 
