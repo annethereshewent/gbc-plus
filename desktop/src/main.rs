@@ -116,6 +116,8 @@ fn main() {
             cpu.step();
         }
 
+        cpu.bus.ppu.cap_fps();
+
         cpu.bus.ppu.frame_finished = false;
 
         texture.update(None, &cpu.bus.ppu.picture.data, SCREEN_WIDTH as usize * 3).unwrap();

@@ -1,3 +1,5 @@
+use std::{thread::sleep, time::{Duration, SystemTime, UNIX_EPOCH}};
+
 use bg_palette_register::{BGColor, BGPaletteRegister};
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
@@ -21,6 +23,8 @@ const MODE1_CYCLES: usize = 456;
 
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
+
+const FPS_INTERVAL: u128 = 1000 / 60;
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -47,7 +51,8 @@ pub struct PPU {
     pub obp1: ObjPaletteRegister,
     pub oam: [OAMEntry; 0xa0],
     pub frame_finished: bool,
-    pub picture: Picture
+    pub picture: Picture,
+    previous_time: u128
 }
 
 impl PPU {
@@ -68,7 +73,8 @@ impl PPU {
             obp1: ObjPaletteRegister::new(),
             oam: [OAMEntry::new(); 0xa0],
             frame_finished: false,
-            picture: Picture::new()
+            picture: Picture::new(),
+            previous_time: 0
         }
     }
 
@@ -104,6 +110,26 @@ impl PPU {
                 LCDMode::OAMScan
             };
         }
+    }
+
+    pub fn cap_fps(&mut self) {
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
+
+        if self.previous_time != 0 {
+            let diff = current_time - self.previous_time;
+
+            if diff < FPS_INTERVAL {
+                sleep(Duration::from_millis((FPS_INTERVAL - diff) as u64));
+            }
+        }
+
+        self.previous_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
     }
 
     fn draw_line(&mut self) {
