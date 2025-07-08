@@ -121,13 +121,19 @@ impl APU {
     }
 
     pub fn tick(&mut self, cycles: usize) {
+        self.cycles += cycles;
+        self.sequencer_cycles += cycles;
+
         self.channel1.tick(cycles);
         self.channel2.tick(cycles);
         self.channel3.tick(cycles);
         self.channel4.tick(cycles);
 
-        self.cycles += cycles;
-        self.sequencer_cycles += cycles;
+        if self.sequencer_cycles >= HZ_512 {
+            self.sequencer_cycles -= HZ_512;
+
+            self.update_frame_sequencer();
+        }
 
         if self.cycles >= TICKS_PER_SAMPLE {
             self.cycles -= TICKS_PER_SAMPLE;
@@ -135,12 +141,6 @@ impl APU {
             if self.nr52.audio_on {
                 self.generate_samples();
             }
-        }
-
-        if self.sequencer_cycles >= HZ_512 {
-            self.sequencer_cycles -= HZ_512;
-
-            self.update_frame_sequencer();
         }
     }
 }
