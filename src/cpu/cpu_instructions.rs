@@ -143,7 +143,7 @@ impl CPU {
             JumpFlags::NoFlag => {
                 true
             }
-            JumpFlags:: NZ => {
+            JumpFlags::NZ => {
                 !self.f.contains(FlagRegister::ZERO)
             }
             JumpFlags::Z => {
