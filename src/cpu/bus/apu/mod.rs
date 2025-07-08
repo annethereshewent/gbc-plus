@@ -23,7 +23,6 @@ pub struct APU {
     pub nr52: AudioMasterRegister,
     pub nr51: SoundPanningRegister,
     pub nr50: MasterVolumeVinRegister,
-    pub wave_ram: [u8; 16],
     pub channel1: PulseChannel<true>,
     pub channel2: PulseChannel<false>,
     pub channel3: Channel3,
@@ -38,7 +37,6 @@ impl APU {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
             nr50: MasterVolumeVinRegister::new(),
-            wave_ram: [0; 16],
             channel1: PulseChannel::new(),
             channel2: PulseChannel::new(),
             channel3: Channel3::new(),
@@ -51,8 +49,9 @@ impl APU {
     fn generate_samples(&mut self) {
         let ch1_sample = self.channel1.generate_sample();
         let ch2_sample = self.channel2.generate_sample();
+        let ch3_sample = self.channel3.generate_sample();
 
-        let sample = (ch1_sample + ch2_sample) / 2.0;
+        let sample = (ch1_sample + ch2_sample + ch3_sample) / 4.0;
 
         let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
         let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;

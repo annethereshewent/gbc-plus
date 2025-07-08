@@ -124,7 +124,13 @@ impl Bus {
             0xff19 => self.apu.channel2.write_period_high_control(value),
             0xff1a => self.apu.channel3.write_dac_enable(value),
             0xff1b => self.apu.channel3.length = value,
-            0xff1c => self.apu.channel3.output = (value >> 5) & 0x3,
+            0xff1c => self.apu.channel3.output = match (value >> 5) & 0x3 {
+                0 => None,
+                1 => Some(0),
+                2 => Some(1),
+                3 => Some(2),
+                _ => unreachable!()
+            },
             0xff1d => {
                 self.apu.channel3.period &= 0x700;
                 self.apu.channel3.period |= value as u16;
@@ -137,7 +143,7 @@ impl Bus {
             0xff24 => self.apu.nr50.write(value),
             0xff25 => self.apu.nr51 = SoundPanningRegister::from_bits_retain(value),
             0xff26 => self.apu.nr52.write(value),
-            0xff30..=0xff3f => self.apu.wave_ram[(address - 0xff30) as usize] = value,
+            0xff30..=0xff3f => self.apu.channel3.wave_ram[(address - 0xff30) as usize] = value,
             0xff40 => self.ppu.update_lcdc(value),
             0xff41 => self.ppu.stat = LCDStatusRegister::from_bits_truncate(value),
             0xff42 => self.ppu.scy = value,

@@ -4,6 +4,7 @@ use super::{channel_length_duty_register::ChannelLengthDutyRegister, channel_per
 
 
 const TICKS_PER_ITERATION: usize = CLOCK_SPEED / 128;
+pub const LENGTH_CYCLES_NEEDED: usize = CLOCK_SPEED / 256;
 
 pub struct PulseChannel<const IS_CHANNEL1: bool>  {
     pub enabled: bool,
@@ -23,7 +24,7 @@ pub struct PulseChannel<const IS_CHANNEL1: bool>  {
     sweep_enabled: bool
 }
 
-pub const DUTY_PATTERNS: [[usize; 8]; 4] = [
+const DUTY_PATTERNS: [[usize; 8]; 4] = [
     [0,0,0,0,0,0,0,1],
     [0,0,0,0,0,0,1,1],
     [0,0,0,0,1,1,1,1],
@@ -84,9 +85,9 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.enabled {
             let bit = DUTY_PATTERNS[self.nrx1.wave_duty as usize][self.duty_step];
 
-            (((bit * self.current_volume) as f32) / 7.5) - 1.0
+            (((bit * self.current_volume) as f32) / 15.0) - 1.0
         } else {
-            -1.0
+            0.0
         }
     }
 
@@ -119,10 +120,8 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         self.length_cycles += cycles;
 
         if self.nrx4.length_enable {
-            let length_cycles_needed = CLOCK_SPEED / 256;
-
-            if self.length_cycles >= length_cycles_needed {
-                self.length_cycles -= length_cycles_needed;
+            if self.length_cycles >= LENGTH_CYCLES_NEEDED {
+                self.length_cycles -= LENGTH_CYCLES_NEEDED;
 
                 self.current_timer += 1;
 
