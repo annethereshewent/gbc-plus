@@ -63,7 +63,7 @@ impl APU {
             let ch1_sample = self.channel1.generate_sample();
             let ch2_sample = self.channel2.generate_sample();
 
-            let sample = (ch1_sample + ch2_sample) / 4.0;
+            let sample = (ch1_sample + ch2_sample) / 2.0;
 
             let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
             let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
