@@ -55,6 +55,10 @@ impl Timer {
         }
     }
 
+    pub fn write_tima(&mut self, value: u8) {
+        self.tima = value;
+    }
+
     pub fn update_tac(&mut self, val: u8) {
         self.tac = TimerControl::from_bits_retain(val);
 

@@ -52,6 +52,7 @@ impl Bus {
             0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
+            0xff0f => self.IF.bits(),
             0xff40 => self.ppu.lcdc.bits(),
             0xff41 => self.ppu.stat.bits(),
             0xff44 => self.ppu.line_y,
@@ -99,6 +100,7 @@ impl Bus {
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
             0xff00 => self.joypad.write(value),
             0xff01..=0xff02 => (), // Serial ports, ignore!
+            0xff05 => self.timer.write_tima(value),
             0xff06 => self.timer.tma = value,
             0xff07 => self.timer.update_tac(value),
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
