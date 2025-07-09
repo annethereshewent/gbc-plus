@@ -1,4 +1,4 @@
-use super::{channel_period_high_control_register::ChannelPeriodHighControlRegister, pulse_channel::LENGTH_CYCLES_NEEDED};
+use super::channel_period_high_control_register::ChannelPeriodHighControlRegister;
 
 pub struct Channel3 {
     pub enabled: bool,

@@ -1,4 +1,14 @@
-use super::{channel4_control_register::Channel4ControlRegister, channel_freq_random_register::{ChannelFreqRandomRegister, LFSRWidth}, channel_volume_register::{ChannelVolumeRegister, EnvelopeDirection}};
+use super::{
+    channel4_control_register::Channel4ControlRegister,
+    channel_freq_random_register::{
+        ChannelFreqRandomRegister,
+        LFSRWidth
+    },
+    channel_volume_register::{
+        ChannelVolumeRegister,
+        EnvelopeDirection
+    }
+};
 
 pub struct Channel4 {
     pub enabled: bool,

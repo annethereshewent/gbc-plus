@@ -106,6 +106,8 @@ impl APU {
         self.sequencer_step = (self.sequencer_step + 1) & 0x7;
     }
 
+    // i wanted to dry up all these tick_length and tick_envelope methods, but rust literally will *not* let me.
+    // it complains constantly about the damn borrow checker. so shitty inefficient code it is! thanks rust.
     fn clock_lengths(&mut self) {
         self.channel1.tick_length();
         self.channel2.tick_length();
