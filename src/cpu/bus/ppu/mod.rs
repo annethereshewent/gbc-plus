@@ -83,7 +83,9 @@ pub struct PPU {
     pub frame_finished: bool,
     pub picture: Picture,
     previous_time: u128,
-    prev_background_indexes: [usize; SCREEN_WIDTH]
+    prev_background_indexes: [usize; SCREEN_WIDTH],
+    current_window_line: Option<usize>,
+    previous_objs: [Option<OAMEntry>; SCREEN_WIDTH]
 }
 
 impl PPU {
@@ -106,7 +108,9 @@ impl PPU {
             frame_finished: false,
             picture: Picture::new(),
             previous_time: 0,
-            prev_background_indexes: [0; SCREEN_WIDTH]
+            prev_background_indexes: [0; SCREEN_WIDTH],
+            current_window_line: None,
+            previous_objs: [None; SCREEN_WIDTH]
         }
     }
 
@@ -176,6 +180,85 @@ impl PPU {
     fn draw_line(&mut self) {
         self.draw_background();
         self.draw_objects();
+        self.draw_window();
+    }
+
+    fn draw_window(&mut self) {
+        if self.line_y < self.wy || !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) || !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
+            return;
+        }
+
+        if self.current_window_line.is_none() {
+            self.current_window_line = Some(0);
+        }
+
+        let current_window_line = &mut self.current_window_line.unwrap();
+
+        let base_tilemap_address = if !self.lcdc.contains(LCDControlRegister::WINDOW_TILEMAP) {
+            0x9800
+        } else {
+            0x9c00
+        };
+
+        let base_tile_address = if !self.lcdc.contains(LCDControlRegister::BG_AND_WINDOW_TILES) {
+            0x9000
+        } else {
+            0x8000
+        };
+
+        let mut x_pos = self.wx as i16 - 7;
+
+        let x_tile_pos = if x_pos < 0 {
+            x_pos = 0;
+            -1 * (self.wx as i16 - 7)
+        } else {
+            0
+        };
+
+        for x in (x_pos as usize)..SCREEN_WIDTH {
+            let tile_number = (x_tile_pos as usize + x) / 8 + (*current_window_line as usize / 8) * 32;
+
+            let tilemap_address = base_tilemap_address + tile_number;
+
+            let tile_index = self.vram_read8(tilemap_address);
+
+            let y_pos_in_tile = *current_window_line & 0x7;
+            let x_pos_in_tile = (x_tile_pos as usize + x) & 0x7;
+
+            let tile_address = if base_tile_address == 0x9000 {
+                (base_tile_address as i32 + (tile_index as i32) * 16) as usize + y_pos_in_tile * 2
+            } else {
+                base_tile_address as usize + tile_index as usize * 16 + y_pos_in_tile * 2
+            };
+
+            let lower = self.vram_read8(tile_address);
+            let upper = self.vram_read8(tile_address + 1);
+
+            let shift = 7 - x_pos_in_tile;
+
+            let lower_bit = (lower >> shift) & 0x1;
+            let upper_bit = (upper >> shift) & 0x1;
+
+            let palette_index = lower_bit | (upper_bit << 1);
+
+            if let Some(sprite) = self.previous_objs[x] {
+                if sprite.attributes.priority == OamPriority::None || palette_index == 0 {
+                    continue;
+                }
+            }
+
+            let color = self.bgp.indexes[palette_index as usize];
+
+            let pixel = Self::get_pixel(color);
+
+            self.picture.set_pixel(x, self.line_y as usize, pixel);
+        }
+
+        *current_window_line += 1;
+
+        if *current_window_line == SCREEN_HEIGHT {
+            self.current_window_line = None;
+        }
     }
 
     fn draw_background(&mut self) {
@@ -234,12 +317,7 @@ impl PPU {
             } else {
                 let color = self.bgp.indexes[0];
 
-                let pixel = match color {
-                    BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
-                    BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
-                    BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
-                    BGColor::Black => Color::new(0x15, 0x56, 0x15)
-                };
+                let pixel = Self::get_pixel(color);
 
                 self.picture.set_pixel(x, y as usize, pixel);
 
@@ -276,6 +354,11 @@ impl PPU {
                     break;
                 }
             }
+        }
+
+        // clear previously drawn sprites, otherwise data will be junk
+        for sprite in &mut self.previous_objs {
+            *sprite = None;
         }
 
         let base_tilemap_address: u16 = 0x8000;
@@ -323,6 +406,8 @@ impl PPU {
                     let pixel = Self::get_pixel(color);
 
                     self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
+
+                    self.previous_objs[x_pos as usize] = Some(sprite);
                 } else {
                     continue;
                 }
