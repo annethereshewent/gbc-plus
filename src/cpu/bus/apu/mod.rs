@@ -55,8 +55,9 @@ impl APU {
         let ch1_sample = self.channel1.generate_sample();
         let ch2_sample = self.channel2.generate_sample();
         let ch3_sample = self.channel3.generate_sample();
+        let ch4_sample = self.channel4.generate_sample();
 
-        let sample = (ch1_sample + ch2_sample + ch3_sample) / 4.0;
+        let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
         let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
         let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
@@ -109,6 +110,7 @@ impl APU {
         self.channel1.tick_length();
         self.channel2.tick_length();
         self.channel3.tick_length();
+        self.channel4.tick_length();
     }
 
     fn clock_sweep(&mut self) {
@@ -118,6 +120,7 @@ impl APU {
     fn clock_envelopes(&mut self) {
         self.channel1.tick_envelope();
         self.channel2.tick_envelope();
+        self.channel4.tick_envelope();
     }
 
     pub fn tick(&mut self, cycles: usize) {

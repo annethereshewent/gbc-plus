@@ -1,12 +1,16 @@
-pub enum LSFRWidth {
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum LFSRWidth {
     Bit15,
     Bit7
 }
 
+const DIVIDERS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
+
 pub struct ChannelFreqRandomRegister {
     pub clock_divider: u8,
     pub clock_shift: u8,
-    pub lsfr_width: LSFRWidth
+    pub lfsr_width: LFSRWidth
 }
 
 impl ChannelFreqRandomRegister {
@@ -14,15 +18,16 @@ impl ChannelFreqRandomRegister {
         Self {
             clock_divider: 0,
             clock_shift: 0,
-            lsfr_width: LSFRWidth::Bit15
+            lfsr_width: LFSRWidth::Bit15
         }
     }
 
     pub fn write(&mut self, value: u8) {
-        self.clock_divider = value & 0x7;
-        self.lsfr_width = match (value >> 3) & 0x1 {
-            0 => LSFRWidth::Bit15,
-            1 => LSFRWidth::Bit7,
+        let div = value & 0x7;
+        self.clock_divider = DIVIDERS[div as usize];
+        self.lfsr_width = match (value >> 3) & 0x1 {
+            0 => LFSRWidth::Bit15,
+            1 => LFSRWidth::Bit7,
             _ => unreachable!()
         };
 

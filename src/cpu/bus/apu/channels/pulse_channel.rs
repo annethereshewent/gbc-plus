@@ -98,7 +98,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
                 }
             }
         }
-
     }
 
     pub fn tick_length(&mut self) {
