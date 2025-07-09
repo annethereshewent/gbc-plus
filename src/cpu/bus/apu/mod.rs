@@ -17,7 +17,7 @@ pub mod master_volume_vin_register;
 pub mod channels;
 
 pub const TICKS_PER_SAMPLE: usize = CLOCK_SPEED / 44100;
-pub const NUM_SAMPLES: usize = 4096;
+pub const NUM_SAMPLES: usize = 4096 * 2;
 pub const HZ_512: usize = CLOCK_SPEED / 512;
 
 pub struct APU {
