@@ -26,7 +26,7 @@ impl Channel4 {
             envelope_timer: 0,
             current_timer: 0,
             current_volume: 0,
-            lfsr: 0,
+            lfsr: 1,
             output: 0
         }
     }
@@ -43,6 +43,7 @@ impl Channel4 {
         self.current_timer = self.length as usize;
         self.envelope_timer = self.nr42.sweep_pace as usize;
         self.current_volume = self.nr42.initial_volume as usize;
+        self.lfsr = 1;
     }
 
     pub fn tick_length(&mut self) {
