@@ -12,7 +12,7 @@ impl ChannelLengthDutyRegister {
     }
 
     pub fn write(&mut self, value: u8) {
-        self.wave_duty = value & 0x3;
-        self.initial_timer = (value >> 6) & 0x3f;
+        self.wave_duty = (value >> 6) & 0x3;
+        self.initial_timer = value & 0x3f;
     }
 }

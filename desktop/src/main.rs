@@ -6,7 +6,7 @@ use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
 use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, pixels::PixelFormatEnum};
 
 pub struct GbcAudioCallback {
-    pub audio_samples: Arc<Mutex<VecDeque<f32>>>
+    pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
 }
 
 impl AudioCallback for GbcAudioCallback {
@@ -25,7 +25,6 @@ impl AudioCallback for GbcAudioCallback {
         }
 
         let mut is_left_sample = true;
-
 
         for b in buf.iter_mut() {
             *b = if let Some(sample) = audio_samples.pop_front() {
@@ -78,13 +77,13 @@ fn main() {
     let spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(2),
-        samples: Some(8192)
+        samples: Some(4096)
     };
 
     let device = audio_subsystem.open_playback(
         None,
         &spec,
-        |_| GbcAudioCallback { audio_samples: audio_buffer.clone() }
+        |_| GbcAudioCallback { audio_samples: audio_buffer }
     ).unwrap();
 
     device.resume();

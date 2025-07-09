@@ -17,7 +17,7 @@ pub mod master_volume_vin_register;
 pub mod channels;
 
 pub const TICKS_PER_SAMPLE: usize = CLOCK_SPEED / 44100;
-pub const NUM_SAMPLES: usize = 8192 * 2;
+pub const NUM_SAMPLES: usize = 4096;
 pub const HZ_512: usize = CLOCK_SPEED / 512;
 
 pub struct APU {
@@ -61,7 +61,7 @@ impl APU {
         let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
         let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
 
-        let mut audio_buffer = self.audio_buffer.lock().unwrap();
+        let audio_buffer = &mut self.audio_buffer.lock().unwrap();
 
         if audio_buffer.len() < NUM_SAMPLES {
             audio_buffer.push_back(left_sample);

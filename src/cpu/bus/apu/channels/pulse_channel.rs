@@ -2,8 +2,6 @@ use crate::cpu::CLOCK_SPEED;
 
 use super::{channel_length_duty_register::ChannelLengthDutyRegister, channel_period_high_control_register::ChannelPeriodHighControlRegister, channel_sweep_register::{ChannelSweepRegister, SweepDirection}, channel_volume_register::{ChannelVolumeRegister, EnvelopeDirection}};
 
-
-const TICKS_PER_ITERATION: usize = CLOCK_SPEED / 128;
 pub const LENGTH_CYCLES_NEEDED: usize = CLOCK_SPEED / 256;
 
 pub struct PulseChannel<const IS_CHANNEL1: bool>  {
@@ -13,15 +11,13 @@ pub struct PulseChannel<const IS_CHANNEL1: bool>  {
     pub nrx0: Option<ChannelSweepRegister>,
     pub nrx1: ChannelLengthDutyRegister,
     pub period: u16,
-    sweep_cycles: usize,
-    length_cycles: usize,
-    envelope_cycles: usize,
     current_timer: usize,
     current_volume: usize,
     frequency_timer: isize,
     duty_step: usize,
     envelope_timer: usize,
-    sweep_enabled: bool
+    sweep_enabled: bool,
+    sweep_timer: usize
 }
 
 const DUTY_PATTERNS: [[usize; 8]; 4] = [
@@ -41,15 +37,13 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
             nrx2: ChannelVolumeRegister::new(),
             nrx4: ChannelPeriodHighControlRegister::new(),
             period: 0,
-            sweep_cycles: 0,
-            length_cycles: 0,
-            envelope_cycles: 0,
             current_timer: 0,
             current_volume: 0,
             frequency_timer: 0,
             duty_step: 0,
             envelope_timer: 0,
-            sweep_enabled: false
+            sweep_enabled: false,
+            sweep_timer: 0
         }
     }
 
@@ -66,8 +60,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     pub fn write_length_register(&mut self, value: u8) {
         self.nrx1.write(value);
-
-        self.current_timer = self.nrx1.initial_timer as usize;
     }
 
     pub fn write_sweep(&mut self, value: u8) {
@@ -76,7 +68,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
             if nrx0.pace == 0 {
                 self.enabled = false;
-                self.sweep_cycles = 0;
             }
         }
     }
@@ -85,9 +76,9 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.enabled {
             let bit = DUTY_PATTERNS[self.nrx1.wave_duty as usize][self.duty_step];
 
-            (((bit * self.current_volume) as f32) / 15.0) - 1.0
+            (((bit * self.current_volume) as f32) / 15.0) * 2.0 - 1.0
         } else {
-            0.0
+            -1.0
         }
     }
 
@@ -96,6 +87,7 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
         if self.envelope_timer == 0 {
             self.envelope_timer = self.nrx2.sweep_pace as usize;
+
             if self.nrx2.env_dir == EnvelopeDirection::Decrease {
                 if self.current_volume != 0 {
                     self.current_volume -= 1;
@@ -115,31 +107,36 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
             if self.current_timer >= 64 {
                 self.enabled = false;
-                self.current_timer = 0;
-                self.length_cycles = 0;
+                self.current_timer = self.nrx1.initial_timer as usize;
             }
         }
     }
 
     pub fn tick_sweep(&mut self) {
         if let Some(nrx0) = &mut self.nrx0 {
-            if self.sweep_enabled {
-                let operand = self.period >> nrx0.step;
+            let operand = self.period >> nrx0.step;
 
-                if nrx0.direction == SweepDirection::Addition {
-                    let new_period = self.period + operand;
+            self.sweep_timer -= 1;
 
-                    if new_period < 0x7ff {
-                        self.period = new_period
-                    } else {
-                        self.enabled = false;
-                    }
-                } else {
-                    if self.period > 0 {
-                        if operand <= self.period {
-                            self.period = self.period - operand
+            if self.sweep_timer == 0 {
+                self.sweep_timer = if nrx0.pace == 0 { 8 } else { nrx0.pace as usize };
+
+                if self.sweep_enabled && self.sweep_timer > 0 {
+                    if nrx0.direction == SweepDirection::Addition {
+                        let new_period = self.period + operand;
+
+                        if new_period < 0x7ff {
+                            self.period = new_period
                         } else {
-                            self.period = 0;
+                            self.enabled = false;
+                        }
+                    } else {
+                        if self.period > 0 {
+                            if operand <= self.period {
+                                self.period = self.period - operand
+                            } else {
+                                self.period = 0;
+                            }
                         }
                     }
                 }
@@ -159,7 +156,8 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         self.current_volume = self.nrx2.initial_volume as usize;
 
         if let Some(nrx0) = &mut self.nrx0 {
-            self.sweep_cycles = if nrx0.pace == 0 { 8 } else { nrx0.pace as usize };
+            self.sweep_timer = if nrx0.pace == 0 { 8 } else { nrx0.pace as usize };
+
             if nrx0.pace > 0 || nrx0.step > 0 {
                 self.sweep_enabled = true;
             }

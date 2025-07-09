@@ -10,7 +10,6 @@ pub struct Channel3 {
     pub wave_ram: [u8; 16],
     current_timer: usize,
     frequency_timer: isize,
-    length_cycles: usize,
     current_sample: u8,
     sample_counter: usize
 }
@@ -27,7 +26,6 @@ impl Channel3 {
             wave_ram: [0; 16],
             current_timer: 0,
             frequency_timer: 0,
-            length_cycles: 0,
             current_sample: 0,
             sample_counter: 0
         }
@@ -52,11 +50,11 @@ impl Channel3 {
     }
 
     pub fn generate_sample(&self) -> f32 {
-        if self.enabled {
+        if self.enabled && self.dac_enable  {
             if let Some(output) = self.output {
-                ((self.current_sample >> output) as f32 / 15.0) - 1.0
+                (((self.current_sample >> output) as f32) / 15.0) * 2.0 - 1.0
             } else {
-                0.0
+                -1.0
             }
         } else {
             0.0
@@ -72,6 +70,8 @@ impl Channel3 {
 
         // could also be calculated as CLOCK_SPEED / sample_frequency where sample_frequency = 2097152 / (2048 - period)
         self.frequency_timer = (2048 - self.period as isize) * 2;
+
+        self.sample_counter = 0;
     }
 
     pub fn tick_length(&mut self) {
