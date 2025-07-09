@@ -28,6 +28,36 @@ const FPS_INTERVAL: u128 = 1000 / 60;
 
 
 #[derive(Copy, Clone, PartialEq)]
+pub enum OamPriority {
+    None,
+    Background
+}
+
+#[derive(Copy, Clone)]
+pub struct OamAttributes {
+    pub priority: OamPriority,
+    pub y_flip: bool,
+    pub x_flip: bool,
+    pub dmg_palette: u8
+}
+
+impl OamAttributes {
+    pub fn new(attributes: u8) -> Self {
+        Self {
+            priority: match (attributes >> 7) & 0x1 {
+                0 => OamPriority::None,
+                1 => OamPriority::Background,
+                _ => unreachable!()
+            },
+            dmg_palette: (attributes >> 4) & 0x1,
+            x_flip: (attributes >> 5) & 0x1 == 1,
+            y_flip: (attributes >> 6) & 0x1 == 1,
+        }
+    }
+}
+
+
+#[derive(Copy, Clone, PartialEq)]
 pub enum LCDMode {
     HBlank = 0,
     VBlank = 1,
@@ -52,7 +82,8 @@ pub struct PPU {
     pub oam: [OAMEntry; 0xa0],
     pub frame_finished: bool,
     pub picture: Picture,
-    previous_time: u128
+    previous_time: u128,
+    prev_background_indexes: [usize; SCREEN_WIDTH]
 }
 
 impl PPU {
@@ -74,7 +105,8 @@ impl PPU {
             oam: [OAMEntry::new(); 0xa0],
             frame_finished: false,
             picture: Picture::new(),
-            previous_time: 0
+            previous_time: 0,
+            prev_background_indexes: [0; SCREEN_WIDTH]
         }
     }
 
@@ -109,6 +141,15 @@ impl PPU {
                 }
                 LCDMode::OAMScan
             };
+        }
+    }
+
+    fn get_pixel(bg_color: BGColor) -> Color {
+        match bg_color {
+            BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
+            BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
+            BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
+            BGColor::Black => Color::new(0x15, 0x56, 0x15)
         }
     }
 
@@ -185,14 +226,11 @@ impl PPU {
 
                 let color = self.bgp.indexes[palette_index as usize];
 
-                let pixel = match color {
-                    BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
-                    BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
-                    BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
-                    BGColor::Black => Color::new(0x15, 0x56, 0x15)
-                };
+                let pixel = Self::get_pixel(color);
 
                 self.picture.set_pixel(x, y as usize, pixel);
+
+                self.prev_background_indexes[x as usize] = color as usize;
             } else {
                 let color = self.bgp.indexes[0];
 
@@ -204,6 +242,8 @@ impl PPU {
                 };
 
                 self.picture.set_pixel(x, y as usize, pixel);
+
+                self.prev_background_indexes[x as usize] = 0;
             }
         }
     }
@@ -213,7 +253,82 @@ impl PPU {
     }
 
     fn draw_objects(&mut self) {
+        if !self.lcdc.contains(LCDControlRegister::OBJ_ENABLE) {
+            return;
+        }
 
+        let sprite_height = if self.lcdc.contains(LCDControlRegister::OBJ_SIZE) {
+            16
+        } else {
+            8
+        };
+
+        let mut candidates: Vec<OAMEntry> = Vec::new();
+
+
+
+        for entry in &mut self.oam {
+             let y_diff: i16 = self.line_y as i16 - (entry.y_position as i16 - 16);
+            if y_diff >= 0 && y_diff < sprite_height as i16 {
+                candidates.push(*entry);
+
+                if candidates.len() == 10 {
+                    break;
+                }
+            }
+        }
+
+        let base_tilemap_address: u16 = 0x8000;
+
+        for sprite in candidates {
+            for i in 0..8 {
+                let x_pos = i + (sprite.x_position as i16 - 8);
+
+                println!("x_pos = {x_pos}");
+
+                if x_pos < 0 {
+                    continue;
+                }
+
+                let mut y_in_tile = self.line_y - (sprite.y_position - 16);
+
+                if sprite.attributes.y_flip {
+                    y_in_tile = sprite_height - 1 - y_in_tile;
+                }
+
+                let tile_address = base_tilemap_address + sprite.tile_index as u16 * 16 + y_in_tile as u16 * 2;
+
+                let lower_byte = self.vram_read8(tile_address as usize);
+                let upper_byte = self.vram_read8(tile_address as usize + 1);
+
+                let bit_index = if sprite.attributes.x_flip { i } else { 7 - i };
+
+                let lower_bit = (lower_byte >> bit_index) & 1;
+                let upper_bit = (upper_byte >> bit_index) & 1;
+
+                let palette_index = lower_bit | (upper_bit << 1);
+
+                if palette_index == 0 {
+                    continue;
+                }
+
+                let color = if sprite.attributes.dmg_palette == 0 {
+                    self.obp0.indexes[palette_index as usize]
+                } else {
+                    self.obp1.indexes[palette_index as usize]
+                };
+
+                if sprite.attributes.priority == OamPriority::None || self.prev_background_indexes[x_pos as usize] == 0 {
+                    // draw the pixel!
+                    let pixel = Self::get_pixel(color);
+
+                    self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
+                } else {
+                    continue;
+                }
+            }
+
+        }
     }
 
     fn handle_vblank(&mut self, interrupt_register: &mut InterruptRegister) {
@@ -281,7 +396,7 @@ impl PPU {
             0 => oam.y_position = value,
             1 => oam.x_position = value,
             2 => oam.tile_index = value,
-            3 => oam.attributes = value,
+            3 => oam.attributes = OamAttributes::new(value),
             _ => unreachable!()
         }
     }
