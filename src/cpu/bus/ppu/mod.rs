@@ -208,7 +208,7 @@ impl PPU {
 
         let mut x_pos = self.wx as i16 - 7;
 
-        let x_tile_pos = if x_pos < 0 {
+        let tile_offset_x = if x_pos < 0 {
             x_pos = 0;
             -1 * (self.wx as i16 - 7)
         } else {
@@ -216,14 +216,14 @@ impl PPU {
         };
 
         for x in (x_pos as usize)..SCREEN_WIDTH {
-            let tile_number = (x_tile_pos as usize + x) / 8 + (*current_window_line as usize / 8) * 32;
+            let tile_number = (tile_offset_x as usize + x) / 8 + (*current_window_line as usize / 8) * 32;
 
             let tilemap_address = base_tilemap_address + tile_number;
 
             let tile_index = self.vram_read8(tilemap_address);
 
             let y_pos_in_tile = *current_window_line & 0x7;
-            let x_pos_in_tile = (x_tile_pos as usize + x) & 0x7;
+            let x_pos_in_tile = (tile_offset_x as usize + x) & 0x7;
 
             let tile_address = if base_tile_address == 0x9000 {
                 (base_tile_address as i32 + (tile_index as i32) * 16) as usize + y_pos_in_tile * 2
