@@ -1,11 +1,12 @@
 use super::{OamAttributes, OamPriority};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct OAMEntry {
     pub y_position: u8,
     pub x_position: u8,
     pub tile_index: u8,
     pub attributes: OamAttributes,
+    pub address: usize
 }
 
 impl OAMEntry {
@@ -14,6 +15,7 @@ impl OAMEntry {
             x_position: 0,
             y_position: 0,
             tile_index: 0,
+            address: 0,
             attributes: OamAttributes {
                 x_flip: false,
                 y_flip: false,

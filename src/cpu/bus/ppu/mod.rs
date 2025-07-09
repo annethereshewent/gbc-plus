@@ -27,13 +27,13 @@ pub const SCREEN_HEIGHT: usize = 144;
 const FPS_INTERVAL: u128 = 1000 / 60;
 
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum OamPriority {
     None,
     Background
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct OamAttributes {
     pub priority: OamPriority,
     pub y_flip: bool,
@@ -84,8 +84,9 @@ pub struct PPU {
     pub picture: Picture,
     previous_time: u128,
     prev_background_indexes: [usize; SCREEN_WIDTH],
-    current_window_line: Option<usize>,
-    previous_objs: [Option<OAMEntry>; SCREEN_WIDTH]
+    current_window_line: isize,
+    previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
+    pub lyc: u8
 }
 
 impl PPU {
@@ -109,8 +110,9 @@ impl PPU {
             picture: Picture::new(),
             previous_time: 0,
             prev_background_indexes: [0; SCREEN_WIDTH],
-            current_window_line: None,
-            previous_objs: [None; SCREEN_WIDTH]
+            current_window_line: -1,
+            previous_objs: [None; SCREEN_WIDTH],
+            lyc: 0
         }
     }
 
@@ -131,6 +133,10 @@ impl PPU {
         if self.cycles >= MODE0_CYCLES {
             self.cycles -= MODE0_CYCLES;
             self.line_y += 1;
+
+            if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+                interrupt_register.set(InterruptRegister::LCD, true);
+            }
 
             self.mode = if self.line_y == 144 {
                 if self.stat.contains(LCDStatusRegister::MODE1) {
@@ -184,15 +190,14 @@ impl PPU {
     }
 
     fn draw_window(&mut self) {
-        if self.line_y < self.wy || !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) || !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
+        if self.line_y < self.wy ||
+            !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) ||
+            !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) ||
+            (self.wx as isize - 7) >= SCREEN_WIDTH as isize
+        {
             return;
         }
 
-        if self.current_window_line.is_none() {
-            self.current_window_line = Some(0);
-        }
-
-        let current_window_line = &mut self.current_window_line.unwrap();
 
         let base_tilemap_address = if !self.lcdc.contains(LCDControlRegister::WINDOW_TILEMAP) {
             0x9800
@@ -206,27 +211,21 @@ impl PPU {
             0x8000
         };
 
-        let mut x_pos = self.wx as i16 - 7;
+        let x_pos = self.wx as i16 - 7;
 
-        let tile_offset_x = if x_pos < 0 {
-            x_pos = 0;
-            -1 * (self.wx as i16 - 7)
-        } else {
-            0
-        };
+        for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
+            let x_pos = x - (self.wx as usize - 7);
 
-        for x in (x_pos as usize)..SCREEN_WIDTH {
-            let tile_number = (tile_offset_x as usize + x) / 8 + (*current_window_line as usize / 8) * 32;
+            let tile_number = (x_pos as usize / 8) + (self.current_window_line as usize / 8) * 32;
 
             let tilemap_address = base_tilemap_address + tile_number;
 
             let tile_index = self.vram_read8(tilemap_address);
 
-            let y_pos_in_tile = *current_window_line & 0x7;
-            let x_pos_in_tile = (tile_offset_x as usize + x) & 0x7;
+            let y_pos_in_tile = (self.current_window_line & 0x7) as usize;
 
             let tile_address = if base_tile_address == 0x9000 {
-                (base_tile_address as i32 + (tile_index as i32) * 16) as usize + y_pos_in_tile * 2
+                (base_tile_address as i32 + (tile_index as i8 as i32) * 16) as usize + y_pos_in_tile * 2
             } else {
                 base_tile_address as usize + tile_index as usize * 16 + y_pos_in_tile * 2
             };
@@ -234,31 +233,29 @@ impl PPU {
             let lower = self.vram_read8(tile_address);
             let upper = self.vram_read8(tile_address + 1);
 
-            let shift = 7 - x_pos_in_tile;
+            for i in 0..8 {
+                let shift = 7 - i;
 
-            let lower_bit = (lower >> shift) & 0x1;
-            let upper_bit = (upper >> shift) & 0x1;
+                let lower_bit = (lower >> shift) & 0x1;
+                let upper_bit = (upper >> shift) & 0x1;
 
-            let palette_index = lower_bit | (upper_bit << 1);
+                let palette_index = lower_bit | (upper_bit << 1);
 
-            if let Some(sprite) = self.previous_objs[x] {
-                if sprite.attributes.priority == OamPriority::None || palette_index == 0 {
-                    continue;
+                if let Some(sprite) = self.previous_objs[x + i] {
+                    if sprite.attributes.priority == OamPriority::None || palette_index == 0 {
+                        continue;
+                    }
                 }
+
+                let color = self.bgp.indexes[palette_index as usize];
+
+                let pixel = Self::get_pixel(color);
+
+                self.picture.set_pixel(x + i, self.line_y as usize, pixel);
             }
-
-            let color = self.bgp.indexes[palette_index as usize];
-
-            let pixel = Self::get_pixel(color);
-
-            self.picture.set_pixel(x, self.line_y as usize, pixel);
         }
 
-        *current_window_line += 1;
-
-        if *current_window_line == SCREEN_HEIGHT {
-            self.current_window_line = None;
-        }
+        self.current_window_line += 1;
     }
 
     fn draw_background(&mut self) {
@@ -279,8 +276,6 @@ impl PPU {
         let y = self.line_y;
 
         let base_tile = ((scroll_y as usize + y as usize) / 8) * 32 + scroll_x as usize / 8;
-
-        // println!("base_tile = {base_tile}");
 
         for x in 0..SCREEN_WIDTH {
             if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
@@ -335,7 +330,9 @@ impl PPU {
             return;
         }
 
-        let sprite_height = if self.lcdc.contains(LCDControlRegister::OBJ_SIZE) {
+        let is8by16 = self.lcdc.contains(LCDControlRegister::OBJ_SIZE);
+
+        let sprite_height = if is8by16 {
             16
         } else {
             8
@@ -345,10 +342,15 @@ impl PPU {
 
 
 
-        for entry in &mut self.oam {
+        for i in 0..self.oam.len() {
+            let entry = self.oam[i];
              let y_diff: i16 = self.line_y as i16 - (entry.y_position as i16 - 16);
             if y_diff >= 0 && y_diff < sprite_height as i16 {
-                candidates.push(*entry);
+                let mut entry = entry.clone();
+
+                entry.address = i;
+
+                candidates.push(entry);
 
                 if candidates.len() == 10 {
                     break;
@@ -367,8 +369,6 @@ impl PPU {
             for i in 0..8 {
                 let x_pos = i + (sprite.x_position as i16 - 8);
 
-                println!("x_pos = {x_pos}");
-
                 if x_pos < 0 {
                     continue;
                 }
@@ -379,7 +379,13 @@ impl PPU {
                     y_in_tile = sprite_height - 1 - y_in_tile;
                 }
 
-                let tile_address = base_tilemap_address + sprite.tile_index as u16 * 16 + y_in_tile as u16 * 2;
+                let tile_index = if is8by16 {
+                    sprite.tile_index & 0xfe
+                } else {
+                    sprite.tile_index
+                };
+
+                let tile_address = base_tilemap_address + tile_index as u16 * 16 + y_in_tile as u16 * 2;
 
                 let lower_byte = self.vram_read8(tile_address as usize);
                 let upper_byte = self.vram_read8(tile_address as usize + 1);
@@ -401,6 +407,14 @@ impl PPU {
                     self.obp1.indexes[palette_index as usize]
                 };
 
+                if let Some(prev_obj) = self.previous_objs[x_pos as usize] {
+                    if (sprite.x_position > prev_obj.x_position) ||
+                        (sprite.x_position == prev_obj.x_position && sprite.address > prev_obj.address)
+                    {
+                        continue;
+                    }
+                }
+
                 if sprite.attributes.priority == OamPriority::None || self.prev_background_indexes[x_pos as usize] == 0 {
                     // draw the pixel!
                     let pixel = Self::get_pixel(color);
@@ -408,11 +422,8 @@ impl PPU {
                     self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
 
                     self.previous_objs[x_pos as usize] = Some(sprite);
-                } else {
-                    continue;
                 }
             }
-
         }
     }
 
@@ -422,6 +433,10 @@ impl PPU {
 
             self.line_y += 1;
 
+            if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+                interrupt_register.set(InterruptRegister::LCD, true);
+            }
+
             if self.line_y == 154 {
                 if self.stat.contains(LCDStatusRegister::MODE2) {
                     interrupt_register.set(InterruptRegister::LCD, true);
@@ -430,6 +445,7 @@ impl PPU {
 
                 self.mode = LCDMode::OAMScan;
                 self.line_y = 0;
+                self.current_window_line = 0;
             }
         }
     }
