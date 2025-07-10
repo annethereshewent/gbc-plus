@@ -256,7 +256,11 @@ impl PPU {
             0x8000
         };
 
-        let x_pos = self.wx as i16 - 7;
+        let mut x_pos = self.wx as i16 - 7;
+
+        if x_pos < 0 {
+            x_pos = 0;
+        }
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
             let x_pos = (x - (self.wx as usize - 7)) & 0xff;
