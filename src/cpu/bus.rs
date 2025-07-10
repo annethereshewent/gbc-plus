@@ -17,6 +17,7 @@ pub mod joypad;
 const CARTRIDGE_TYPE_ADDR: usize = 0x147;
 const ROM_SIZE_ADDR: usize = 0x148;
 const RAM_SIZE_ADDR: usize = 0x149;
+const CGB_ADDR: usize = 0x143;
 
 pub struct Bus {
     pub cartridge: Cartridge,
@@ -56,10 +57,18 @@ impl Bus {
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
         match address {
-            0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
+            // 0x0000..=0x3fff => self.cartridge.rom[address as usize], // TODO: implement banks
+            0x0000..=0x3fff => if self.cartridge.mbc.is_some() {
+                self.cartridge.mbc_read8(address)
+            } else {
+                self.cartridge.rom[address as usize]
+            }
+            0x4000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_read8(address),
+            0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize],
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
             0xff04 => self.timer.div,
+            0xff05 => self.timer.tima,
             0xff0f => self.IF.bits(),
             0xff25 => self.apu.nr51.bits(),
             0xff40 => self.ppu.lcdc.bits(),
@@ -74,7 +83,12 @@ impl Bus {
 
     pub fn mem_read16(&self, address: u16) -> u16 {
         match address {
-            0x0000..=0x7fff => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }, // TODO: implement banks
+            0x0000..=0x3fff => if self.cartridge.mbc.is_some() {
+                self.cartridge.mbc_read16(address)
+            } else {
+                unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }
+            },
+            0x4000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_read16(address),
             0xc000..=0xdfff => unsafe { *(&self.wram[(address - 0xc000) as usize] as *const u8 as *const u16) },
             0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
             _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
@@ -83,8 +97,12 @@ impl Bus {
 
     pub fn mem_write16(&mut self, address: u16, value: u16) {
         match address {
+            0x8000..=0x9fff => unsafe { *(&mut self.ppu.vram[(address - 0x8000) as usize] as *mut u8 as *mut u16) = value },
+            0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
             0xc000..=0xdfff => unsafe { *(&mut self.wram[(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
+            0xff7f => (),
             0xff80..=0xfffe => unsafe { *(&mut self.hram[(address - 0xff80) as usize] as *mut u8 as *mut u16) = value },
+            0xffff => self.ie = InterruptRegister::from_bits_retain(value as u8),
             _ => panic!("(mem_write16): invalid address given: 0x{:x}", address)
         }
     }
@@ -104,10 +122,10 @@ impl Bus {
     pub fn check_header(&mut self) {
         let cartridge_type = self.cartridge.rom[CARTRIDGE_TYPE_ADDR];
 
-        match cartridge_type {
-            0 => (),
-            1 => self.set_mbc1(),
-            _ => panic!("unsupported mbc type: {cartridge_type}")
+        let cgb_flag = self.cartridge.rom[CGB_ADDR];
+
+        if [0x80, 0xc0].contains(&cgb_flag) {
+            // todo!("GBC mode");
         }
 
         let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
@@ -129,25 +147,31 @@ impl Bus {
 
         self.cartridge.ram_size = match ram_size_header {
             0 => 0,
-            2 => 8,
-            3 => 32,
-            4 => 128,
-            5 => 64,
+            2 => 0x2000,
+            3 => 0x8000,
+            4 => 0x20000,
+            5 => 0x10000,
             _ => panic!("unsupported option received: {ram_size_header}")
         };
+
+        match cartridge_type {
+            0 => (),
+            1 => self.set_mbc1(false, false),
+            2 => self.set_mbc1(true, false),
+            3 => self.set_mbc1(true, true),
+            _ => panic!("unsupported mbc type: {cartridge_type}")
+        }
     }
 
-    fn set_mbc1(&mut self) {
-
+    fn set_mbc1(&mut self, ram: bool, battery: bool) {
+        self.cartridge.set_mbc1(ram, battery);
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
 
         match address {
-            0x0000..=0x3fff => (), // TODO: ROM bank switching
-            0x4000..=0x7fff => (), // TODO: ROM bank switching
+            0x0000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_write8(address, value),
             0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize] = value,
-            0xa000..=0xbfff => self.cartridge.write_ram(address - 0xa000, value),
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
             0xfe00..=0xfe9f => self.ppu.write_oam(address, value),
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it

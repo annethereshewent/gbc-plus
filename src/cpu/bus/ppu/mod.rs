@@ -147,7 +147,7 @@ impl PPU {
             wy: 0,
             wx: 0,
             stat: LCDStatusRegister::from_bits_truncate(0),
-            lcdc: LCDControlRegister::from_bits_retain(0),
+            lcdc: LCDControlRegister::from_bits_retain(0x83),
             mode: LCDMode::OAMScan,
             line_y: 0,
             vram: vec![0; 0x2000].into_boxed_slice(),
