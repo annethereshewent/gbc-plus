@@ -14,13 +14,16 @@ impl TimerControl {
     }
 }
 
+pub const DIV_CYCLES: usize = 256;
+
 pub struct Timer {
     pub div: u8,
     pub tima: u8,
     pub tma: u8,
     pub tac: TimerControl,
     pub interval: usize,
-    cycles: usize
+    cycles: usize,
+    div_cycles: usize
 }
 
 impl Timer {
@@ -31,11 +34,13 @@ impl Timer {
             tma: 0,
             tac: TimerControl::from_bits_retain(0),
             interval: 0,
-            cycles: 0
+            cycles: 0,
+            div_cycles: 0
         }
     }
 
     pub fn tick(&mut self, cycles: usize, interrupt_register: &mut InterruptRegister) {
+        self.div_cycles += cycles;
         if self.tac.contains(TimerControl::ENABLE) {
             self.cycles += cycles;
 
@@ -52,6 +57,11 @@ impl Timer {
                     interrupt_register.set(InterruptRegister::TIMER, true);
                 }
             }
+        }
+
+        if self.div_cycles >= DIV_CYCLES {
+            self.div_cycles -= DIV_CYCLES;
+            self.div += 1;
         }
     }
 

@@ -132,6 +132,7 @@ pub struct PPU {
     pub picture: Picture,
     previous_time: u128,
     prev_background_indexes: [usize; SCREEN_WIDTH],
+    prev_window_indexes: [usize; SCREEN_WIDTH],
     current_window_line: isize,
     previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
     pub lyc: u8,
@@ -159,6 +160,7 @@ impl PPU {
             picture: Picture::new(),
             previous_time: 0,
             prev_background_indexes: [0; SCREEN_WIDTH],
+            prev_window_indexes: [0; SCREEN_WIDTH],
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
             lyc: 0,
@@ -230,8 +232,8 @@ impl PPU {
 
     fn draw_line(&mut self) {
         self.draw_background();
-        self.draw_objects();
         self.draw_window();
+        self.draw_objects();
     }
 
     fn draw_window(&mut self) {
@@ -242,7 +244,6 @@ impl PPU {
         {
             return;
         }
-
 
         let base_tilemap_address = if !self.lcdc.contains(LCDControlRegister::WINDOW_TILEMAP) {
             0x9800
@@ -261,6 +262,8 @@ impl PPU {
         if x_pos < 0 {
             x_pos = 0;
         }
+
+        for index in self.prev_window_indexes.iter_mut() { *index = 0; }
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
             let x_pos = (x - (self.wx as usize - 7)) & 0xff;
@@ -290,11 +293,7 @@ impl PPU {
 
                 let palette_index = lower_bit | (upper_bit << 1);
 
-                if let Some(sprite) = self.previous_objs[x + i] {
-                    if sprite.attributes.priority == OamPriority::None || palette_index == 0 {
-                        continue;
-                    }
-                }
+                self.prev_background_indexes[x + i] = palette_index as usize;
 
                 let color = self.bgp.indexes[palette_index as usize];
 
@@ -463,7 +462,7 @@ impl PPU {
                     }
                 }
 
-                if sprite.attributes.priority == OamPriority::None || self.prev_background_indexes[x_pos as usize] == 0 {
+                if sprite.attributes.priority == OamPriority::None || (self.prev_background_indexes[x_pos as usize] == 0 && self.prev_window_indexes[x_pos as usize] == 0) {
                     // draw the pixel!
                     let pixel = self.get_pixel(color);
 

@@ -50,11 +50,12 @@ impl Bus {
     }
 
 
-    pub fn mem_read8(&self, address: u16) -> u8 {
+    pub fn mem_read8(&mut self, address: u16) -> u8 {
         match address {
             0x0000..=0x7fff => self.cartridge.rom[address as usize], // TODO: implement banks
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
+            0xff04 => self.timer.div,
             0xff0f => self.IF.bits(),
             0xff40 => self.ppu.lcdc.bits(),
             0xff41 => self.ppu.stat.bits(),
@@ -85,7 +86,8 @@ impl Bus {
         let address = (value as u16) << 8;
 
         for i in 0..0xa0 {
-            self.mem_write8(0xfe00 + i, self.mem_read8(address + i));
+            let value = self.mem_read8(address + i);
+            self.mem_write8(0xfe00 + i, value);
         }
 
         // TODO: add cycles, probably need to refactor this code
@@ -103,6 +105,7 @@ impl Bus {
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
             0xff00 => self.joypad.write(value),
             0xff01..=0xff02 => (), // Serial ports, ignore!
+            0xff04 => self.timer.div = 0,
             0xff05 => self.timer.write_tima(value),
             0xff06 => self.timer.tma = value,
             0xff07 => self.timer.update_tac(value),

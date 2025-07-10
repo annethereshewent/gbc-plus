@@ -135,10 +135,20 @@ fn main() {
 
                 }
                 Event::JoyButtonDown { button_idx, .. } => {
-
+                    cpu.bus.joypad.press_button(button_idx);
                 }
                 Event::JoyButtonUp { button_idx, .. } => {
-
+                    cpu.bus.joypad.release_button(button_idx);
+                }
+                Event::JoyDeviceAdded { which, .. } => {
+                    let _controller = match game_controller_subsystem.open(which) {
+                        Ok(c) => {
+                            Some(c)
+                        }
+                        Err(_) => {
+                            None
+                        }
+                    };
                 }
                 _ => { /* do nothing */ }
             }

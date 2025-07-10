@@ -4,13 +4,13 @@ use super::{cpu_instructions::{AluOp, CBOp, IncrementMode, JumpFlags, LoadType, 
 
 impl CPU {
 
-    fn diss_ld_immediate_sp(&self) -> String {
+    fn diss_ld_immediate_sp(&mut self) -> String {
         let immediate = self.bus.mem_read16(self.pc);
 
         format!("LD ({:x}), SP", immediate)
     }
 
-    fn diss_jr(&self, flag: JumpFlags) -> String {
+    fn diss_jr(&mut self, flag: JumpFlags) -> String {
         let displacement = self.bus.mem_read8(self.pc) as i8;
 
         let operand = format!("0x{:x}", self.pc as i32 + displacement as i32 + 1);
@@ -26,7 +26,7 @@ impl CPU {
         format!("JR {} {operand} (branch: {})", flag.to_string(), if condition_met { "yes" } else { "no" })
     }
 
-    fn diss_jp(&self, flag: JumpFlags) -> String {
+    fn diss_jp(&mut self, flag: JumpFlags) -> String {
         let address = self.bus.mem_read16(self.pc);
 
         let condition_met = match flag {
@@ -40,7 +40,7 @@ impl CPU {
         format!("JP {} 0x{:x} (branch: {})", flag.to_string(), address, if condition_met { "yes" } else { "no" })
     }
 
-    fn diss_ld_immediate(&self, reg1: Register, load_type: LoadType) -> String {
+    fn diss_ld_immediate(&mut self, reg1: Register, load_type: LoadType) -> String {
         match load_type {
             LoadType::Normal => {
                 let immediate = if reg1 as usize > 6 {
@@ -64,11 +64,11 @@ impl CPU {
         }
     }
 
-    fn diss_add(&self, r1: Register, r2: Register) -> String {
+    fn diss_add(&mut self, r1: Register, r2: Register) -> String {
         format!("ADD {:?}, {:?}", r1, r2)
     }
 
-    fn diss_alu(&self, op: &str, r1: Option<Register>) -> String {
+    fn diss_alu(&mut self, op: &str, r1: Option<Register>) -> String {
         let operand = if let Some(register) = r1 {
             format!("{:?}", register)
         } else {
@@ -77,7 +77,7 @@ impl CPU {
 
         format!("{op} A, {operand}")
     }
-    fn diss_ld_registers(&self, reg1: Register, reg2: Register, load_type: LoadType) -> String {
+    fn diss_ld_registers(&mut self, reg1: Register, reg2: Register, load_type: LoadType) -> String {
         match load_type {
             LoadType::LeftPointer => format!("LD ({:?}), {:?}", reg1, reg2),
             LoadType::Normal => format!("LD {:?}, {:?}", reg1, reg2),
@@ -85,7 +85,7 @@ impl CPU {
         }
     }
 
-    fn diss_store_hl_ptr(&self, reg1: Register, inc_mode: IncrementMode) -> String {
+    fn diss_store_hl_ptr(&mut self, reg1: Register, inc_mode: IncrementMode) -> String {
         let sign = match inc_mode {
             IncrementMode::Decrement => "-",
             IncrementMode::Increment => "+"
@@ -94,7 +94,7 @@ impl CPU {
         format!("LD (HL{sign}), {:?}", reg1)
     }
 
-    fn diss_load_hl_ptr(&self, reg1: Register, inc_mode: IncrementMode) -> String {
+    fn diss_load_hl_ptr(&mut self, reg1: Register, inc_mode: IncrementMode) -> String {
         let sign = match inc_mode {
             IncrementMode::Decrement => "-",
             IncrementMode::Increment => "+"
@@ -103,15 +103,15 @@ impl CPU {
         format!("LD {:?}, (HL{sign})", reg1)
     }
 
-    fn diss_inc(&self, reg1: Register) -> String {
+    fn diss_inc(&mut self, reg1: Register) -> String {
         format!("INC {:?}", reg1)
     }
 
-    fn diss_dec(&self, reg1: Register) -> String {
+    fn diss_dec(&mut self, reg1: Register) -> String {
         format!("DEC {:?}", reg1)
     }
 
-    fn diss_ld_upper(&self, r1: Register, load_type: LoadType, use_c: bool) -> String {
+    fn diss_ld_upper(&mut self, r1: Register, load_type: LoadType, use_c: bool) -> String {
         let mut immediate = if use_c {
             self.registers[Register::C as usize] as u16
         } else {
@@ -127,11 +127,11 @@ impl CPU {
         }
     }
 
-    fn diss_ret(&self, cond: JumpFlags) -> String {
+    fn diss_ret(&mut self, cond: JumpFlags) -> String {
         format!("RET {}", cond.to_string())
     }
 
-    fn diss_add_sp(&self) -> String {
+    fn diss_add_sp(&mut self) -> String {
         let displacement = self.bus.mem_read8(self.pc) as i8;
 
         let operand = if displacement < 0 {
@@ -143,7 +143,7 @@ impl CPU {
         format!("ADD SP, {operand}")
     }
 
-    fn diss_ld_hl_displacement(&self) -> String {
+    fn diss_ld_hl_displacement(&mut self) -> String {
         let displacement = self.bus.mem_read8(self.pc) as i8;
 
         let operand = if displacement < 0 {
@@ -155,56 +155,56 @@ impl CPU {
         format!("LD HL, SP + {operand}")
     }
 
-    fn diss_call(&self, cond: JumpFlags) -> String {
+    fn diss_call(&mut self, cond: JumpFlags) -> String {
         let address = self.bus.mem_read16(self.pc);
         format!("CALL {} 0x{:x}", cond.to_string(), address)
     }
 
-    fn diss_bit(&self, bit: u8, r1: Register) -> String {
+    fn diss_bit(&mut self, bit: u8, r1: Register) -> String {
         format!("BIT {bit}, {:?}", r1)
     }
 
-    fn diss_res(&self, bit: u8, r1: Register) -> String {
+    fn diss_res(&mut self, bit: u8, r1: Register) -> String {
         format!("RES {bit}, {:?}", r1)
     }
 
-    fn diss_set(&self, bit: u8, r1: Register) -> String {
+    fn diss_set(&mut self, bit: u8, r1: Register) -> String {
         format!("SET {bit}, {:?}", r1)
     }
 
-    fn diss_rl(&self, r1: Register) -> String {
+    fn diss_rl(&mut self, r1: Register) -> String {
         format!("RL {:?}", r1)
     }
 
-    fn diss_srl(&self, r1: Register) -> String {
+    fn diss_srl(&mut self, r1: Register) -> String {
         format!("SRL {:?}", r1)
     }
 
-    fn diss_sra(&self, r1: Register) -> String {
+    fn diss_sra(&mut self, r1: Register) -> String {
         format!("SRA {:?}", r1)
     }
 
-    fn diss_rlc(&self, r1: Register) -> String {
+    fn diss_rlc(&mut self, r1: Register) -> String {
         format!("RLC {:?}", r1)
     }
 
-    fn diss_rrc(&self, r1: Register) -> String {
+    fn diss_rrc(&mut self, r1: Register) -> String {
        format!("RRC {:?}", r1)
     }
 
-    fn diss_sla(&self, r1: Register) -> String {
+    fn diss_sla(&mut self, r1: Register) -> String {
        format!("SLA {:?}", r1)
     }
 
-    fn diss_rr(&self, r1: Register) -> String {
+    fn diss_rr(&mut self, r1: Register) -> String {
         format!("RR {:?}", r1)
     }
 
-    fn diss_swap(&self, r1: Register) -> String {
+    fn diss_swap(&mut self, r1: Register) -> String {
         format!("SWAP {:?}", r1)
     }
 
-    pub fn disassemble(&self, instruction: u8) -> String {
+    pub fn disassemble(&mut self, instruction: u8) -> String {
         let z = instruction & 0x7;
         let q = (instruction >> 3) & 1;
         let p = (instruction >> 4) & 0x3;
@@ -366,7 +366,7 @@ impl CPU {
         }
     }
 
-    fn disassemble_cb(&self, instruction: u8) -> String {
+    fn disassemble_cb(&mut self, instruction: u8) -> String {
         let z = instruction & 0x7;
         let y = (instruction >> 3) & 0x7;
         let x = (instruction >> 6) & 0x3;
