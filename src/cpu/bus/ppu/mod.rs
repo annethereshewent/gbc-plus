@@ -26,7 +26,6 @@ pub const SCREEN_HEIGHT: usize = 144;
 
 const FPS_INTERVAL: u128 = 1000 / 60;
 
-
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum OamPriority {
     None,
@@ -55,6 +54,55 @@ impl OamAttributes {
         }
     }
 }
+
+pub const CLASSIC_GREEN: [Color; 4] = [
+    Color { r: 0x9b, g: 0xbc, b: 0x0f },
+    Color { r: 0x8b, g: 0xac, b: 0x0f },
+    Color { r: 0x48, g: 0x98, b: 0x48 },
+    Color { r: 0x15, g: 0x56, b: 0x15 }
+];
+
+pub const GRAYSCALE: [Color; 4] = [
+    Color { r: 0xff, g: 0xff, b: 0xff },
+    Color { r: 0xaa, g: 0xaa, b: 0xaa },
+    Color { r: 0x55, g: 0x55, b: 0x55 },
+    Color { r: 0x00, g: 0x00, b: 0x00 }
+];
+
+pub const SOLARIZED: [Color; 4] = [
+    Color { r: 0xee, g: 0xe8, b: 0xd5 },
+    Color { r: 0x83, g: 0x94, b: 0x96 },
+    Color { r: 0x58, g: 0x6e, b: 0x75 },
+    Color { r: 0x00, g: 0x2b, b: 0x36 }
+];
+
+pub const MAVERICK: [Color; 4] = [
+    Color { r: 0xe0, g: 0xf8, b: 0xcf },
+    Color { r: 0x86, g: 0xc0, b: 0x6c },
+    Color { r: 0x30, g: 0x68, b: 0x50 },
+    Color { r: 0x07, g: 0x18, b: 0x21 }
+];
+
+pub const OCEANIC: [Color; 4] = [
+    Color { r: 0xe0, g: 0xff, b: 0xff },
+    Color { r: 0x7f, g: 0xdb, b: 0xff },
+    Color { r: 0x00, g: 0x74, b: 0xd9 },
+    Color { r: 0x00, g: 0x1f, b: 0x3f }
+];
+
+pub const BURNT_PEACH: [Color; 4] = [
+    Color { r: 0xff, g: 0xee, b: 0xd8 },
+    Color { r: 0xd9, g: 0x72, b: 0x5e },
+    Color { r: 0x80, g: 0x3d, b: 0x26 },
+    Color { r: 0x2f, g: 0x0e, b: 0x00 }
+];
+
+pub const GRAPE_SODA: [Color; 4] = [
+    Color { r: 0xdc, g: 0xc6, b: 0xf8 },
+    Color { r: 0x8e, g: 0x7c, b: 0xc3 },
+    Color { r: 0x5c, g: 0x25, b: 0x8d },
+    Color { r: 0x1f, g: 0x00, b: 0x37 }
+];
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -86,7 +134,8 @@ pub struct PPU {
     prev_background_indexes: [usize; SCREEN_WIDTH],
     current_window_line: isize,
     previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
-    pub lyc: u8
+    pub lyc: u8,
+    palette_colors: [Color; 4]
 }
 
 impl PPU {
@@ -112,7 +161,8 @@ impl PPU {
             prev_background_indexes: [0; SCREEN_WIDTH],
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
-            lyc: 0
+            lyc: 0,
+            palette_colors: BURNT_PEACH
         }
     }
 
@@ -154,13 +204,8 @@ impl PPU {
         }
     }
 
-    fn get_pixel(bg_color: BGColor) -> Color {
-        match bg_color {
-            BGColor::White => Color::new(0x9b, 0xbc, 0x0f),
-            BGColor::LightGray => Color::new(0x8b, 0xac, 0x0f),
-            BGColor::DarkGray => Color::new(0x48, 0x98, 0x48),
-            BGColor::Black => Color::new(0x15, 0x56, 0x15)
-        }
+    fn get_pixel(&self, bg_color: BGColor) -> Color {
+        self.palette_colors[bg_color as usize]
     }
 
     pub fn cap_fps(&mut self) {
@@ -214,7 +259,7 @@ impl PPU {
         let x_pos = self.wx as i16 - 7;
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
-            let x_pos = x - (self.wx as usize - 7);
+            let x_pos = (x - (self.wx as usize - 7)) & 0xff;
 
             let tile_number = (x_pos as usize / 8) + (self.current_window_line as usize / 8) * 32;
 
@@ -249,7 +294,7 @@ impl PPU {
 
                 let color = self.bgp.indexes[palette_index as usize];
 
-                let pixel = Self::get_pixel(color);
+                let pixel = self.get_pixel(color);
 
                 self.picture.set_pixel(x + i, self.line_y as usize, pixel);
             }
@@ -275,11 +320,11 @@ impl PPU {
         let scroll_y = self.scy;
         let y = self.line_y;
 
-        let base_tile = ((scroll_y as usize + y as usize) / 8) * 32 + scroll_x as usize / 8;
-
+        let scrolled_y = (scroll_y as usize + y as usize) & 0xff;
         for x in 0..SCREEN_WIDTH {
             if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
-                let tile_number = base_tile + x / 8;
+                let scrolled_x = (scroll_x as usize + x) & 0xff;
+                let tile_number = (scrolled_y / 8) * 32 + scrolled_x / 8;
 
                 let tilemap_address = base_tilemap_address as usize + tile_number;
 
@@ -291,7 +336,7 @@ impl PPU {
                 let tile_address = if base_tile_address == 0x8000 {
                     base_tile_address + tile_id as usize * 16 + y_in_tile * 2
                 } else {
-                    let offset = tile_id as i8 as i32 * 16 + y_in_tile as i32 * 2;
+                    let offset = ((tile_id as i8 as i32) * 16) + ((y_in_tile as i32) * 2);
 
                     (base_tile_address as i32 + offset) as usize
                 };
@@ -299,12 +344,11 @@ impl PPU {
                 let lower_byte = self.vram_read8(tile_address);
                 let upper_byte = self.vram_read8(tile_address + 1);
 
-
                 let palette_index = (upper_byte >> (7 - x_in_tile) & 0x1) << 1 | lower_byte >> (7 - x_in_tile) & 0x1;
 
                 let color = self.bgp.indexes[palette_index as usize];
 
-                let pixel = Self::get_pixel(color);
+                let pixel = self.get_pixel(color);
 
                 self.picture.set_pixel(x, y as usize, pixel);
 
@@ -312,7 +356,7 @@ impl PPU {
             } else {
                 let color = self.bgp.indexes[0];
 
-                let pixel = Self::get_pixel(color);
+                let pixel = self.get_pixel(color);
 
                 self.picture.set_pixel(x, y as usize, pixel);
 
@@ -417,7 +461,7 @@ impl PPU {
 
                 if sprite.attributes.priority == OamPriority::None || self.prev_background_indexes[x_pos as usize] == 0 {
                     // draw the pixel!
-                    let pixel = Self::get_pixel(color);
+                    let pixel = self.get_pixel(color);
 
                     self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
 
