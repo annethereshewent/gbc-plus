@@ -416,7 +416,7 @@ impl PPU {
             for i in 0..8 {
                 let x_pos = i + (sprite.x_position as i16 - 8);
 
-                if x_pos < 0 {
+                if x_pos < 0 || x_pos as usize >= SCREEN_WIDTH {
                     continue;
                 }
 

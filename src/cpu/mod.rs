@@ -95,11 +95,12 @@ impl CPU {
         let cycles = self.decode_instruction(opcode);
 
         self.bus.tick(cycles);
-
     }
 
     pub fn load_rom(&mut self, bytes: &[u8]) {
         self.bus.cartridge.rom = bytes.to_vec();
+
+        self.bus.check_header()
     }
 
     pub fn handle_interrupts(&mut self) {

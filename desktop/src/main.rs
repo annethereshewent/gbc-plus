@@ -129,7 +129,9 @@ fn main() {
             match event {
                 Event::Quit { .. } => std::process::exit(0),
                 Event::KeyDown { keycode, .. } => {
-
+                    if let Some(keycode) = keycode {
+                        // cpu.bus.joypad.press_key(keycode)
+                    }
                 }
                 Event::KeyUp { keycode, .. } => {
 

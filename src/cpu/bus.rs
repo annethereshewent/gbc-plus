@@ -14,6 +14,10 @@ pub mod apu;
 pub mod timer;
 pub mod joypad;
 
+const CARTRIDGE_TYPE_ADDR: usize = 0x147;
+const ROM_SIZE_ADDR: usize = 0x148;
+const RAM_SIZE_ADDR: usize = 0x149;
+
 pub struct Bus {
     pub cartridge: Cartridge,
     wram: Box<[u8]>,
@@ -57,6 +61,7 @@ impl Bus {
             0xff00 => self.joypad.read(),
             0xff04 => self.timer.div,
             0xff0f => self.IF.bits(),
+            0xff25 => self.apu.nr51.bits(),
             0xff40 => self.ppu.lcdc.bits(),
             0xff41 => self.ppu.stat.bits(),
             0xff44 => self.ppu.line_y,
@@ -71,6 +76,7 @@ impl Bus {
         match address {
             0x0000..=0x7fff => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }, // TODO: implement banks
             0xc000..=0xdfff => unsafe { *(&self.wram[(address - 0xc000) as usize] as *const u8 as *const u16) },
+            0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
             _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
         }
     }
@@ -78,6 +84,7 @@ impl Bus {
     pub fn mem_write16(&mut self, address: u16, value: u16) {
         match address {
             0xc000..=0xdfff => unsafe { *(&mut self.wram[(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
+            0xff80..=0xfffe => unsafe { *(&mut self.hram[(address - 0xff80) as usize] as *mut u8 as *mut u16) = value },
             _ => panic!("(mem_write16): invalid address given: 0x{:x}", address)
         }
     }
@@ -94,7 +101,48 @@ impl Bus {
         self.tick(640);
     }
 
+    pub fn check_header(&mut self) {
+        let cartridge_type = self.cartridge.rom[CARTRIDGE_TYPE_ADDR];
+
+        match cartridge_type {
+            0 => (),
+            1 => self.set_mbc1(),
+            _ => panic!("unsupported mbc type: {cartridge_type}")
+        }
+
+        let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
+
+        self.cartridge.rom_size = match rom_size_header {
+            0 => 32,
+            1 => 64,
+            2 => 128,
+            3 => 256,
+            4 => 512,
+            5 => 1024,
+            6 => 2048,
+            7 => 4196,
+            8 => 8192,
+            _ => panic!("unsupported rom size: {rom_size_header}")
+        };
+
+        let ram_size_header = self.cartridge.rom[RAM_SIZE_ADDR];
+
+        self.cartridge.ram_size = match ram_size_header {
+            0 => 0,
+            2 => 8,
+            3 => 32,
+            4 => 128,
+            5 => 64,
+            _ => panic!("unsupported option received: {ram_size_header}")
+        };
+    }
+
+    fn set_mbc1(&mut self) {
+
+    }
+
     pub fn mem_write8(&mut self, address: u16, value: u8) {
+
         match address {
             0x0000..=0x3fff => (), // TODO: ROM bank switching
             0x4000..=0x7fff => (), // TODO: ROM bank switching

@@ -1,13 +1,17 @@
 pub struct Cartridge {
     pub rom: Vec<u8>,
-    pub ram: Box<[u8]>
+    pub ram: Box<[u8]>,
+    pub rom_size: usize,
+    pub ram_size: usize
 }
 
 impl Cartridge {
     pub fn new() -> Self {
         Self {
             rom: Vec::new(),
-            ram: vec![0; 0x2000].into_boxed_slice()
+            ram: vec![0; 0x2000].into_boxed_slice(),
+            rom_size: 0,
+            ram_size: 0
         }
     }
 
