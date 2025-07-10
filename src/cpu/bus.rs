@@ -131,15 +131,15 @@ impl Bus {
         let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
 
         self.cartridge.rom_size = match rom_size_header {
-            0 => 32,
-            1 => 64,
-            2 => 128,
-            3 => 256,
-            4 => 512,
-            5 => 1024,
-            6 => 2048,
-            7 => 4196,
-            8 => 8192,
+            0 => 0x8000,
+            1 => 0x10000,
+            2 => 0x20000,
+            3 => 0x40000,
+            4 => 0x80000,
+            5 => 0x100000,
+            6 => 0x200000,
+            7 => 0x400000,
+            8 => 0x800000,
             _ => panic!("unsupported rom size: {rom_size_header}")
         };
 
