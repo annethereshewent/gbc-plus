@@ -118,7 +118,7 @@ fn main() {
 
             if file.is_file() {
                 rom_bytes = vec![0; file.size() as usize];
-                file.read_to_end(&mut rom_bytes).unwrap();
+                file.read_exact(&mut rom_bytes).unwrap();
                 break;
             }
         }
