@@ -325,7 +325,6 @@ impl CPU {
 
         self.set_register16(Register::HL, result);
 
-        self.f.set(FlagRegister::ZERO, result == 0);
         self.f.set(FlagRegister::CARRY, result < old_hl);
         self.f.set(FlagRegister::SUBTRACT, false);
         self.f.set(FlagRegister::HALF_CARRY, (result & 0xfff) < (old_hl & 0xfff));
@@ -366,13 +365,14 @@ impl CPU {
 
     fn adc(&mut self, register: Option<Register>) -> usize {
         let old_a = self.registers[Register::A as usize];
+        let carry_bit = self.f.contains(FlagRegister::CARRY) as u8;
         let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
-                self.registers[Register::A as usize] += self.bus.mem_read8(self.hl()) + self.f.contains(FlagRegister::CARRY) as u8;
+                self.registers[Register::A as usize] += self.bus.mem_read8(self.hl()) + carry_bit;
 
                 8
             } else {
-                self.registers[Register::A as usize] += self.registers[register as usize] + self.f.contains(FlagRegister::CARRY) as u8;
+                self.registers[Register::A as usize] += self.registers[register as usize] + carry_bit;
 
                 4
             }
@@ -381,7 +381,7 @@ impl CPU {
 
             self.pc += 1;
 
-            self.registers[Register::A as usize] += operand + self.f.contains(FlagRegister::CARRY) as u8;
+            self.registers[Register::A as usize] += operand + carry_bit;
 
             8
         };
@@ -429,11 +429,11 @@ impl CPU {
         let old_a = self.registers[Register::A as usize];
         let cycles = if let Some(register) = register {
             if register == Register::HLPointer {
-                self.registers[Register::A as usize] -= self.bus.mem_read8(self.hl()) - self.f.contains(FlagRegister::CARRY) as u8;
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] - self.bus.mem_read8(self.hl()) - self.f.contains(FlagRegister::CARRY) as u8;
 
                 8
             } else {
-                self.registers[Register::A as usize] -= self.registers[register as usize] - self.f.contains(FlagRegister::CARRY) as u8;
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] - self.registers[register as usize] - self.f.contains(FlagRegister::CARRY) as u8;
 
                 4
             }
@@ -442,14 +442,14 @@ impl CPU {
 
             self.pc += 1;
 
-            self.registers[Register::A as usize] -= operand - self.f.contains(FlagRegister::CARRY) as u8;
+            self.registers[Register::A as usize] = self.registers[Register::A as usize] - operand - self.f.contains(FlagRegister::CARRY) as u8;
 
             8
         };
 
         self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
         self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] > old_a);
-        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::SUBTRACT, true);
         self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) > (old_a & 0xf));
 
         cycles
@@ -614,11 +614,7 @@ impl CPU {
 
         self.set_register16(Register::HL, result);
 
-        let (carry, half_carry) = if displacement < 0 {
-            ((old_sp as u8) < (self.sp as u8), (old_sp & 0xf) < (self.sp & 0xf))
-        } else {
-            ((old_sp as u8) > (self.sp as u8), (old_sp & 0xf) > (self.sp & 0xf))
-        };
+        let (carry, half_carry) = ((old_sp as u8) > (result as u8), (old_sp & 0xf) > (result & 0xf));
 
         self.f.set(FlagRegister::ZERO, false);
         self.f.set(FlagRegister::SUBTRACT, false);
@@ -768,10 +764,15 @@ impl CPU {
 
             if self.f.contains(FlagRegister::CARRY) || self.registers[Register::A as usize] > 0x99 {
                 adj += 0x60;
+                self.f.insert(FlagRegister::CARRY);
             }
 
             self.registers[Register::A as usize] += adj;
         }
+
+        self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
 
         4
     }
@@ -835,11 +836,7 @@ impl CPU {
 
         self.sp = (self.sp as i32 + displacement as i32) as u16;
 
-        let (carry, half_carry) = if displacement < 0 {
-            ((old_sp as u8) < (self.sp as u8),  (old_sp & 0xf) < (self.sp & 0xf))
-        } else {
-            ((old_sp as u8) > (self.sp as u8),  (old_sp & 0xf) > (self.sp & 0xf))
-        };
+        let (carry, half_carry) = ((old_sp as u8) > (self.sp as u8), (old_sp & 0xf) > (self.sp & 0xf));
 
         self.f.set(FlagRegister::ZERO, false);
         self.f.set(FlagRegister::SUBTRACT, false);
