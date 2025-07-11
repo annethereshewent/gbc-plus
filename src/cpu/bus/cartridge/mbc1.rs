@@ -102,7 +102,7 @@ impl MBC1 {
             _has_battery: has_battery,
             ram_enable: false,
             banking_mode: BankingMode::Simple,
-            rom_bank: 0,
+            rom_bank: 1,
             ram_bank: 0,
             ram: vec![0; ram_size].into_boxed_slice()
         }

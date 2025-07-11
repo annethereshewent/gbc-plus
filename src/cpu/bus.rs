@@ -115,7 +115,6 @@ impl Bus {
             self.mem_write8(0xfe00 + i, value);
         }
 
-        // TODO: add cycles, probably need to refactor this code
         self.tick(640);
     }
 
@@ -168,7 +167,6 @@ impl Bus {
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
-
         match address {
             0x0000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_write8(address, value),
             0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize] = value,

@@ -853,7 +853,7 @@ impl CPU {
         let value = self.pop_from_stack();
 
         if r1 == Register::AF {
-            self.f = FlagRegister::from_bits_retain(value as u8);
+            self.f = FlagRegister::from_bits_truncate(value as u8);
             self.registers[Register::A as usize] = (value >> 8) as u8;
         } else {
             self.set_register16(r1, value);
@@ -943,6 +943,7 @@ impl CPU {
         } else {
             self.get_register16(r1)
         };
+
         self.push_to_stack(value);
 
         16
