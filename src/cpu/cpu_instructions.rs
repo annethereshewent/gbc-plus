@@ -366,30 +366,35 @@ impl CPU {
     fn adc(&mut self, register: Option<Register>) -> usize {
         let old_a = self.registers[Register::A as usize];
         let carry_bit = self.f.contains(FlagRegister::CARRY) as u8;
-        let cycles = if let Some(register) = register {
+        let (cycles, result_full, operand) = if let Some(register) = register {
             if register == Register::HLPointer {
-                self.registers[Register::A as usize] += self.bus.mem_read8(self.hl()) + carry_bit;
+                let result_full = self.registers[Register::A as usize] as u16 + self.bus.mem_read8(self.hl()) as u16 + carry_bit as u16;
 
-                8
+                self.registers[Register::A as usize] = result_full as u8;
+
+                (8, result_full, self.bus.mem_read8(self.hl()))
             } else {
-                self.registers[Register::A as usize] += self.registers[register as usize] + carry_bit;
+                let result_full = self.registers[Register::A as usize] as u16 + carry_bit as u16 + self.registers[register as usize] as u16;
+                self.registers[Register::A as usize] = result_full as u8;
 
-                4
+                (4, result_full, self.registers[register as usize])
             }
         } else {
             let operand = self.bus.mem_read8(self.pc);
 
+            let result_full = self.registers[Register::A as usize] as u16 + operand as u16 + carry_bit as u16;
+
             self.pc += 1;
 
-            self.registers[Register::A as usize] += operand + carry_bit;
+            self.registers[Register::A as usize] = result_full as u8;
 
-            8
+            (8, result_full, operand)
         };
 
         self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
-        self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] < old_a);
+        self.f.set(FlagRegister::CARRY, result_full > 0xff);
         self.f.set(FlagRegister::SUBTRACT, false);
-        self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) < (old_a & 0xf));
+        self.f.set(FlagRegister::HALF_CARRY, (old_a & 0xf) + (operand & 0xf) + carry_bit > 0xf);
 
         cycles
     }
@@ -427,30 +432,32 @@ impl CPU {
 
     fn sbc(&mut self, register: Option<Register>) -> usize {
         let old_a = self.registers[Register::A as usize];
-        let cycles = if let Some(register) = register {
+        let carry_bit = self.f.contains(FlagRegister::CARRY) as u8;
+        let (cycles, operand) = if let Some(register) = register {
             if register == Register::HLPointer {
-                self.registers[Register::A as usize] = self.registers[Register::A as usize] - self.bus.mem_read8(self.hl()) - self.f.contains(FlagRegister::CARRY) as u8;
+                let operand = self.bus.mem_read8(self.hl());
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] - operand - carry_bit;
 
-                8
+                (8, operand)
             } else {
-                self.registers[Register::A as usize] = self.registers[Register::A as usize] - self.registers[register as usize] - self.f.contains(FlagRegister::CARRY) as u8;
+                self.registers[Register::A as usize] = self.registers[Register::A as usize] - self.registers[register as usize] - carry_bit;
 
-                4
+                (4, self.registers[register as usize])
             }
         } else {
             let operand = self.bus.mem_read8(self.pc);
 
             self.pc += 1;
 
-            self.registers[Register::A as usize] = self.registers[Register::A as usize] - operand - self.f.contains(FlagRegister::CARRY) as u8;
+            self.registers[Register::A as usize] = self.registers[Register::A as usize] - operand - carry_bit;
 
-            8
+            (8, operand)
         };
 
         self.f.set(FlagRegister::ZERO, self.registers[Register::A as usize] == 0);
-        self.f.set(FlagRegister::CARRY, self.registers[Register::A as usize] > old_a);
+        self.f.set(FlagRegister::CARRY, (old_a as i16 - operand as i16 - carry_bit as i16) < 0);
         self.f.set(FlagRegister::SUBTRACT, true);
-        self.f.set(FlagRegister::HALF_CARRY, (self.registers[Register::A as usize] & 0xf) > (old_a & 0xf));
+        self.f.set(FlagRegister::HALF_CARRY, ((old_a & 0xf) as i16 - (operand & 0xf) as i16 - carry_bit as i16) < 0);
 
         cycles
     }
@@ -519,9 +526,8 @@ impl CPU {
             if register == Register::HLPointer {
                 let value = self.bus.mem_read8(self.hl());
 
-                let result = self.registers[Register::A as usize] | value;
+                self.registers[Register::A as usize] |= value;
 
-                self.bus.mem_write8(self.hl(), result);
                 8
             } else {
 
@@ -742,7 +748,20 @@ impl CPU {
     }
 
     fn rla(&mut self) -> usize {
-        todo!("rla");
+        let carry_bit = self.f.contains(FlagRegister::CARRY) as u8;
+
+        let bit7 = (self.registers[Register::A as usize] >> 7) & 0x1;
+
+        self.registers[Register::A as usize] <<= 1;
+
+        self.registers[Register::A as usize] |= carry_bit;
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, bit7 == 1);
+        self.f.set(FlagRegister::ZERO, false);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+        4
     }
 
     fn daa(&mut self) -> usize {
@@ -780,10 +799,15 @@ impl CPU {
     fn cpl(&mut self) -> usize {
         self.registers[Register::A as usize] = !self.registers[Register::A as usize];
 
+        self.f.set(FlagRegister::SUBTRACT, true);
+        self.f.set(FlagRegister::HALF_CARRY, true);
+
         4
     }
 
     fn scf(&mut self) -> usize {
+        self.f.set(FlagRegister::HALF_CARRY, false);
+        self.f.set(FlagRegister::SUBTRACT, false);
         self.f.set(FlagRegister::CARRY, true);
 
         4
@@ -791,6 +815,8 @@ impl CPU {
 
     fn ccf(&mut self) -> usize {
         self.f.set(FlagRegister::CARRY, !self.f.contains(FlagRegister::CARRY));
+        self.f.set(FlagRegister::HALF_CARRY, false);
+        self.f.set(FlagRegister::SUBTRACT, false);
 
         4
     }
@@ -963,7 +989,7 @@ impl CPU {
 
         self.f.set(FlagRegister::ZERO, (value >> bit) & 0x1 == 0);
         self.f.set(FlagRegister::SUBTRACT, false);
-        self.f.set(FlagRegister::HALF_CARRY, false);
+        self.f.set(FlagRegister::HALF_CARRY, true);
 
         cycles
     }
@@ -1004,7 +1030,6 @@ impl CPU {
             let mut value = self.bus.mem_read8(self.hl());
 
             let bit7 = (value >> 7) & 0x1;
-            self.f.set(FlagRegister::CARRY, bit7 == 1);
 
             value <<= 1;
 
@@ -1015,13 +1040,13 @@ impl CPU {
             self.f.set(FlagRegister::SUBTRACT, false);
             self.f.set(FlagRegister::HALF_CARRY, false);
             self.f.set(FlagRegister::ZERO, value == 0);
+            self.f.set(FlagRegister::CARRY, bit7 == 1);
 
             self.bus.mem_write8(self.hl(), value);
 
             16
         } else {
             let bit7 = (self.registers[r1 as usize] >> 7) & 0x1;
-            self.f.set(FlagRegister::CARRY, bit7 == 1);
 
             self.registers[r1 as usize] <<= 1;
 
@@ -1032,6 +1057,7 @@ impl CPU {
             self.f.set(FlagRegister::SUBTRACT, false);
             self.f.set(FlagRegister::HALF_CARRY, false);
             self.f.set(FlagRegister::ZERO, self.registers[r1 as usize] == 0);
+            self.f.set(FlagRegister::CARRY, bit7 == 1);
 
             8
         }
@@ -1103,11 +1129,68 @@ impl CPU {
     }
 
     fn rlc(&mut self, r1: Register) -> usize {
-        todo!("rlc");
+
+        let (cycles, bit7, value) = if r1 == Register::HLPointer {
+            let mut value = self.bus.mem_read8(self.hl());
+
+            let bit7 = (value >> 7) & 0x1;
+
+            value  <<= 1;
+
+            value |= bit7;
+
+            self.bus.mem_write8(self.hl(), value);
+
+            (16, bit7, value)
+        } else {
+            let bit7 = (self.registers[r1 as usize] >> 7) & 0x1;
+
+            self.registers[r1 as usize] <<= 1;
+
+            self.registers[r1 as usize] |= bit7;
+
+            (8, bit7, self.registers[r1 as usize])
+        };
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, bit7 == 1);
+        self.f.set(FlagRegister::ZERO, value == 0);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+
+        cycles
     }
 
     fn rrc(&mut self, r1: Register) -> usize {
-        todo!("rrc");
+        let (cycles, bit1, result) = if r1 == Register::HLPointer {
+            let mut value = self.bus.mem_read8(self.hl());
+
+            let bit1 = value & 0x1;
+
+            value  >>= 1;
+
+            value |= bit1 << 7;
+
+            self.bus.mem_write8(self.hl(), value);
+
+            (16, bit1, value)
+        } else {
+            let bit1 = self.registers[r1 as usize] & 0x1;
+
+            self.registers[r1 as usize] >>= 1;
+
+            self.registers[r1 as usize] |= bit1 << 7;
+
+            (8, bit1, self.registers[r1 as usize])
+        };
+
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, bit1 == 1);
+        self.f.set(FlagRegister::ZERO, result == 0);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+
+        cycles
     }
 
     fn sla(&mut self, r1: Register) -> usize {

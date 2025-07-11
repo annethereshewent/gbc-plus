@@ -8,3 +8,4 @@ path = "../"
 
 [dependencies]
 sdl2 = "0.37"
+zip = "4.3.0"

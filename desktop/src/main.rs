@@ -1,9 +1,10 @@
-use std::{collections::VecDeque, env, fs, sync::{Arc, Mutex}};
+use std::{collections::VecDeque, env, fs, io::Read, path::Path, sync::{Arc, Mutex}};
 
 extern crate gbc_plus;
 
 use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
 use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, pixels::PixelFormatEnum};
+use zip::{HasZipMetadata, ZipArchive};
 
 pub struct GbcAudioCallback {
     pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
@@ -106,7 +107,22 @@ fn main() {
 
     let rom_path = &args[1];
 
-    let rom_bytes = fs::read(rom_path).unwrap();
+    let mut rom_bytes = fs::read(rom_path).unwrap();
+
+    if Path::new(rom_path).extension().unwrap().to_os_string() == "zip" {
+        let file = fs::File::open(rom_path).unwrap();
+        let mut archive = ZipArchive::new(file).unwrap();
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+
+            if file.is_file() {
+                rom_bytes = vec![0; file.size() as usize];
+                file.read_to_end(&mut rom_bytes).unwrap();
+                break;
+            }
+        }
+    }
 
     cpu.load_rom(&rom_bytes);
 

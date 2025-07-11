@@ -286,6 +286,9 @@ impl PPU {
             let upper = self.vram_read8(tile_address + 1);
 
             for i in 0..8 {
+                if x + i >= SCREEN_WIDTH {
+                    break;
+                }
                 let shift = 7 - i;
 
                 let lower_bit = (lower >> shift) & 0x1;
