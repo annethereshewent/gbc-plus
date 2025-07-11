@@ -106,6 +106,12 @@ impl APU {
         self.sequencer_step = (self.sequencer_step + 1) & 0x7;
     }
 
+    pub fn read_channel_status(&self) -> u8 {
+        let audio_on = self.nr52.read();
+
+        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel3.enabled as u8) << 3 | audio_on << 7
+    }
+
     // i wanted to dry up all these tick_length and tick_envelope methods, but rust literally will *not* let me.
     // it complains constantly about the damn borrow checker. so shitty inefficient code it is! thanks rust.
     fn clock_lengths(&mut self) {

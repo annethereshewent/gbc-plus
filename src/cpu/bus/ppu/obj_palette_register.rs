@@ -11,6 +11,15 @@ impl ObjPaletteRegister {
         }
     }
 
+    pub fn read(&self) -> u8 {
+        let mut val = 0;
+        for i in 1..self.indexes.len() {
+            val |= (self.indexes[i] as u8) << (2 * i);
+        }
+
+        val
+    }
+
     pub fn new() -> Self {
         Self {
             indexes: [BGColor::White; 4]

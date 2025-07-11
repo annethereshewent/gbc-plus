@@ -3,7 +3,7 @@ use std::{collections::VecDeque, env, fs, io::Read, path::Path, sync::{Arc, Mute
 extern crate gbc_plus;
 
 use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
-use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, pixels::PixelFormatEnum};
+use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
 use zip::{HasZipMetadata, ZipArchive};
 
 pub struct GbcAudioCallback {
@@ -61,7 +61,7 @@ fn main() {
         .num_joysticks()
         .map_err(|e| format!("can't enumerate joysticks: {}", e)).unwrap();
 
-    let _controller = (0..available)
+    let mut _controller = (0..available)
         .find_map(|id| {
         match game_controller_subsystem.open(id) {
             Ok(c) => {
@@ -113,14 +113,20 @@ fn main() {
         let file = fs::File::open(rom_path).unwrap();
         let mut archive = ZipArchive::new(file).unwrap();
 
+        let mut file_found = false;
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
 
             if file.is_file() {
+                file_found = true;
                 rom_bytes = vec![0; file.size() as usize];
                 file.read_exact(&mut rom_bytes).unwrap();
                 break;
             }
+        }
+
+        if !file_found {
+            panic!("couldn't extract ROM from zip file!");
         }
     }
 
@@ -146,7 +152,9 @@ fn main() {
                 Event::Quit { .. } => std::process::exit(0),
                 Event::KeyDown { keycode, .. } => {
                     if let Some(keycode) = keycode {
-                        // cpu.bus.joypad.press_key(keycode)
+                        if keycode == Keycode::G {
+                            cpu.debug_on = !cpu.debug_on;
+                        }
                     }
                 }
                 Event::KeyUp { keycode, .. } => {
@@ -159,17 +167,7 @@ fn main() {
                     cpu.bus.joypad.release_button(button_idx);
                 }
                 Event::JoyDeviceAdded { which, .. } => {
-                    let _controller = (0..available)
-                        .find_map(|id| {
-                        match game_controller_subsystem.open(id) {
-                            Ok(c) => {
-                                Some(c)
-                            }
-                            Err(_) => {
-                                None
-                            }
-                        }
-                    });
+                    _controller = Some(game_controller_subsystem.open(which).unwrap());
                 }
                 _ => { /* do nothing */ }
             }

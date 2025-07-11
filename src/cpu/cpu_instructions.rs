@@ -134,7 +134,6 @@ impl CPU {
 
     fn stop(&mut self) -> usize {
         // NOP, TODO: actually implement for GBC
-
         0
     }
 

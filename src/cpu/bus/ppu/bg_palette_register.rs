@@ -26,6 +26,16 @@ impl BGPaletteRegister {
         }
     }
 
+    pub fn read(&self) -> u8 {
+        let mut value = 0;
+
+        for i in 0..self.indexes.len() {
+            value |= (self.indexes[i] as u8) << (i * 2);
+        }
+
+        value
+    }
+
     pub fn get_id_color(value: u8) -> BGColor {
         match value {
             0 => BGColor::White,

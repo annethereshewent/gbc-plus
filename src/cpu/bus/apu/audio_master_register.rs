@@ -1,18 +1,10 @@
 pub struct AudioMasterRegister {
-    pub ch1_on: bool,
-    pub ch2_on: bool,
-    pub ch3_on: bool,
-    pub ch4_on: bool,
     pub audio_on: bool
 }
 
 impl AudioMasterRegister {
     pub fn new() -> Self {
         Self {
-            ch1_on: false,
-            ch2_on: false,
-            ch3_on: false,
-            ch4_on: false,
             audio_on: false
         }
     }
@@ -22,6 +14,6 @@ impl AudioMasterRegister {
     }
 
     pub fn read(&self) -> u8 {
-        self.ch1_on as u8 | (self.ch2_on as u8) << 1 | (self.ch3_on as u8) << 2 | (self.ch4_on as u8) << 3  | (self.audio_on as u8) << 7
+        self.audio_on as u8
     }
 }

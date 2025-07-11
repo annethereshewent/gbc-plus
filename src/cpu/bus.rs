@@ -70,11 +70,17 @@ impl Bus {
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
             0xff0f => self.IF.bits(),
+            0xff1a => self.apu.channel3.dac_enable as u8,
+            0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
+            0xff26 => self.apu.read_channel_status(),
             0xff40 => self.ppu.lcdc.bits(),
-            0xff41 => self.ppu.stat.bits(),
+            0xff41 => self.ppu.read_stat(),
             0xff44 => self.ppu.line_y,
-            0xff4d => 0, // GBC, TODO
+            0xff47 => self.ppu.bgp.read(),
+            0xff48 => self.ppu.obp0.read(),
+            0xff4a => self.ppu.wy,
+            // 0xff4d => 0, // GBC, TODO
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
@@ -221,6 +227,7 @@ impl Bus {
             0xff41 => self.ppu.stat = LCDStatusRegister::from_bits_truncate(value),
             0xff42 => self.ppu.scy = value,
             0xff43 => self.ppu.scx = value,
+            0xff44 => (),
             0xff45 => self.ppu.lyc = value,
             0xff46 => self.handle_dma(value),
             0xff47 => self.ppu.bgp.write(value),

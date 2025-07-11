@@ -309,6 +309,11 @@ impl PPU {
         self.current_window_line += 1;
     }
 
+    pub fn read_stat(&self) -> u8 {
+        let lcd_status = if !self.lcdc.contains(LCDControlRegister::LCD_AND_PPU_ENABLE) { 0 } else { self.mode as u8 };
+        self.stat.read() | lcd_status | ((self.line_y == self.lyc) as u8) << 2
+    }
+
     fn draw_background(&mut self) {
         let base_tilemap_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_TILEMAP) {
             0x9800

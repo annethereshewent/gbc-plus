@@ -42,7 +42,7 @@ pub struct CPU {
     f: FlagRegister,
     pub bus: Bus,
     found: HashSet<u16>,
-    debug_on: bool,
+    pub debug_on: bool,
     is_halted: bool
 }
 

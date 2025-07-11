@@ -10,11 +10,7 @@ bitflags! {
 }
 
 impl LCDStatusRegister {
-    pub fn mode(&self) -> u8 {
-        self.bits() & 0x3
-    }
-
-    pub fn lyc_eq_ly(&self) -> u8 {
-        (self.bits() >> 2) & 0x1
+    pub fn read(&self) -> u8 {
+        self.bits()
     }
 }
