@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, env, fs, io::Read, path::Path, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::VecDeque, env, fs, io::Read, path::Path, process::exit, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 extern crate gbc_plus;
 
@@ -170,7 +170,14 @@ fn main() {
 
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. } => std::process::exit(0),
+                Event::Quit { .. } => {
+                    if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
+                        if mbc.backup_file().is_dirty {
+                            mbc.save();
+                        }
+                    }
+                    exit(0);
+                }
                 Event::KeyDown { keycode, .. } => {
                     if let Some(keycode) = keycode {
                         if keycode == Keycode::G {

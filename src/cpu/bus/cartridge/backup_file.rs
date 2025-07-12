@@ -18,10 +18,7 @@ impl BackupFile {
 
         let mut ram = vec![0; ram_size];
 
-        println!("filename = {filename}");
-
         let file = if has_backup {
-            println!("yeah!");
             let mut file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -30,8 +27,6 @@ impl BackupFile {
                 .unwrap();
 
             let file_length = file.metadata().unwrap().len();
-
-            println!("file_length = {file_length}, ram_size = {ram_size}");
 
             if file_length == ram_size as u64 {
                 file.read_exact(&mut ram).unwrap();
@@ -65,7 +60,9 @@ impl BackupFile {
 
     pub fn write16(&mut self, address: usize, value: u16) {
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
-        self.is_dirty = true;
+        if self.file.is_some() {
+            self.is_dirty = true;
+        }
     }
 
     pub fn read8(&self, address: usize) -> u8 {
@@ -77,12 +74,19 @@ impl BackupFile {
     }
 
     pub fn save_file(&mut self) {
+        println!("saving file....");
         self.is_dirty = false;
         if let Some(file) = &mut self.file {
             file.seek(SeekFrom::Start(0)).unwrap();
             file.write_all(&self.ram).unwrap();
+        }
+    }
+}
 
-            println!("file size is now = {}", file.metadata().unwrap().len())
+impl Drop for BackupFile {
+    fn drop(&mut self) {
+        if self.is_dirty {
+            self.save_file();
         }
     }
 }
