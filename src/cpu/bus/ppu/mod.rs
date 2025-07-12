@@ -157,7 +157,8 @@ pub struct PPU {
     current_window_line: isize,
     previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
     pub lyc: u8,
-    palette_colors: [Color; 4]
+    pub palette_colors: [[Color; 4]; 10],
+    pub current_palette: usize
 }
 
 impl PPU {
@@ -185,7 +186,19 @@ impl PPU {
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
             lyc: 0,
-            palette_colors: STRAWBERRY_MILK
+            palette_colors: [
+                CLASSIC_GREEN,
+                GRAYSCALE,
+                SOLARIZED,
+                MAVERICK,
+                OCEANIC,
+                BURNT_PEACH,
+                GRAPE_SODA,
+                STRAWBERRY_MILK,
+                WITCHING_HOUR,
+                VOID_DREAM
+            ],
+            current_palette: 1
         }
     }
 
@@ -233,8 +246,12 @@ impl PPU {
         }
     }
 
+    pub fn set_dmg_palette(&mut self, palette_id: usize) {
+        self.current_palette = palette_id;
+    }
+
     fn get_pixel(&self, bg_color: BGColor) -> Color {
-        self.palette_colors[bg_color as usize]
+        self.palette_colors[self.current_palette][bg_color as usize]
     }
 
     pub fn cap_fps(&mut self) {

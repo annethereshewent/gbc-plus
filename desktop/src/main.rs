@@ -63,7 +63,7 @@ fn main() {
 
     let mut cpu = CPU::new(audio_buffer.clone(), &rom_path.clone());
 
-    let mut frontend = Frontend::new(audio_buffer);
+    let mut frontend = Frontend::new(&mut cpu, audio_buffer);
 
     cpu.load_rom(&rom_bytes);
 

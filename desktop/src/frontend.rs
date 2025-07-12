@@ -1,5 +1,30 @@
-use std::{collections::{HashMap, VecDeque}, process::exit, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    collections::{
+        HashMap, VecDeque
+    },
+    fs::{
+        self,
+        File,
+        OpenOptions
+    },
+    io::{
+        Read,
+        Seek,
+        SeekFrom,
+        Write
+    },
+    process::exit,
+    sync::{
+        Arc,
+        Mutex
+    },
+    time::{
+        SystemTime,
+        UNIX_EPOCH
+    }
+};
 
+use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
         joypad::JoypadButtons,
@@ -17,8 +42,7 @@ use sdl2::{
         AudioSpecDesired
     }, controller::GameController, event::Event, keyboard::Keycode, pixels::PixelFormatEnum, render::Canvas, video::Window, EventPump, GameControllerSubsystem
 };
-
-
+use serde::{Deserialize, Serialize};
 
 const BUTTON_CROSS: u8 = 0;
 const BUTTON_SQUARE: u8 = 2;
@@ -29,6 +53,18 @@ const BUTTON_DOWN: u8 = 12;
 const BUTTON_LEFT: u8 = 13;
 const BUTTON_RIGHT: u8 = 14;
 
+#[derive(Serialize, Deserialize)]
+struct EmuConfig {
+    current_palette: usize
+}
+
+impl EmuConfig {
+    pub fn new() -> Self {
+        Self {
+            current_palette: 1
+        }
+    }
+}
 
 pub struct Frontend {
     controller: Option<GameController>,
@@ -39,7 +75,9 @@ pub struct Frontend {
     keyboard_map: HashMap<Keycode, JoypadButtons>,
     controller_id: Option<u32>,
     game_controller_subsystem: GameControllerSubsystem,
-    retry_attempts: usize
+    retry_attempts: usize,
+    config: EmuConfig,
+    config_file: File
 }
 
 pub struct GbcAudioCallback {
@@ -95,7 +133,7 @@ impl Frontend {
         }
     }
 
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
+    pub fn new(cpu: &mut CPU, audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
@@ -167,6 +205,36 @@ impl Frontend {
             ]
         );
 
+        let mut config_path = data_dir().expect("Couldn't find application directory");
+
+        config_path.push("GBC+");
+
+        fs::create_dir_all(&config_path).expect("Couldn't find app directory");
+
+        config_path.push("config.json");
+
+        let mut config_file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&config_path)
+                .unwrap();
+
+        let mut str: String = "".to_string();
+
+        config_file.read_to_string(&mut str).unwrap();
+
+        config_file.seek(SeekFrom::Start(0)).unwrap();
+
+        let mut config = EmuConfig::new();
+
+        match serde_json::from_str(&str) {
+            Ok(config_json) => config = config_json,
+            Err(_) => ()
+        }
+
+        cpu.bus.ppu.set_dmg_palette(config.current_palette);
+
         Self {
             controller,
             canvas,
@@ -176,7 +244,9 @@ impl Frontend {
             keyboard_map,
             controller_id: None,
             retry_attempts: 0,
-            game_controller_subsystem
+            game_controller_subsystem,
+            config,
+            config_file
         }
     }
 
@@ -245,6 +315,20 @@ impl Frontend {
                             cpu.bus.joypad.press_button(*button);
                         } else if keycode == Keycode::G {
                             cpu.debug_on = !cpu.debug_on;
+                        } else if keycode == Keycode::F2 {
+                            cpu.bus.ppu.current_palette = (cpu.bus.ppu.current_palette + 1) % cpu.bus.ppu.palette_colors.len();
+
+                            self.config.current_palette = cpu.bus.ppu.current_palette;
+
+                            let json = match serde_json::to_string(&self.config) {
+                                Ok(result) => result,
+                                Err(_) => "".to_string()
+                            };
+
+                            if json != "" {
+                                self.config_file.seek(SeekFrom::Start(0)).unwrap();
+                                self.config_file.write_all(json.as_bytes()).unwrap();
+                            }
                         }
                     }
                 }
