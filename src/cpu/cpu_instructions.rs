@@ -1193,23 +1193,22 @@ impl CPU {
     }
 
     fn sla(&mut self, r1: Register) -> usize {
-        let mut carry = false;
-        let (result, cycles) = if r1 == Register::HLPointer {
+        let (result, cycles, carry) = if r1 == Register::HLPointer {
             let mut val = self.bus.mem_read8(self.hl());
 
-            carry = (val >> 7) & 0x1 == 1;
+            let carry = (val >> 7) & 0x1 == 1;
 
             val <<= 1;
 
             self.bus.mem_write8(self.hl(), val);
 
-            (val, 16)
+            (val, 16, carry)
         } else {
-            carry = (self.registers[r1 as usize] >> 7) & 0x1 == 1;
+            let carry = (self.registers[r1 as usize] >> 7) & 0x1 == 1;
 
             self.registers[r1 as usize] <<= 1;
 
-            (self.registers[r1 as usize], 8)
+            (self.registers[r1 as usize], 8, carry)
         };
 
         self.f.set(FlagRegister::CARRY, carry);

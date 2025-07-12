@@ -176,7 +176,7 @@ impl PPU {
                 LCDMode::HBlank => self.handle_hblank(interrupt_register),
                 LCDMode::VBlank => self.handle_vblank(interrupt_register),
                 LCDMode::OAMScan => self.handle_oam_scan(interrupt_register),
-                LCDMode::HDraw => self.handle_hdraw(interrupt_register),
+                LCDMode::HDraw => self.handle_hdraw(),
             }
         }
     }
@@ -532,7 +532,7 @@ impl PPU {
         }
     }
 
-    fn handle_hdraw(&mut self, interrupt_register: &mut InterruptRegister) {
+    fn handle_hdraw(&mut self) {
         if self.cycles >= MODE3_CYCLES {
             self.cycles -= MODE3_CYCLES;
 

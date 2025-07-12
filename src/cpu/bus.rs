@@ -3,7 +3,7 @@ use std::{collections::VecDeque, sync::{Arc, Mutex}};
 use apu::{sound_panning_register::SoundPanningRegister, APU};
 use cartridge::Cartridge;
 use joypad::Joypad;
-use ppu::{lcd_status_register::LCDStatusRegister, PPU};
+use ppu::PPU;
 use interrupt_register::InterruptRegister;
 use timer::Timer;
 

@@ -29,7 +29,6 @@ pub struct Joypad {
     pub select_buttons: bool,
     pub select_dpad: bool,
     pub joypad_register: JoypadRegister,
-    joypad_buttons: JoypadButtons,
     button_map: HashMap<u8, JoypadButtons>,
     pressed_buttons: HashMap<JoypadButtons, bool>
 }
@@ -39,7 +38,6 @@ impl Joypad {
         Self {
             select_buttons: false,
             select_dpad: false,
-            joypad_buttons: JoypadButtons::None,
             button_map: HashMap::from([
                 (0, JoypadButtons::A),
                 (2, JoypadButtons::B),
