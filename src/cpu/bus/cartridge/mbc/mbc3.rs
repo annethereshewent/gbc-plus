@@ -165,7 +165,7 @@ impl MBC3 {
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
             clock: ClockRegister::new(),
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery),
+            backup_file: BackupFile::new(rom_path, ram_size, has_battery && has_ram),
             _rom_size: rom_size,
             has_ram,
             has_timer,

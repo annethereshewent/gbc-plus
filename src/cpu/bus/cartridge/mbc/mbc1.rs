@@ -106,7 +106,7 @@ impl MBC1 {
             banking_mode: BankingMode::Simple,
             rom_bank: 1,
             ram_bank: 0,
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery)
+            backup_file: BackupFile::new(rom_path, ram_size, has_battery && has_ram)
         }
     }
 

@@ -78,6 +78,8 @@ impl Bus {
             0xff26 => self.apu.read_channel_status(),
             0xff40 => self.ppu.lcdc.bits(),
             0xff41 => self.ppu.read_stat(),
+            0xff42 => self.ppu.scy,
+            0xff43 => self.ppu.scx,
             0xff44 => self.ppu.line_y,
             0xff47 => self.ppu.bgp.read(),
             0xff48 => self.ppu.obp0.read(),
