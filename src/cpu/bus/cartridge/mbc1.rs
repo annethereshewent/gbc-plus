@@ -54,8 +54,14 @@ impl MBC for MBC1 {
             0x2000..=0x3fff => self.update_rom_bank(value),
             0x4000..=0x5fff => self.update_ram_upper_rom_bank(value),
             0x6000..=0x7fff => self.update_banking_mode(value & 0x1),
-            0xa000..=0xbfff => {
+            0xa000..=0xbfff => if self.has_ram && self.ram_enable {
+                let actual_address = if self.banking_mode == BankingMode::Simple {
+                    (address & 0x1fff) as usize
+                } else {
+                    (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
+                };
 
+                self.ram[actual_address] = value;
             }
             _ => panic!("unsupported address received for mbc write: 0x{:x}", address)
         }
