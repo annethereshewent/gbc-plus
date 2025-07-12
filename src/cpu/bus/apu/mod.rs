@@ -148,10 +148,7 @@ impl APU {
 
         if self.cycles >= TICKS_PER_SAMPLE {
             self.cycles -= TICKS_PER_SAMPLE;
-
-            if self.nr52.audio_on {
-                self.generate_samples();
-            }
+            self.generate_samples();
         }
     }
 }
