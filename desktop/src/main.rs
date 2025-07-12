@@ -1,10 +1,10 @@
-use std::{collections::VecDeque, env, fs, io::Read, path::Path, sync::{Arc, Mutex}};
+use std::{collections::VecDeque, env, fs, io::Read, path::Path, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 extern crate gbc_plus;
 
 use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
 use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
-use zip::{HasZipMetadata, ZipArchive};
+use zip::ZipArchive;
 
 pub struct GbcAudioCallback {
     pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
@@ -43,8 +43,6 @@ impl AudioCallback for GbcAudioCallback {
 }
 
 fn main() {
-    let audio_buffer = Arc::new(Mutex::new(VecDeque::<f32>::new()));
-    let mut cpu = CPU::new(audio_buffer.clone());
 
     let args: Vec<String> = env::args().collect();
 
@@ -81,10 +79,12 @@ fn main() {
         samples: Some(4096)
     };
 
+    let audio_buffer = Arc::new(Mutex::new(VecDeque::<f32>::new()));
+
     let device = audio_subsystem.open_playback(
         None,
         &spec,
-        |_| GbcAudioCallback { audio_samples: audio_buffer }
+        |_| GbcAudioCallback { audio_samples: audio_buffer.clone() }
     ).unwrap();
 
     device.resume();
@@ -106,6 +106,8 @@ fn main() {
         .unwrap();
 
     let rom_path = &args[1];
+
+    let mut cpu = CPU::new(audio_buffer, rom_path);
 
     let mut rom_bytes = fs::read(rom_path).unwrap();
 
@@ -132,9 +134,28 @@ fn main() {
 
     cpu.load_rom(&rom_bytes);
 
+    let mut current_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("an error occurred")
+        .as_millis();
+
     loop {
         while !cpu.bus.ppu.frame_finished {
             cpu.step();
+        }
+
+
+
+        if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
+            if mbc.backup_file().is_dirty {
+                let last_updated = mbc.backup_file().last_updated;
+
+                let diff = current_time - last_updated;
+
+                if diff >= 500 {
+                    mbc.save();
+                }
+            }
         }
 
         cpu.bus.ppu.cap_fps();
@@ -172,5 +193,10 @@ fn main() {
                 _ => { /* do nothing */ }
             }
         }
+
+        current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
     }
 }

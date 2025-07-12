@@ -1,4 +1,4 @@
-use super::mbc::MBC;
+use super::{backup_file::BackupFile, mbc::MBC};
 
 #[derive(Copy, Clone, PartialEq)]
 enum BankingMode {
@@ -10,15 +10,22 @@ pub struct MBC1 {
     _ram_size: usize,
     rom_size: usize,
     has_ram: bool,
-    _has_battery: bool,
     ram_enable: bool,
     rom_bank: u8,
     ram_bank: u8,
     banking_mode: BankingMode,
-    ram: Box<[u8]>
+    pub backup_file: BackupFile
 }
 
 impl MBC for MBC1 {
+    fn backup_file(&self) -> &BackupFile {
+        &self.backup_file
+    }
+
+    fn save(&mut self) {
+        self.backup_file.save_file();
+    }
+
     fn read(&self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
@@ -41,7 +48,7 @@ impl MBC for MBC1 {
                 } else {
                     (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
                 };
-                self.ram[actual_address]
+                self.backup_file.read8(actual_address)
             } else {
                 0xff
             }
@@ -61,7 +68,7 @@ impl MBC for MBC1 {
                     (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
                 };
 
-                self.ram[actual_address] = value;
+                self.backup_file.write8(actual_address, value);
             }
             _ => panic!("unsupported address received for mbc write: 0x{:x}", address)
         }
@@ -73,7 +80,15 @@ impl MBC for MBC1 {
             0x2000..=0x3fff => self.update_rom_bank(value as u8),
             0x4000..=0x5fff => self.update_ram_upper_rom_bank(value as u8),
             0x6000..=0x7fff => self.update_banking_mode((value & 0x1) as u8),
-            0xa000..=0xbfff => if self.ram_enable { unsafe { *(&mut self.ram[address as usize] as *mut u8 as *mut u16) = value } },
+            0xa000..=0xbfff => if self.has_ram && self.ram_enable {
+                let actual_address = if self.banking_mode == BankingMode::Simple {
+                    (address & 0x1fff) as usize
+                } else {
+                    (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
+                };
+
+                self.backup_file.write16(actual_address, value);
+            },
             _ => panic!("unsupported address received: 0x{:x}", address)
         }
     }
@@ -100,17 +115,16 @@ impl MBC for MBC1 {
 }
 
 impl MBC1 {
-    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize) -> Self {
+    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, rom_path: &str) -> Self {
         Self {
             _ram_size: ram_size,
             rom_size: rom_size,
             has_ram,
-            _has_battery: has_battery,
             ram_enable: false,
             banking_mode: BankingMode::Simple,
             rom_bank: 1,
             ram_bank: 0,
-            ram: vec![0; ram_size].into_boxed_slice()
+            backup_file: BackupFile::new(rom_path, ram_size, has_battery)
         }
     }
 

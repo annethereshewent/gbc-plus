@@ -33,9 +33,9 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: &str) -> Self {
         Self {
-            cartridge: Cartridge::new(),
+            cartridge: Cartridge::new(rom_path),
             wram: vec![0; 0x2000].into_boxed_slice(),
             hram: vec![0; 0x7f].into_boxed_slice(),
             IF: InterruptRegister::from_bits_retain(0),
