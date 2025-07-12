@@ -2,8 +2,27 @@ use std::{collections::{HashMap, VecDeque}, env, fs, io::Read, path::Path, proce
 
 extern crate gbc_plus;
 
-use gbc_plus::cpu::{bus::{joypad::JoypadButtons, ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}}, CPU};
-use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
+use gbc_plus::cpu::{
+    bus::{
+        joypad::JoypadButtons,
+        ppu::{
+            SCREEN_HEIGHT,
+            SCREEN_WIDTH
+        }
+    },
+    CPU
+};
+use sdl2::{
+    audio::{
+        AudioCallback,
+        AudioSpecDesired
+    },
+    controller::GameController,
+    event::Event,
+    keyboard::Keycode,
+    pixels::PixelFormatEnum,
+    GameControllerSubsystem
+};
 use zip::ZipArchive;
 
 const BUTTON_CROSS: u8 = 0;
@@ -15,6 +34,7 @@ const BUTTON_DOWN: u8 = 12;
 const BUTTON_LEFT: u8 = 13;
 const BUTTON_RIGHT: u8 = 14;
 
+// TODO: move this stuff to a separate frontend struct.
 
 pub struct GbcAudioCallback {
     pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
@@ -49,6 +69,22 @@ impl AudioCallback for GbcAudioCallback {
             };
             is_left_sample = !is_left_sample;
         }
+    }
+}
+
+fn reconnect_controller(controller_subsystem: &GameControllerSubsystem, controller_id: u32, retry_attempts: &mut usize) -> Option<GameController> {
+    if *retry_attempts < 5 {
+        match controller_subsystem.open(controller_id) {
+            Ok(c) => {
+                Some(c)
+            }
+            Err(_) => {
+                *retry_attempts += 1;
+                None
+            }
+        }
+    } else {
+        None
     }
 }
 
@@ -167,17 +203,15 @@ fn main() {
 
     cpu.load_rom(&rom_bytes);
 
-    let mut current_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("an error occurred")
-        .as_millis();
+    let mut retry_attempts = 0;
+    let mut controller_id: Option<u32> = None;
 
     loop {
         while !cpu.bus.ppu.frame_finished {
             cpu.step();
         }
 
-        current_time = SystemTime::now()
+        let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
             .as_millis();
@@ -204,6 +238,14 @@ fn main() {
         canvas.copy(&texture, None, None).unwrap();
 
         canvas.present();
+
+        if let Some(id) = controller_id {
+            _controller = reconnect_controller(&game_controller_subsystem, id, &mut retry_attempts);
+
+            if _controller.is_some() || retry_attempts >= 5 {
+                controller_id = None
+            }
+        }
 
         for event in event_pump.poll_iter() {
             match event {
@@ -242,7 +284,15 @@ fn main() {
                     }
                 }
                 Event::JoyDeviceAdded { which, .. } => {
-                    _controller = Some(game_controller_subsystem.open(which).unwrap());
+                    _controller = match game_controller_subsystem.open(which) {
+                        Ok(c) => {
+                            Some(c)
+                        }
+                        Err(_) => {
+                            controller_id = Some(which);
+                            None
+                        }
+                    }
                 }
                 _ => { /* do nothing */ }
             }

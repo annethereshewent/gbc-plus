@@ -1,4 +1,4 @@
-use chrono::{Datelike, Local, Timelike};
+use chrono::{Datelike, Local, TimeZone, Timelike, Utc};
 
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
@@ -67,12 +67,26 @@ impl MBC for MBC3 {
                 if self.ram_bank > 0x7 {
                     let local_time = Local::now();
 
+                    let datetime = Utc.with_ymd_and_hms(
+                        local_time.year(),
+                        local_time.month(),
+                        local_time.day(),
+                        local_time.hour(),
+                        local_time.minute(),
+                        local_time.second()
+                    );
+                    let datetime2 = Utc.with_ymd_and_hms(local_time.year(), 1, 1, 0, 0, 0);
+
+                    let diff = datetime.unwrap().timestamp() - datetime2.unwrap().timestamp();
+
+                    let day = diff / 24 / 60 / 60;
+
                     match self.selected_register {
-                        SelectedRegister::Dh => 0,
-                        SelectedRegister::Dl => 0,
-                        SelectedRegister::H => local_time.hour() as u8 - 1,
-                        SelectedRegister::M => local_time.minute() as u8 - 1,
-                        SelectedRegister::S => local_time.second() as u8 - 1,
+                        SelectedRegister::Dh => day as u8,
+                        SelectedRegister::Dl => ((day >> 8) & 0x1) as u8,
+                        SelectedRegister::H => local_time.hour() as u8,
+                        SelectedRegister::M => local_time.minute() as u8,
+                        SelectedRegister::S => local_time.second() as u8,
                         SelectedRegister::None => unreachable!()
                     }
                 } else if self.has_ram {
@@ -97,18 +111,32 @@ impl MBC for MBC3 {
             0x4000..=0x7fff => {
                 let actual_address = self.get_rom_address(address);
 
-                unsafe { *(&rom[actual_address as usize] as *const u8 as *const u16) }
+                unsafe { *(&rom[actual_address] as *const u8 as *const u16) }
             }
             0xa000..=0xbfff => if self.timer_ram_enable {
                 if self.ram_bank > 0x7 {
                     let local_time = Local::now();
 
+                    let datetime = Utc.with_ymd_and_hms(
+                        local_time.year(),
+                        local_time.month(),
+                        local_time.day(),
+                        local_time.hour(),
+                        local_time.minute(),
+                        local_time.second()
+                    );
+                    let datetime2 = Utc.with_ymd_and_hms(local_time.year(), 1, 1, 0, 0, 0);
+
+                    let diff = datetime.unwrap().timestamp() - datetime2.unwrap().timestamp();
+
+                    let day = diff / 24 / 60 / 60;
+
                     match self.selected_register {
-                        SelectedRegister::Dh => 0,
-                        SelectedRegister::Dl => 0,
-                        SelectedRegister::H => local_time.hour() as u16 - 1,
-                        SelectedRegister::M => local_time.minute() as u16 - 1,
-                        SelectedRegister::S => local_time.second() as u16 - 1,
+                        SelectedRegister::Dh => day as u8 as u16,
+                        SelectedRegister::Dl => (day >> 8) as u16,
+                        SelectedRegister::H => local_time.hour() as u16,
+                        SelectedRegister::M => local_time.minute() as u16,
+                        SelectedRegister::S => local_time.second() as u16,
                         SelectedRegister::None => unreachable!()
                     }
                 } else if self.has_ram {

@@ -164,7 +164,7 @@ impl PPU {
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
             lyc: 0,
-            palette_colors: BURNT_PEACH
+            palette_colors: GRAPE_SODA
         }
     }
 

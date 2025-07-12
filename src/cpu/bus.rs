@@ -71,8 +71,10 @@ impl Bus {
             0xff05 => self.timer.tima,
             0xff0f => self.IF.bits(),
             0xff11 => self.apu.channel1.read_length(),
+            0xff15 => 0xff, // i have no idea what this does, but Pokemon Gold seems to use it despite it not being an official register.
             0xff16 => self.apu.channel2.read_length(),
             0xff1a => self.apu.channel3.dac_enable as u8,
+            0xff1f => 0xff, // see above comment
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
             0xff26 => self.apu.read_channel_status(),
@@ -83,6 +85,7 @@ impl Bus {
             0xff44 => self.ppu.line_y,
             0xff47 => self.ppu.bgp.read(),
             0xff48 => self.ppu.obp0.read(),
+            0xff49 => self.ppu.obp1.read(),
             0xff4a => self.ppu.wy,
             0xff4b => self.ppu.wx,
             // 0xff4d => 0, // GBC, TODO
@@ -202,6 +205,7 @@ impl Bus {
                 self.apu.channel1.period |= value as u16;
             }
             0xff14 => self.apu.channel1.write_period_high_control(value),
+            0xff15 => (),
             0xff16 => self.apu.channel2.write_length_register(value),
             0xff17 => self.apu.channel2.write_volume_register(value),
             0xff18 => {
@@ -223,6 +227,7 @@ impl Bus {
                 self.apu.channel3.period |= value as u16;
             }
             0xff1e => self.apu.channel3.write_period_high_control(value),
+            0xff1f => (), // used by pokemon gold but doesn't seem to do or be anything.
             0xff20 => self.apu.channel4.length = value & 0x3f,
             0xff21 => self.apu.channel4.nr42.write(value),
             0xff22 => self.apu.channel4.nr43.write(value),
