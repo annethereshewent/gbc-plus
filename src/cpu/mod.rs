@@ -105,15 +105,21 @@ impl CPU {
 
     pub fn handle_interrupts(&mut self) {
         let fired_interrupts = self.bus.IF.bits() & self.bus.ie.bits();
+
+        if fired_interrupts != 0 {
+            self.is_halted = false;
+        }
+
         if self.bus.ime {
             if fired_interrupts != 0 {
-                self.is_halted = false;
+                let irq_index = fired_interrupts.trailing_zeros();
 
-                self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !fired_interrupts);
+
+                self.bus.IF = InterruptRegister::from_bits_truncate(self.bus.IF.bits() & !(1 << irq_index));
                 self.bus.ime = false;
 
                 // use the InterruptRegister struct to determine what interrupt fired
-                let temp = InterruptRegister::from_bits_retain(fired_interrupts);
+                let temp = InterruptRegister::from_bits_retain(1 << irq_index);
 
                 self.bus.tick(8);
 
@@ -134,10 +140,6 @@ impl CPU {
                 }
 
                 self.bus.tick(4);
-            }
-        } else if self.is_halted {
-            if self.bus.IF.bits() & self.bus.ie.bits() != 0 {
-                self.is_halted = false;
             }
         }
     }

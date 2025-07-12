@@ -175,32 +175,38 @@ impl PPU {
             match self.mode {
                 LCDMode::HBlank => self.handle_hblank(interrupt_register),
                 LCDMode::VBlank => self.handle_vblank(interrupt_register),
-                LCDMode::OAMScan => self.handle_oam_scan(),
+                LCDMode::OAMScan => self.handle_oam_scan(interrupt_register),
                 LCDMode::HDraw => self.handle_hdraw(interrupt_register),
             }
+        }
+    }
+
+    pub fn update_lyc(&mut self, value: u8, interrupt_register: &mut InterruptRegister) {
+        self.lyc = value;
+
+        if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+            interrupt_register.set(InterruptRegister::LCD, true);
         }
     }
 
     fn handle_hblank(&mut self, interrupt_register: &mut InterruptRegister) {
         if self.cycles >= MODE0_CYCLES {
             self.cycles -= MODE0_CYCLES;
+
             self.line_y += 1;
 
-            if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+             if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+                interrupt_register.set(InterruptRegister::LCD, true);
+            }
+
+            if self.stat.contains(LCDStatusRegister::MODE0) {
                 interrupt_register.set(InterruptRegister::LCD, true);
             }
 
             self.mode = if self.line_y == 144 {
-                if self.stat.contains(LCDStatusRegister::MODE1) {
-                    interrupt_register.set(InterruptRegister::LCD, true);
-                }
-
                 interrupt_register.set(InterruptRegister::VBLANK, true);
                 LCDMode::VBlank
             } else {
-                if self.stat.contains(LCDStatusRegister::MODE2) {
-                    interrupt_register.set(InterruptRegister::LCD, true);
-                }
                 LCDMode::OAMScan
             };
         }
@@ -486,6 +492,10 @@ impl PPU {
         if self.cycles >= MODE1_CYCLES {
             self.cycles -= MODE1_CYCLES;
 
+            if self.stat.contains(LCDStatusRegister::MODE1) {
+                interrupt_register.set(InterruptRegister::LCD, true);
+            }
+
             self.line_y += 1;
 
             if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
@@ -500,14 +510,23 @@ impl PPU {
 
                 self.mode = LCDMode::OAMScan;
                 self.line_y = 0;
+
+                if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+                    interrupt_register.set(InterruptRegister::LCD, true);
+                }
+
                 self.current_window_line = 0;
             }
         }
     }
 
-    fn handle_oam_scan(&mut self) {
+    fn handle_oam_scan(&mut self, interrupt_register: &mut InterruptRegister) {
         if self.cycles >= MODE2_CYCLES {
             self.cycles -= MODE2_CYCLES;
+
+            if self.stat.contains(LCDStatusRegister::MODE2) {
+                interrupt_register.set(InterruptRegister::LCD, true);
+            }
 
             self.mode = LCDMode::HDraw
         }
@@ -517,13 +536,17 @@ impl PPU {
         if self.cycles >= MODE3_CYCLES {
             self.cycles -= MODE3_CYCLES;
 
-            if self.stat.contains(LCDStatusRegister::MODE0) {
-                interrupt_register.set(InterruptRegister::LCD, true);
-            }
-
             self.draw_line();
 
             self.mode = LCDMode::HBlank;
+        }
+    }
+
+    pub fn update_stat(&mut self, value: u8, interrupt_register: &mut InterruptRegister) {
+        self.stat = LCDStatusRegister::from_bits_truncate(value);
+
+        if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+            interrupt_register.set(InterruptRegister::LCD, true);
         }
     }
 
