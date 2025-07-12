@@ -104,6 +104,27 @@ pub const GRAPE_SODA: [Color; 4] = [
     Color { r: 0x1f, g: 0x00, b: 0x37 }
 ];
 
+pub const STRAWBERRY_MILK: [Color; 4] = [
+    Color { r: 0xff, g: 0xf1, b: 0xf5 },
+    Color { r: 0xff, g: 0xc2, b: 0xd7 },
+    Color { r: 0xe1, g: 0x75, b: 0xa4 },
+    Color { r: 0x8c, g: 0x1c, b: 0x3b }
+];
+
+pub const WITCHING_HOUR: [Color; 4] = [
+    Color { r: 0xe6, g: 0xe6, b: 0xfa },
+    Color { r: 0x94, g: 0x7e, b: 0xc3 },
+    Color { r: 0x4b, g: 0x00, b: 0x82 },
+    Color { r: 0x1a, g: 0x00, b: 0x2e }
+];
+
+pub const VOID_DREAM: [Color; 4] = [
+    Color { r: 0xe0, g: 0xf7, b: 0xfa },
+    Color { r: 0x81, g: 0xd4, b: 0xfa },
+    Color { r: 0x4f, g: 0x86, b: 0xf7 },
+    Color { r: 0x0d, g: 0x47, b: 0xa1 }
+];
+
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum LCDMode {
@@ -164,7 +185,7 @@ impl PPU {
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
             lyc: 0,
-            palette_colors: GRAPE_SODA
+            palette_colors: STRAWBERRY_MILK
         }
     }
 

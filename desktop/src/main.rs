@@ -23,16 +23,14 @@ fn main() {
         panic!("syntax: ./gbc-plus <rom name>");
     }
 
-    let rom_path = &args[1];
+    let mut rom_path = args[1].clone();
 
     let audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
 
-    let mut cpu = CPU::new(audio_buffer.clone(), rom_path);
+    let mut rom_bytes = fs::read(rom_path.clone()).unwrap();
 
-    let mut rom_bytes = fs::read(rom_path).unwrap();
-
-    if Path::new(rom_path).extension().unwrap().to_os_string() == "zip" {
-        let file = fs::File::open(rom_path).unwrap();
+    if Path::new(&rom_path).extension().unwrap().to_os_string() == "zip" {
+        let file = fs::File::open(rom_path.to_string()).unwrap();
         let mut archive = ZipArchive::new(file).unwrap();
 
         let mut file_found = false;
@@ -43,6 +41,17 @@ fn main() {
                 file_found = true;
                 rom_bytes = vec![0; file.size() as usize];
                 file.read_exact(&mut rom_bytes).unwrap();
+
+                let real_file_name = file.name().to_string();
+
+                let mut split_str: Vec<&str> = rom_path.split('/').collect();
+
+                split_str.pop();
+
+                split_str.push(&real_file_name);
+
+                rom_path = split_str.join("/");
+
                 break;
             }
         }
@@ -51,6 +60,8 @@ fn main() {
             panic!("couldn't extract ROM from zip file!");
         }
     }
+
+    let mut cpu = CPU::new(audio_buffer.clone(), &rom_path.clone());
 
     let mut frontend = Frontend::new(audio_buffer);
 
