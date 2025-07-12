@@ -246,7 +246,8 @@ impl PPU {
         if self.line_y < self.wy ||
             !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) ||
             !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) ||
-            (self.wx as isize - 7) >= SCREEN_WIDTH as isize
+            (self.wx as isize - 7) >= SCREEN_WIDTH as isize ||
+            self.current_window_line as usize >= SCREEN_HEIGHT
         {
             return;
         }
@@ -277,7 +278,6 @@ impl PPU {
             let tile_number = (x_pos as usize / 8) + (self.current_window_line as usize / 8) * 32;
 
             let tilemap_address = base_tilemap_address + tile_number;
-
             let tile_index = self.vram_read8(tilemap_address);
 
             let y_pos_in_tile = (self.current_window_line & 0x7) as usize;
