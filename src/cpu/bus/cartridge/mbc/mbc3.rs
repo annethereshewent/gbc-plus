@@ -153,7 +153,7 @@ impl MBC for MBC3 {
     }
 
     fn save(&mut self) {
-
+        self.backup_file.save_file();
     }
 
     fn write(&mut self, address: u16, value: u8) {
