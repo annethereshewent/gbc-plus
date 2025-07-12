@@ -76,6 +76,7 @@ impl BackupFile {
     pub fn save_file(&mut self) {
         println!("saving file....");
         self.is_dirty = false;
+        self.last_updated = 0;
         if let Some(file) = &mut self.file {
             file.seek(SeekFrom::Start(0)).unwrap();
             file.write_all(&self.ram).unwrap();

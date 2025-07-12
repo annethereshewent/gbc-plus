@@ -1,10 +1,20 @@
-use std::{collections::VecDeque, env, fs, io::Read, path::Path, process::exit, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::{HashMap, VecDeque}, env, fs, io::Read, path::Path, process::exit, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 extern crate gbc_plus;
 
-use gbc_plus::cpu::{bus::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}, CPU};
+use gbc_plus::cpu::{bus::{joypad::JoypadButtons, ppu::{SCREEN_HEIGHT, SCREEN_WIDTH}}, CPU};
 use sdl2::{audio::{AudioCallback, AudioSpecDesired}, event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
 use zip::ZipArchive;
+
+const BUTTON_CROSS: u8 = 0;
+const BUTTON_SQUARE: u8 = 2;
+const BUTTON_SELECT: u8 = 4;
+const BUTTON_START: u8 = 6;
+const BUTTON_UP: u8 = 11;
+const BUTTON_DOWN: u8 = 12;
+const BUTTON_LEFT: u8 = 13;
+const BUTTON_RIGHT: u8 = 14;
+
 
 pub struct GbcAudioCallback {
     pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
@@ -111,6 +121,29 @@ fn main() {
 
     let mut rom_bytes = fs::read(rom_path).unwrap();
 
+    let button_map = HashMap::from([
+        (BUTTON_CROSS, JoypadButtons::A),
+        (BUTTON_SQUARE, JoypadButtons::B),
+        (BUTTON_SELECT, JoypadButtons::Select),
+        (BUTTON_START, JoypadButtons::Start),
+        (BUTTON_UP, JoypadButtons::Up),
+        (BUTTON_DOWN, JoypadButtons::Down),
+        (BUTTON_LEFT, JoypadButtons::Left),
+        (BUTTON_RIGHT, JoypadButtons::Right)
+    ]);
+
+    let keyboard_map = HashMap::from([
+            (Keycode::W, JoypadButtons::Up),
+            (Keycode::S, JoypadButtons::Down),
+            (Keycode::A, JoypadButtons::Left),
+            (Keycode::D, JoypadButtons::Right),
+            (Keycode::J, JoypadButtons::B),
+            (Keycode::K, JoypadButtons::A),
+            (Keycode::LShift, JoypadButtons::Select),
+            (Keycode::Return, JoypadButtons::Start)
+        ]
+    );
+
     if Path::new(rom_path).extension().unwrap().to_os_string() == "zip" {
         let file = fs::File::open(rom_path).unwrap();
         let mut archive = ZipArchive::new(file).unwrap();
@@ -144,14 +177,18 @@ fn main() {
             cpu.step();
         }
 
-
+        current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
 
         if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
-            if mbc.backup_file().is_dirty {
-                let last_updated = mbc.backup_file().last_updated;
-
+            let last_updated = mbc.backup_file().last_updated;
+            if mbc.backup_file().is_dirty &&
+                current_time > last_updated &&
+                last_updated != 0
+            {
                 let diff = current_time - last_updated;
-
                 if diff >= 500 {
                     mbc.save();
                 }
@@ -180,19 +217,29 @@ fn main() {
                 }
                 Event::KeyDown { keycode, .. } => {
                     if let Some(keycode) = keycode {
-                        if keycode == Keycode::G {
+                        if let Some(button) = keyboard_map.get(&keycode) {
+                            cpu.bus.joypad.press_button(*button);
+                        } else if keycode == Keycode::G {
                             cpu.debug_on = !cpu.debug_on;
                         }
                     }
                 }
                 Event::KeyUp { keycode, .. } => {
-
+                    if let Some(keycode) = keycode {
+                        if let Some(button) = keyboard_map.get(&keycode) {
+                            cpu.bus.joypad.release_button(*button);
+                        }
+                    }
                 }
                 Event::JoyButtonDown { button_idx, .. } => {
-                    cpu.bus.joypad.press_button(button_idx);
+                    if let Some(button) = button_map.get(&button_idx) {
+                        cpu.bus.joypad.press_button(*button);
+                    }
                 }
                 Event::JoyButtonUp { button_idx, .. } => {
-                    cpu.bus.joypad.release_button(button_idx);
+                    if let Some(button) = button_map.get(&button_idx) {
+                        cpu.bus.joypad.release_button(*button);
+                    }
                 }
                 Event::JoyDeviceAdded { which, .. } => {
                     _controller = Some(game_controller_subsystem.open(which).unwrap());
@@ -200,10 +247,5 @@ fn main() {
                 _ => { /* do nothing */ }
             }
         }
-
-        current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("an error occurred")
-            .as_millis();
     }
 }

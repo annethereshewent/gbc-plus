@@ -29,7 +29,6 @@ pub struct Joypad {
     pub select_buttons: bool,
     pub select_dpad: bool,
     pub joypad_register: JoypadRegister,
-    button_map: HashMap<u8, JoypadButtons>,
     pressed_buttons: HashMap<JoypadButtons, bool>
 }
 
@@ -38,16 +37,6 @@ impl Joypad {
         Self {
             select_buttons: false,
             select_dpad: false,
-            button_map: HashMap::from([
-                (0, JoypadButtons::A),
-                (2, JoypadButtons::B),
-                (4, JoypadButtons::Select),
-                (6, JoypadButtons::Start),
-                (11, JoypadButtons::Up),
-                (12, JoypadButtons::Down),
-                (13, JoypadButtons::Left),
-                (14, JoypadButtons::Right)
-            ]),
             pressed_buttons: HashMap::new(),
             joypad_register: JoypadRegister::from_bits_retain(0xf)
         }
@@ -74,15 +63,11 @@ impl Joypad {
         self.joypad_register.bits() | (self.select_dpad as u8) << 4 | (self.select_buttons as u8) << 5
     }
 
-    pub fn press_button(&mut self, button_id: u8) {
-        if let Some(button) = self.button_map.get(&button_id) {
-            self.pressed_buttons.insert(*button, true);
-        }
+    pub fn press_button(&mut self, button: JoypadButtons) {
+        self.pressed_buttons.insert(button, true);
     }
 
-    pub fn release_button(&mut self, button_id: u8) {
-        if let Some(button) = self.button_map.get(&button_id) {
-            self.pressed_buttons.remove(button);
-        }
+    pub fn release_button(&mut self, button: JoypadButtons) {
+        self.pressed_buttons.remove(&button);
     }
 }
