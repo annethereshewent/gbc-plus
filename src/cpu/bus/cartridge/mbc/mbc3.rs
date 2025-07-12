@@ -1,3 +1,5 @@
+use chrono::{Datelike, Local, Timelike};
+
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
 use super::MBC;
@@ -61,9 +63,24 @@ impl MBC for MBC3 {
 
                 rom[actual_address]
             }
-            0xa000..=0xbfff => if self.has_ram && self.timer_ram_enable {
-                let actual_address = self.get_ram_address(address);
-                self.backup_file.read8(actual_address)
+            0xa000..=0xbfff => if self.timer_ram_enable {
+                if self.ram_bank > 0x7 {
+                    let local_time = Local::now();
+
+                    match self.selected_register {
+                        SelectedRegister::Dh => 0,
+                        SelectedRegister::Dl => 0,
+                        SelectedRegister::H => local_time.hour() as u8 - 1,
+                        SelectedRegister::M => local_time.minute() as u8 - 1,
+                        SelectedRegister::S => local_time.second() as u8 - 1,
+                        SelectedRegister::None => unreachable!()
+                    }
+                } else if self.has_ram {
+                    let actual_address = self.get_ram_address(address);
+                    self.backup_file.read8(actual_address)
+                } else {
+                    0xff
+                }
             } else {
                 0xff
             }
@@ -82,9 +99,26 @@ impl MBC for MBC3 {
 
                 unsafe { *(&rom[actual_address as usize] as *const u8 as *const u16) }
             }
-            0xa000..=0xbfff => {
-                let actual_address = self.get_ram_address(address);
-                self.backup_file.read16(actual_address)
+            0xa000..=0xbfff => if self.timer_ram_enable {
+                if self.ram_bank > 0x7 {
+                    let local_time = Local::now();
+
+                    match self.selected_register {
+                        SelectedRegister::Dh => 0,
+                        SelectedRegister::Dl => 0,
+                        SelectedRegister::H => local_time.hour() as u16 - 1,
+                        SelectedRegister::M => local_time.minute() as u16 - 1,
+                        SelectedRegister::S => local_time.second() as u16 - 1,
+                        SelectedRegister::None => unreachable!()
+                    }
+                } else if self.has_ram {
+                    let actual_address = self.get_ram_address(address);
+                    self.backup_file.read16(actual_address)
+                } else {
+                    0xff
+                }
+            } else {
+                0xff
             }
             _ => panic!("(mbc_read16): unsupported address given: 0x{:x}", address)
         }
@@ -104,18 +138,20 @@ impl MBC for MBC3 {
             0x2000..=0x3fff => self.update_bank(value),
             0x4000..=0x5fff => self.update_timer_ram_bank(value),
             0x6000..=0x7fff => self.latch_clock_value(value),
-            0xa000..=0xbfff => if self.timer_ram_enable && self.ram_bank > 0x7 {
-                match self.selected_register {
-                    SelectedRegister::Dh => self.clock.rtc_dh = value,
-                    SelectedRegister::Dl => self.clock.rtc_dl = value,
-                    SelectedRegister::H => self.clock.rtc_h = value,
-                    SelectedRegister::M => self.clock.rtc_m = value,
-                    SelectedRegister::S => self.clock.rtc_s = value,
-                    SelectedRegister::None => unreachable!()
+            0xa000..=0xbfff => if self.timer_ram_enable {
+                if self.ram_bank > 0x7 {
+                    match self.selected_register {
+                        SelectedRegister::Dh => self.clock.rtc_dh = value,
+                        SelectedRegister::Dl => self.clock.rtc_dl = value,
+                        SelectedRegister::H => self.clock.rtc_h = value,
+                        SelectedRegister::M => self.clock.rtc_m = value,
+                        SelectedRegister::S => self.clock.rtc_s = value,
+                        SelectedRegister::None => unreachable!()
+                    }
+                } else if self.has_ram {
+                    let actual_address = self.get_ram_address(address);
+                    self.backup_file.write8(actual_address, value);
                 }
-            } else {
-                let actual_address = self.get_ram_address(address);
-                self.backup_file.write8(actual_address, value);
             }
             _ => panic!("unsupported address received: 0x{:x}", address)
         }
@@ -131,18 +167,20 @@ impl MBC for MBC3 {
             0x2000..=0x3fff => self.update_bank(value as u8),
             0x4000..=0x5fff => self.update_timer_ram_bank(value as u8),
             0x6000..=0x7fff => self.latch_clock_value(value as u8),
-            0xa000..=0xbfff => if self.timer_ram_enable && self.ram_bank > 0x7 {
-                match self.selected_register {
-                    SelectedRegister::Dh => self.clock.rtc_dh = value as u8,
-                    SelectedRegister::Dl => self.clock.rtc_dl = value as u8,
-                    SelectedRegister::H => self.clock.rtc_h = value as u8,
-                    SelectedRegister::M => self.clock.rtc_m = value as u8,
-                    SelectedRegister::S => self.clock.rtc_s = value as u8,
-                    SelectedRegister::None => unreachable!()
+            0xa000..=0xbfff => if self.timer_ram_enable {
+                if self.ram_bank > 0x7 {
+                    match self.selected_register {
+                        SelectedRegister::Dh => self.clock.rtc_dh = value as u8,
+                        SelectedRegister::Dl => self.clock.rtc_dl = value as u8,
+                        SelectedRegister::H => self.clock.rtc_h = value as u8,
+                        SelectedRegister::M => self.clock.rtc_m = value as u8,
+                        SelectedRegister::S => self.clock.rtc_s = value as u8,
+                        SelectedRegister::None => unreachable!()
+                    }
+                } else {
+                    let actual_address = self.get_ram_address(address);
+                    self.backup_file.write16(actual_address, value);
                 }
-            } else {
-                let actual_address = self.get_ram_address(address);
-                self.backup_file.write16(actual_address, value);
             }
             _ => panic!("unsupported address received: 0x{:x}", address)
         }

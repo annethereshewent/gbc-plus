@@ -243,7 +243,8 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
-            0xff68..=0xff69 => (), // ignore this for now lmao
+            0xff56 => (), // Infrared comms port for GBC, TODO
+            0xff68..=0xff69 => (), // GBC palettes, TODO
             0xff4d => (), // GBC, TODO
             0xff4f => (), // GBC, TODO
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
