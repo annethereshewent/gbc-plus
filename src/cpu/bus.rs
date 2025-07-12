@@ -70,6 +70,8 @@ impl Bus {
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
             0xff0f => self.IF.bits(),
+            0xff11 => self.apu.channel1.read_length(),
+            0xff16 => self.apu.channel2.read_length(),
             0xff1a => self.apu.channel3.dac_enable as u8,
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
@@ -80,6 +82,7 @@ impl Bus {
             0xff47 => self.ppu.bgp.read(),
             0xff48 => self.ppu.obp0.read(),
             0xff4a => self.ppu.wy,
+            0xff4b => self.ppu.wx,
             // 0xff4d => 0, // GBC, TODO
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
@@ -160,16 +163,19 @@ impl Bus {
         };
 
         match cartridge_type {
-            0 => (),
-            1 => self.set_mbc1(false, false),
-            2 => self.set_mbc1(true, false),
-            3 => self.set_mbc1(true, true),
-            _ => panic!("unsupported mbc type: {cartridge_type}")
-        }
-    }
+            0x00 => (),
+            0x01 => self.cartridge.set_mbc1(false, false),
+            0x02 => self.cartridge.set_mbc1(true, false),
+            0x03 => self.cartridge.set_mbc1(true, true),
+            0x0f => self.cartridge.set_mbc3(false, true, true),
+            0x10 => self.cartridge.set_mbc3(true, true, true),
+            0x11 => self.cartridge.set_mbc3(false, false, false),
+            0x12 => self.cartridge.set_mbc3(true, false, false),
+            0x13 => self.cartridge.set_mbc3(true, true, false),
 
-    fn set_mbc1(&mut self, ram: bool, battery: bool) {
-        self.cartridge.set_mbc1(ram, battery);
+
+            _ => panic!("unsupported mbc type: 0x{:x}", cartridge_type)
+        }
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {

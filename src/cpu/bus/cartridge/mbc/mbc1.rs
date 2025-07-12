@@ -1,4 +1,6 @@
-use super::{backup_file::BackupFile, mbc::MBC};
+use crate::cpu::bus::cartridge::backup_file::BackupFile;
+
+use super::MBC;
 
 #[derive(Copy, Clone, PartialEq)]
 enum BankingMode {
@@ -29,25 +31,17 @@ impl MBC for MBC1 {
     fn read(&self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
-                if self.banking_mode == BankingMode::Simple {
-                    rom[(address & 0x3fff) as usize]
-                } else {
-                    let actual_address = (address as usize) & 0x3fff | (((self.rom_bank as usize) >> 5) & 0x3) << 19;
+                let actual_address = self.get_rom_address_lower(address);
 
-                    rom[actual_address]
-                }
+                rom[actual_address]
             }
             0x4000..=0x7fff => {
-                let actual_address = (address as usize) & 0x3fff | (self.rom_bank as usize) << 14;
+                let actual_address = self.get_rom_address_upper(address);
 
                 rom[actual_address]
             }
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
-                let actual_address = if self.banking_mode == BankingMode::Simple {
-                    (address & 0x1fff) as usize
-                } else {
-                    (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
-                };
+                let actual_address = self.get_ram_address(address);
                 self.backup_file.read8(actual_address)
             } else {
                 0xff
@@ -62,11 +56,7 @@ impl MBC for MBC1 {
             0x4000..=0x5fff => self.update_ram_upper_rom_bank(value),
             0x6000..=0x7fff => self.update_banking_mode(value & 0x1),
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
-                let actual_address = if self.banking_mode == BankingMode::Simple {
-                    (address & 0x1fff) as usize
-                } else {
-                    (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
-                };
+                let actual_address = self.get_ram_address(address);
 
                 self.backup_file.write8(actual_address, value);
             }
@@ -81,11 +71,7 @@ impl MBC for MBC1 {
             0x4000..=0x5fff => self.update_ram_upper_rom_bank(value as u8),
             0x6000..=0x7fff => self.update_banking_mode((value & 0x1) as u8),
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
-                let actual_address = if self.banking_mode == BankingMode::Simple {
-                    (address & 0x1fff) as usize
-                } else {
-                    (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
-                };
+                let actual_address = self.get_ram_address(address);
 
                 self.backup_file.write16(actual_address, value);
             },
@@ -96,16 +82,12 @@ impl MBC for MBC1 {
     fn read16(&self, address: u16, rom: &[u8]) -> u16 {
         match address {
             0x0000..=0x3fff => {
-                if self.banking_mode == BankingMode::Simple {
-                   unsafe { *(&rom[(address & 0x3fff) as usize] as *const u8 as *const u16) }
-                } else {
-                    let actual_address = (address as usize) & 0x3fff | (((self.rom_bank as usize) >> 5) & 0x3) << 19;
+                let actual_address = self.get_rom_address_lower(address);
+                unsafe { *(&rom[actual_address] as *const u8 as *const u16) }
 
-                    unsafe { *(&rom[actual_address as usize] as *const u8 as *const u16) }
-                }
             }
             0x4000..=0x7fff => {
-                let actual_address = (address as usize) & 0x3fff | (self.rom_bank as usize) << 14;
+                let actual_address = self.get_rom_address_upper(address);
 
                 unsafe { *(&rom[actual_address as usize] as *const u8 as *const u16) }
             }
@@ -128,6 +110,26 @@ impl MBC1 {
         }
     }
 
+    fn get_ram_address(&self, address: u16) -> usize {
+        if self.banking_mode == BankingMode::Simple {
+            (address & 0x1fff) as usize
+        } else {
+            (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
+        }
+    }
+
+    fn get_rom_address_lower(&self, address: u16) -> usize {
+        if self.banking_mode == BankingMode::Simple {
+            (address as usize) & 0x3fff
+        } else {
+            (address as usize) & 0x3fff | (((self.rom_bank as usize) >> 5) & 0x3) << 19
+        }
+    }
+
+    fn get_rom_address_upper(&self, address: u16) -> usize {
+        (address as usize) & 0x3fff | (self.rom_bank as usize) << 14
+    }
+
     fn update_rom_bank(&mut self, value: u8) {
         let rom_bank = if value == 0 { 1 } else { value & 0x1f };
 
@@ -143,7 +145,7 @@ impl MBC1 {
     }
 
     fn update_ram_upper_rom_bank(&mut self, value: u8) {
-        if self.rom_size >= 1024 {
+        if self.rom_size >= 0x100000 {
             self.rom_bank &= 0x1f;
             self.rom_bank |= (value & 0x3) << 5;
         } else if self.has_ram {

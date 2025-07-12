@@ -47,6 +47,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
+    pub fn read_length(&self) -> u8 {
+        self.nrx1.read()
+    }
+
     pub fn write_volume_register(&mut self, value: u8) {
         self.nrx2.write(value);
     }

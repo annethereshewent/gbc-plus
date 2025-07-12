@@ -1,5 +1,8 @@
 use super::backup_file::BackupFile;
 
+pub mod mbc1;
+pub mod mbc3;
+
 pub trait MBC {
     fn read(&self, address: u16, rom: &[u8]) -> u8;
     fn write(&mut self, address: u16, value: u8);
