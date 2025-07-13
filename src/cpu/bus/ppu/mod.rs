@@ -142,6 +142,21 @@ pub enum LCDMode {
     HDraw = 3
 }
 
+#[derive(Copy, Clone, Debug)]
+struct BgAttributes {
+    palette_index: usize,
+    priority: bool
+}
+
+impl BgAttributes {
+    pub fn new() -> Self {
+        Self {
+            palette_index: 0,
+            priority: false
+        }
+    }
+}
+
 pub struct PPU {
     pub scy: u8,
     pub scx: u8,
@@ -160,8 +175,8 @@ pub struct PPU {
     pub frame_finished: bool,
     pub picture: Picture,
     previous_time: u128,
-    prev_background_indexes: [usize; SCREEN_WIDTH],
-    prev_window_indexes: [usize; SCREEN_WIDTH],
+    prev_background_pixels: [BgAttributes; SCREEN_WIDTH],
+    prev_window_pixels: [BgAttributes; SCREEN_WIDTH],
     current_window_line: isize,
     previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
     pub lyc: u8,
@@ -195,8 +210,8 @@ impl PPU {
             frame_finished: false,
             picture: Picture::new(),
             previous_time: 0,
-            prev_background_indexes: [0; SCREEN_WIDTH],
-            prev_window_indexes: [0; SCREEN_WIDTH],
+            prev_background_pixels: [BgAttributes::new(); SCREEN_WIDTH],
+            prev_window_pixels: [BgAttributes::new(); SCREEN_WIDTH],
             current_window_line: -1,
             previous_objs: [None; SCREEN_WIDTH],
             lyc: 0,
@@ -314,6 +329,7 @@ impl PPU {
 
     fn draw_line(&mut self) {
         if self.cgb_mode {
+
             self.draw_gbc_background();
             self.draw_gbc_window();
             self.draw_gbc_objects();
@@ -352,7 +368,7 @@ impl PPU {
             x_pos = 0;
         }
 
-        for index in self.prev_window_indexes.iter_mut() { *index = 0; }
+        for index in self.prev_window_pixels.iter_mut() { *index = BgAttributes::new(); }
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
             let x_pos = (x - (self.wx as usize - 7)) & 0xff;
@@ -396,7 +412,10 @@ impl PPU {
 
                 let palette_index = lower_bit | (upper_bit << 1);
 
-                self.prev_background_indexes[x + i] = palette_index as usize;
+                self.prev_background_pixels[x + i] = BgAttributes {
+                    palette_index: palette_index as usize,
+                    priority
+                };
 
                 let base_palette_address = color_palette * 4 * 2;
 
@@ -441,7 +460,7 @@ impl PPU {
             x_pos = 0;
         }
 
-        for index in self.prev_window_indexes.iter_mut() { *index = 0; }
+        for index in self.prev_window_pixels.iter_mut() { *index = BgAttributes::new(); }
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
             let x_pos = (x - (self.wx as usize - 7)) & 0xff;
@@ -473,7 +492,10 @@ impl PPU {
 
                 let palette_index = lower_bit | (upper_bit << 1);
 
-                self.prev_background_indexes[x + i] = palette_index as usize;
+                self.prev_background_pixels[x + i] = BgAttributes {
+                    priority: false,
+                    palette_index: palette_index as usize
+                };
 
                 let color = self.bgp.indexes[palette_index as usize];
 
@@ -510,63 +532,56 @@ impl PPU {
 
         let scrolled_y = (scroll_y as usize + y as usize) & 0xff;
         for x in 0..SCREEN_WIDTH {
-            if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
-                let scrolled_x = (scroll_x as usize + x) & 0xff;
-                let tile_number = (scrolled_y / 8) * 32 + scrolled_x / 8;
+            let scrolled_x = (scroll_x as usize + x) & 0xff;
+            let tile_number = (scrolled_y / 8) * 32 + scrolled_x / 8;
 
-                let tilemap_address = base_tilemap_address as usize + tile_number;
+            let tilemap_address = base_tilemap_address as usize + tile_number;
 
-                let tile_id = self.vram_read8(tilemap_address, 0);
-                let attributes = self.vram_read8(tilemap_address, 1);
+            let tile_id = self.vram_read8(tilemap_address, 0);
+            let attributes = self.vram_read8(tilemap_address, 1);
 
-                let color_palette = attributes & 0x7;
-                let bank = (attributes >> 3) & 0x1;
-                let x_flip = (attributes >> 5) & 0x1 == 1;
-                let y_flip = (attributes >> 6) & 0x1 == 1;
-                let priority = (attributes >> 7) & 0x1 == 1;
+            let color_palette = attributes & 0x7;
+            let bank = (attributes >> 3) & 0x1;
+            let x_flip = (attributes >> 5) & 0x1 == 1;
+            let y_flip = (attributes >> 6) & 0x1 == 1;
+            let priority = (attributes >> 7) & 0x1 == 1;
 
-                let base_bgp_index = color_palette * 4 * 2;
+            let base_bgp_index = color_palette * 4 * 2;
 
-                let x_in_tile = (x as usize + scroll_x as usize) % 8;
-                let mut y_in_tile = (y as usize + scroll_y as usize) % 8;
+            let x_in_tile = (x as usize + scroll_x as usize) % 8;
+            let mut y_in_tile = (y as usize + scroll_y as usize) % 8;
 
-                if y_flip {
-                    y_in_tile = 7 - y_in_tile;
-                }
-
-                let tile_address = if base_tile_address == 0x8000 {
-                    base_tile_address + tile_id as usize * 16 + y_in_tile * 2
-                } else {
-                    let offset = ((tile_id as i8 as i32) * 16) + ((y_in_tile as i32) * 2);
-
-                    (base_tile_address as i32 + offset) as usize
-                };
-
-                let lower_byte = self.vram_read8(tile_address, bank as usize);
-                let upper_byte = self.vram_read8(tile_address + 1, bank as usize);
-
-                let shift = if x_flip { x_in_tile } else { 7 - x_in_tile };
-
-                let palette_index = (upper_byte >> shift & 0x1) << 1 | lower_byte >> shift & 0x1;
-
-                let palette_address = (base_bgp_index + palette_index * 2) as usize;
-
-                let color = self.bg_pal_read16(palette_address);
-
-                let pixel = Self::convert_pixel(color);
-
-                self.picture.set_pixel(x, y as usize, pixel);
-
-                self.prev_background_indexes[x as usize] = color as usize;
-            } else {
-                let color = self.bg_pal_read16(0);
-
-                let pixel = Self::convert_pixel(color);
-
-                self.picture.set_pixel(x, y as usize, pixel);
-
-                self.prev_background_indexes[x as usize] = 0;
+            if y_flip {
+                y_in_tile = 7 - y_in_tile;
             }
+
+            let tile_address = if base_tile_address == 0x8000 {
+                base_tile_address + tile_id as usize * 16 + y_in_tile * 2
+            } else {
+                let offset = ((tile_id as i8 as i32) * 16) + ((y_in_tile as i32) * 2);
+
+                (base_tile_address as i32 + offset) as usize
+            };
+
+            let lower_byte = self.vram_read8(tile_address, bank as usize);
+            let upper_byte = self.vram_read8(tile_address + 1, bank as usize);
+
+            let shift = if x_flip { x_in_tile } else { 7 - x_in_tile };
+
+            let palette_index = (upper_byte >> shift & 0x1) << 1 | lower_byte >> shift & 0x1;
+
+            let palette_address = (base_bgp_index + palette_index * 2) as usize;
+
+            let color = self.bg_pal_read16(palette_address);
+
+            let pixel = Self::convert_pixel(color);
+
+            self.picture.set_pixel(x, y as usize, pixel);
+
+            self.prev_background_pixels[x as usize] = BgAttributes {
+                palette_index: palette_index as usize,
+                priority
+            };
         }
     }
 
@@ -639,7 +654,10 @@ impl PPU {
 
                 self.picture.set_pixel(x, y as usize, pixel);
 
-                self.prev_background_indexes[x as usize] = color as usize;
+                self.prev_background_pixels[x as usize] = BgAttributes {
+                    palette_index: palette_index as usize,
+                    priority: false
+                }
             } else {
                 let color = self.bgp.indexes[0];
 
@@ -647,7 +665,7 @@ impl PPU {
 
                 self.picture.set_pixel(x, y as usize, pixel);
 
-                self.prev_background_indexes[x as usize] = 0;
+                self.prev_background_pixels[x as usize] = BgAttributes::new();
             }
         }
     }
@@ -746,7 +764,9 @@ impl PPU {
                     }
                 }
 
-                if sprite.attributes.priority == OamPriority::None || (self.prev_background_indexes[x_pos as usize] == 0 && self.prev_window_indexes[x_pos as usize] == 0) {
+                if sprite.attributes.priority == OamPriority::None ||
+                    (self.prev_background_pixels[x_pos as usize].palette_index == 0 && self.prev_window_pixels[x_pos as usize].palette_index == 0)
+                {
                     // draw the pixel!
                     let pixel = self.get_pixel(color);
 
@@ -850,7 +870,13 @@ impl PPU {
                     }
                 }
 
-                if sprite.attributes.priority == OamPriority::None || (self.prev_background_indexes[x_pos as usize] == 0 && self.prev_window_indexes[x_pos as usize] == 0) {
+                let prev_background = self.prev_background_pixels[x_pos as usize];
+                let prev_window = self.prev_window_pixels[x_pos as usize];
+
+                let draw_pixel = self.check_priority(prev_background, prev_window);
+
+                if draw_pixel {
+
                     // draw the pixel!
                     let pixel = Self::convert_pixel(color);
 
@@ -860,6 +886,16 @@ impl PPU {
                 }
             }
         }
+    }
+
+    fn check_priority(&self, prev_background: BgAttributes, prev_window: BgAttributes) -> bool {
+        if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
+            if (prev_background.priority && prev_background.palette_index > 0) || (prev_window.priority && prev_window.palette_index > 0) {
+                return false
+            }
+        }
+
+        true
     }
 
     fn handle_vblank(&mut self, interrupt_register: &mut InterruptRegister) {
