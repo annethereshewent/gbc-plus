@@ -1,6 +1,7 @@
 use std::{thread::sleep, time::{Duration, SystemTime, UNIX_EPOCH}};
 
 use bg_palette_register::{BGColor, BGPaletteRegister};
+use bg_palette_spec_register::BgPaletteSpecRegister;
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
 use oam_entry::OAMEntry;
@@ -15,6 +16,7 @@ pub mod bg_palette_register;
 pub mod obj_palette_register;
 pub mod oam_entry;
 pub mod picture;
+pub mod bg_palette_spec_register;
 
 const MODE2_CYCLES: usize = 80;
 const MODE3_CYCLES: usize = 172;
@@ -142,7 +144,7 @@ pub struct PPU {
     pub stat: LCDStatusRegister,
     pub lcdc: LCDControlRegister,
     pub line_y: u8,
-    pub vram: Box<[u8]>,
+    pub vram: [Box<[u8]>; 2],
     pub cycles: usize,
     pub bgp: BGPaletteRegister,
     mode: LCDMode,
@@ -158,7 +160,10 @@ pub struct PPU {
     previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
     pub lyc: u8,
     pub palette_colors: [[Color; 4]; 10],
-    pub current_palette: usize
+    pub current_palette: usize,
+    pub vram_bank: u8,
+    pub bgpi: BgPaletteSpecRegister,
+    pub palette_ram: [u8; 64]
 }
 
 impl PPU {
@@ -169,10 +174,10 @@ impl PPU {
             wy: 0,
             wx: 0,
             stat: LCDStatusRegister::from_bits_truncate(0),
-            lcdc: LCDControlRegister::from_bits_retain(0x83),
+            lcdc: LCDControlRegister::from_bits_retain(0x91),
             mode: LCDMode::OAMScan,
             line_y: 0,
-            vram: vec![0; 0x2000].into_boxed_slice(),
+            vram: [vec![0; 0x2000].into_boxed_slice(), vec![0; 0x2000].into_boxed_slice()],
             cycles: 0,
             bgp: BGPaletteRegister::new(),
             obp0: ObjPaletteRegister::new(),
@@ -198,7 +203,10 @@ impl PPU {
                 WITCHING_HOUR,
                 VOID_DREAM
             ],
-            current_palette: 1
+            current_palette: 1,
+            vram_bank: 0,
+            bgpi: BgPaletteSpecRegister::new(),
+            palette_ram: [0; 64]
         }
     }
 
@@ -213,6 +221,17 @@ impl PPU {
                 LCDMode::HDraw => self.handle_hdraw(),
             }
         }
+    }
+
+    pub fn update_bg_palette_color(&mut self, value: u8) {
+        self.palette_ram[self.bgpi.address as usize] = value;
+        if self.bgpi.auto_increment {
+            self.bgpi.address += 1;
+        }
+    }
+
+    pub fn set_vram_bank(&mut self, value: u8) {
+        self.vram_bank = value & 0x1;
     }
 
     pub fn update_lyc(&mut self, value: u8, interrupt_register: &mut InterruptRegister) {
@@ -316,7 +335,7 @@ impl PPU {
             let tile_number = (x_pos as usize / 8) + (self.current_window_line as usize / 8) * 32;
 
             let tilemap_address = base_tilemap_address + tile_number;
-            let tile_index = self.vram_read8(tilemap_address);
+            let tile_index = self.vram_read8(tilemap_address, 0);
 
             let y_pos_in_tile = (self.current_window_line & 0x7) as usize;
 
@@ -326,8 +345,8 @@ impl PPU {
                 base_tile_address as usize + tile_index as usize * 16 + y_pos_in_tile * 2
             };
 
-            let lower = self.vram_read8(tile_address);
-            let upper = self.vram_read8(tile_address + 1);
+            let lower = self.vram_read8(tile_address, 0);
+            let upper = self.vram_read8(tile_address + 1, 0);
 
             for i in 0..8 {
                 if x + i >= SCREEN_WIDTH {
@@ -383,7 +402,7 @@ impl PPU {
 
                 let tilemap_address = base_tilemap_address as usize + tile_number;
 
-                let tile_id = self.vram_read8(tilemap_address);
+                let tile_id = self.vram_read8(tilemap_address, 0);
 
                 let x_in_tile = (x as usize + scroll_x as usize) % 8;
                 let y_in_tile = (y as usize + scroll_y as usize) % 8;
@@ -396,8 +415,8 @@ impl PPU {
                     (base_tile_address as i32 + offset) as usize
                 };
 
-                let lower_byte = self.vram_read8(tile_address);
-                let upper_byte = self.vram_read8(tile_address + 1);
+                let lower_byte = self.vram_read8(tile_address, 0);
+                let upper_byte = self.vram_read8(tile_address + 1, 0);
 
                 let palette_index = (upper_byte >> (7 - x_in_tile) & 0x1) << 1 | lower_byte >> (7 - x_in_tile) & 0x1;
 
@@ -420,8 +439,8 @@ impl PPU {
         }
     }
 
-    fn vram_read8(&self, address: usize) -> u8 {
-        self.vram[address - 0x8000]
+    fn vram_read8(&self, address: usize, bank: usize) -> u8 {
+        self.vram[bank][address - 0x8000]
     }
 
     fn draw_objects(&mut self) {
@@ -486,8 +505,8 @@ impl PPU {
 
                 let tile_address = base_tilemap_address + tile_index as u16 * 16 + y_in_tile as u16 * 2;
 
-                let lower_byte = self.vram_read8(tile_address as usize);
-                let upper_byte = self.vram_read8(tile_address as usize + 1);
+                let lower_byte = self.vram_read8(tile_address as usize, 0);
+                let upper_byte = self.vram_read8(tile_address as usize + 1, 0);
 
                 let bit_index = if sprite.attributes.x_flip { i } else { 7 - i };
 

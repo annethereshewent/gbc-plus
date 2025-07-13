@@ -8,6 +8,7 @@ pub mod cpu_instructions;
 pub mod disassembler;
 
 pub const CLOCK_SPEED: usize = 4194304;
+const CGB_ADDR: usize = 0x143;
 
 bitflags! {
     pub struct FlagRegister: u8 {
@@ -43,7 +44,8 @@ pub struct CPU {
     pub bus: Bus,
     found: HashSet<u16>,
     pub debug_on: bool,
-    is_halted: bool
+    is_halted: bool,
+    cgb_mode: bool
 }
 
 impl CPU {
@@ -56,7 +58,8 @@ impl CPU {
             bus: Bus::new(audio_buffer, rom_path),
             found: HashSet::new(),
             debug_on: false,
-            is_halted: false
+            is_halted: false,
+            cgb_mode: false
         }
     }
 
@@ -100,7 +103,38 @@ impl CPU {
     pub fn load_rom(&mut self, bytes: &[u8]) {
         self.bus.cartridge.rom = bytes.to_vec();
 
+        self.check_cgb_header();
         self.bus.check_header()
+    }
+
+    fn check_cgb_header(&mut self) {
+        let cgb_flag = self.bus.cartridge.rom[CGB_ADDR];
+        if [0x80, 0xc0].contains(&cgb_flag) {
+            self.cgb_mode = true;
+            self.update_cgb_registers();
+        }
+    }
+
+    fn update_cgb_registers(&mut self) {
+        use Register::*;
+
+        self.registers[Register::A as usize] = 0x11;
+
+        self.f.set(FlagRegister::ZERO, true);
+        self.f.set(FlagRegister::SUBTRACT, false);
+        self.f.set(FlagRegister::CARRY, false);
+        self.f.set(FlagRegister::HALF_CARRY, false);
+
+        self.registers[B as usize] = 0x0;
+        self.registers[C as usize] = 0x0;
+        self.registers[D as usize] = 0xff;
+        self.registers[E as usize] = 0x56;
+
+        self.registers[H as usize] = 0x0;
+        self.registers[L as usize] = 0xd;
+
+        self.sp = 0xfffe;
+        self.pc = 0x100;
     }
 
     pub fn handle_interrupts(&mut self) {

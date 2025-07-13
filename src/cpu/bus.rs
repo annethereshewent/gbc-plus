@@ -7,6 +7,8 @@ use ppu::PPU;
 use interrupt_register::InterruptRegister;
 use timer::Timer;
 
+use super::CPU;
+
 pub mod interrupt_register;
 pub mod ppu;
 pub mod cartridge;
@@ -17,7 +19,6 @@ pub mod joypad;
 const CARTRIDGE_TYPE_ADDR: usize = 0x147;
 const ROM_SIZE_ADDR: usize = 0x148;
 const RAM_SIZE_ADDR: usize = 0x149;
-const CGB_ADDR: usize = 0x143;
 
 pub struct Bus {
     pub cartridge: Cartridge,
@@ -64,7 +65,7 @@ impl Bus {
                 self.cartridge.rom[address as usize]
             }
             0xa000..=0xbfff => self.cartridge.mbc_read8(address),
-            0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize],
+            0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize],
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
             0xff00 => self.joypad.read(),
             0xff04 => self.timer.div,
@@ -111,7 +112,7 @@ impl Bus {
 
     pub fn mem_write16(&mut self, address: u16, value: u16) {
         match address {
-            0x8000..=0x9fff => unsafe { *(&mut self.ppu.vram[(address - 0x8000) as usize] as *mut u8 as *mut u16) = value },
+            0x8000..=0x9fff => unsafe { *(&mut self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value },
             0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
             0xc000..=0xdfff => unsafe { *(&mut self.wram[(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
             0xff7f => (),
@@ -135,11 +136,7 @@ impl Bus {
     pub fn check_header(&mut self) {
         let cartridge_type = self.cartridge.rom[CARTRIDGE_TYPE_ADDR];
 
-        let cgb_flag = self.cartridge.rom[CGB_ADDR];
 
-        if [0x80, 0xc0].contains(&cgb_flag) {
-            // todo!("GBC mode");
-        }
 
         let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
 
@@ -186,7 +183,7 @@ impl Bus {
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_write8(address, value),
-            0x8000..=0x9fff => self.ppu.vram[(address - 0x8000) as usize] = value,
+            0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] = value,
             0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
             0xfe00..=0xfe9f => self.ppu.write_oam(address, value),
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
@@ -248,10 +245,10 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
+            0xff4f => self.ppu.set_vram_bank(value & 0x1),
             0xff56 => (), // Infrared comms port for GBC, TODO
-            0xff68..=0xff69 => (), // GBC palettes, TODO
-            0xff4d => (), // GBC, TODO
-            0xff4f => (), // GBC, TODO
+            0xff68 => self.ppu.bgpi.write(value),
+            0xff69 => self.ppu.update_bg_palette_color(value),
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
