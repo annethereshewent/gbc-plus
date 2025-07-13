@@ -103,12 +103,11 @@ impl Bus {
 
         self.ppu.in_hblank = false;
 
-        self.tick(128);
-
         if self.hdma_length == 0 {
             self.hdma_length = 0;
             self.hdma_hblank = false;
         }
+        self.tick(32);
     }
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
