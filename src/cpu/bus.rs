@@ -277,12 +277,16 @@ impl Bus {
                 self.mem_write8(actual_address + i as u16, value);
             }
         } else {
-            self.hdma_hblank = true;
-            self.hdma_length = length as isize;
-
-            self.curr_dma_source = self.vram_dma_source;
-            self.curr_dma_dest = self.vram_dma_destination;
+            self.restart_hdma_hblank(length);
         }
+    }
+
+    fn restart_hdma_hblank(&mut self, length: u16) {
+        self.hdma_hblank = true;
+        self.hdma_length = length as isize;
+
+        self.curr_dma_source = self.vram_dma_source;
+        self.curr_dma_dest = self.vram_dma_destination;
     }
 
     pub fn mem_write8(&mut self, address: u16, value: u8) {
