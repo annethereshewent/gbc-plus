@@ -67,7 +67,7 @@ impl Bus {
             apu: APU::new(audio_buffer),
             joypad: Joypad::new(),
             timer: Timer::new(),
-            wram_bank: 0,
+            wram_bank: 1,
             double_speed: false,
             vram_dma_destination: 0,
             vram_dma_source: 0,
