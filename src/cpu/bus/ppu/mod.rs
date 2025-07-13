@@ -187,7 +187,8 @@ pub struct PPU {
     pub palette_ram: [u8; 64],
     pub obj_palette_ram: [u8; 64],
     pub obpi: ObjPaletteIndexRegister,
-    pub cgb_mode: bool
+    pub cgb_mode: bool,
+    pub in_hblank: bool
 }
 
 impl PPU {
@@ -233,7 +234,8 @@ impl PPU {
             obpi: ObjPaletteIndexRegister::new(),
             palette_ram: [0; 64],
             obj_palette_ram: [0; 64],
-            cgb_mode: false
+            cgb_mode: false,
+            in_hblank: false
         }
     }
 
@@ -278,6 +280,7 @@ impl PPU {
 
     fn handle_hblank(&mut self, interrupt_register: &mut InterruptRegister) {
         if self.cycles >= MODE0_CYCLES {
+            self.in_hblank = true;
             self.cycles -= MODE0_CYCLES;
 
             self.line_y += 1;
@@ -291,9 +294,11 @@ impl PPU {
             }
 
             self.mode = if self.line_y == 144 {
+                self.in_hblank = false;
                 interrupt_register.set(InterruptRegister::VBLANK, true);
                 LCDMode::VBlank
             } else {
+                self.in_hblank = false;
                 LCDMode::OAMScan
             };
         }

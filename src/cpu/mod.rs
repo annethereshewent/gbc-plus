@@ -90,7 +90,7 @@ impl CPU {
 
         if !self.found.contains(&(self.pc - 1)) && self.debug_on {
             println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
-            self.found.insert(self.pc - 1);
+            // self.found.insert(self.pc - 1);
         }
 
         let cycles = self.decode_instruction(opcode);
@@ -102,7 +102,7 @@ impl CPU {
         self.bus.cartridge.rom = bytes.to_vec();
 
         self.check_cgb_header();
-        self.bus.check_header()
+        self.bus.check_header();
     }
 
     fn check_cgb_header(&mut self) {

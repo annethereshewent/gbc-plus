@@ -20,9 +20,15 @@ const CARTRIDGE_TYPE_ADDR: usize = 0x147;
 const ROM_SIZE_ADDR: usize = 0x148;
 const RAM_SIZE_ADDR: usize = 0x149;
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum HdmaMode {
+    General,
+    Hblank
+}
+
 pub struct Bus {
     pub cartridge: Cartridge,
-    wram: Box<[u8]>,
+    wram: [Box<[u8]>; 8],
     hram: Box<[u8]>,
     pub ime: bool,
     pub IF: InterruptRegister,
@@ -31,13 +37,30 @@ pub struct Bus {
     pub apu: APU,
     pub joypad: Joypad,
     pub timer: Timer,
+    wram_bank: usize,
+    pub double_speed: bool,
+    pub vram_dma_source: u16,
+    pub vram_dma_destination: u16,
+    hdma_hblank: bool,
+    hdma_length: isize,
+    curr_dma_source: u16,
+    curr_dma_dest: u16
 }
 
 impl Bus {
     pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: &str) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
-            wram: vec![0; 0x2000].into_boxed_slice(),
+            wram: [
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice(),
+                vec![0; 0x1000].into_boxed_slice()
+            ],
             hram: vec![0; 0x7f].into_boxed_slice(),
             IF: InterruptRegister::from_bits_retain(0),
             ie: InterruptRegister::from_bits_retain(0),
@@ -45,7 +68,15 @@ impl Bus {
             ppu: PPU::new(),
             apu: APU::new(audio_buffer),
             joypad: Joypad::new(),
-            timer: Timer::new()
+            timer: Timer::new(),
+            wram_bank: 0,
+            double_speed: false,
+            vram_dma_destination: 0,
+            vram_dma_source: 0,
+            hdma_hblank: false,
+            hdma_length: 0,
+            curr_dma_source: 0,
+            curr_dma_dest: 0
         }
     }
 
@@ -53,8 +84,31 @@ impl Bus {
         self.timer.tick(cycles, &mut self.IF);
         self.ppu.tick(cycles, &mut self.IF);
         self.apu.tick(cycles);
+
+        if self.hdma_hblank && self.ppu.in_hblank {
+            self.do_hdma_hblank();
+        }
     }
 
+    fn do_hdma_hblank(&mut self) {
+        let actual_destination = self.curr_dma_dest | 0x8000;
+        for i in 0..0x10 {
+            let value = self.mem_read8(self.curr_dma_source + i as u16);
+            self.mem_write8(actual_destination + i as u16, value);
+        }
+
+        self.curr_dma_source += 0x10;
+        self.curr_dma_dest += 0x10;
+
+        self.hdma_length -= 0x10;
+
+        self.ppu.in_hblank = false;
+
+        if self.hdma_length <= 0 {
+            self.hdma_length = 0;
+            self.hdma_hblank = false;
+        }
+    }
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
         match address {
@@ -66,7 +120,12 @@ impl Bus {
             }
             0xa000..=0xbfff => self.cartridge.mbc_read8(address),
             0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize],
-            0xc000..=0xdfff => self.wram[(address - 0xc000) as usize],
+            0xc000..=0xcfff => self.wram[0][(address - 0xc000) as usize],
+            0xd000..=0xdfff => if self.ppu.cgb_mode {
+                self.wram[self.wram_bank][(address - 0xd000) as usize]
+            } else {
+                self.wram[1][(address - 0xd000) as usize]
+            }
             0xff00 => self.joypad.read(),
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
@@ -89,7 +148,9 @@ impl Bus {
             0xff49 => self.ppu.obp1.read(),
             0xff4a => self.ppu.wy,
             0xff4b => self.ppu.wx,
-            // 0xff4d => 0, // GBC, TODO
+            0xff4d => self.double_speed as u8,
+            0xff55 => ((self.hdma_length - 1) / 0x10) as u8,
+            0xff70 => self.wram_bank as u8,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
             _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
@@ -105,7 +166,12 @@ impl Bus {
             }
             0x8000..=0x9fff => unsafe { *(&self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *const u8 as *const u16) },
             0xa000..=0xbfff => self.cartridge.mbc_read16(address),
-            0xc000..=0xdfff => unsafe { *(&self.wram[(address - 0xc000) as usize] as *const u8 as *const u16) },
+            0xc000..=0xcfff => unsafe { *(&self.wram[0][(address - 0xc000) as usize] as *const u8 as *const u16) },
+            0xd000..=0xdfff => if self.ppu.cgb_mode {
+                unsafe { *(&self.wram[self.wram_bank][(address - 0xd000) as usize] as *const u8 as *const u16) }
+            } else {
+                unsafe { *(&self.wram[1][(address - 0xd000) as usize] as *const u8 as *const u16) }
+            }
             0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
             _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
         }
@@ -115,7 +181,12 @@ impl Bus {
         match address {
             0x8000..=0x9fff => unsafe { *(&mut self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value },
             0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
-            0xc000..=0xdfff => unsafe { *(&mut self.wram[(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
+            0xc000..=0xcfff => unsafe { *(&mut self.wram[0][(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
+            0xd000..=0xdfff => if self.ppu.cgb_mode {
+                unsafe { *(&mut self.wram[self.wram_bank][(address - 0xd000) as usize] as *mut u8 as *mut u16) = value }
+            } else {
+                unsafe { *(&mut self.wram[1][(address - 0xd000) as usize] as *mut u8 as *mut u16) = value }
+            }
             0xff7f => (),
             0xff80..=0xfffe => unsafe { *(&mut self.hram[(address - 0xff80) as usize] as *mut u8 as *mut u16) = value },
             0xffff => self.ie = InterruptRegister::from_bits_retain(value as u8),
@@ -179,11 +250,43 @@ impl Bus {
         }
     }
 
+    fn start_hdma(&mut self, value: u8) {
+        let length = (value & 0x7f + 1) * 0x10;
+
+        let mode = match (value >> 7) & 0x1 {
+            0 => HdmaMode::General,
+            1 => HdmaMode::Hblank,
+            _ => unreachable!()
+        };
+
+        self.vram_dma_destination &= !(0xf);
+        self.vram_dma_source &= !(0xf);
+        self.vram_dma_source &= 0x1fff;
+
+        if mode == HdmaMode::General {
+            // do transfer immediately
+            for i in 0..length {
+                let value = self.mem_read8(self.vram_dma_source + i as u16);
+                self.mem_write8(self.vram_dma_destination + i as u16, value);
+            }
+        } else {
+            self.hdma_hblank = true;
+            self.hdma_length = length as isize;
+            self.curr_dma_source = self.vram_dma_source;
+            self.curr_dma_dest = self.vram_dma_destination;
+        }
+    }
+
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_write8(address, value),
             0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] = value,
-            0xc000..=0xdfff => self.wram[(address - 0xc000) as usize] = value,
+            0xc000..=0xcfff => self.wram[0][(address - 0xc000) as usize] = value,
+            0xd000..=0xdfff => if self.ppu.cgb_mode {
+                self.wram[self.wram_bank][(address - 0xd000) as usize] = value
+            } else {
+                self.wram[1][(address - 0xd000) as usize] = value
+            }
             0xfe00..=0xfe9f => self.ppu.write_oam(address, value),
             0xfea0..=0xfeff => (), // ignore, this area is restricted but some games may still write to it
             0xff00 => self.joypad.write(value),
@@ -245,11 +348,17 @@ impl Bus {
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
             0xff4f => self.ppu.set_vram_bank(value & 0x1),
+            0xff51 => self.vram_dma_source = (self.vram_dma_source & 0xff) | (value as u16) << 8,
+            0xff52 => self.vram_dma_source = (self.vram_dma_source & 0xff00) | value as u16,
+            0xff53 => self.vram_dma_destination = (self.vram_dma_destination & 0xff) | (value as u16) << 8,
+            0xff54 => self.vram_dma_destination = (self.vram_dma_destination & 0xff00) | value as u16,
+            0xff55 => self.start_hdma(value),
             0xff56 => (), // Infrared comms port for GBC, TODO
             0xff68 => self.ppu.bgpi.write(value),
             0xff69 => self.ppu.update_bg_palette_color(value),
             0xff6a => self.ppu.obpi.write(value),
             0xff6b => self.ppu.update_obj_palette_color(value),
+            0xff70 => self.wram_bank = if value == 0 { 1 } else { (value & 0x7) as usize },
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
