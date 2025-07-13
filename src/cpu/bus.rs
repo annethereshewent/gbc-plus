@@ -95,7 +95,7 @@ impl Bus {
         }
     }
 
-    pub fn mem_read16(&self, address: u16) -> u16 {
+    pub fn mem_read16(&mut self, address: u16) -> u16 {
         match address {
             0x0000..=0x7fff => if self.cartridge.mbc.is_some() {
                 self.cartridge.mbc_read16(address)

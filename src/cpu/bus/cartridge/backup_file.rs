@@ -74,7 +74,6 @@ impl BackupFile {
     }
 
     pub fn save_file(&mut self) {
-        println!("saving file....");
         self.is_dirty = false;
         self.last_updated = 0;
         if let Some(file) = &mut self.file {

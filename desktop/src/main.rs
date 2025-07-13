@@ -72,6 +72,7 @@ fn main() {
             cpu.step();
         }
 
+        frontend.update_rtc(&mut cpu);
         frontend.check_saves(&mut cpu);
         frontend.render_screen(&mut cpu);
         frontend.check_controller_status();

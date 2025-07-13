@@ -1,10 +1,26 @@
-use chrono::{Datelike, Local, TimeZone, Timelike, Utc};
+use std::{cmp, fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}};
+
+use chrono::{DateTime, Duration, Local, TimeDelta, TimeZone};
+use serde::{Deserialize, Serialize};
 
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
 use super::MBC;
 
-#[derive(Copy, Clone)]
+#[derive(Serialize, Deserialize)]
+struct RtcFile {
+    timestamp: usize
+}
+
+impl RtcFile {
+    pub fn new(timestamp: usize) -> Self {
+        Self {
+            timestamp
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct ClockRegister {
     rtc_s: u8,
     rtc_m: u8,
@@ -25,27 +41,23 @@ impl ClockRegister {
     }
 }
 
-enum SelectedRegister {
-    Dh,
-    Dl,
-    H,
-    M,
-    S,
-    None
-}
-
 pub struct MBC3 {
+    start: DateTime<Local>,
     rom_bank: u8,
     ram_bank: u8,
     timer_ram_enable: bool,
     latch_clock: ClockRegister,
-    clock: ClockRegister,
     backup_file: BackupFile,
     _rom_size: usize,
     has_ram: bool,
     has_timer: bool,
-    selected_register: SelectedRegister,
-    latch_value: Option<u8>
+    latch_value: u8,
+    clock_latched: bool,
+    rtc_file: File,
+    carry_bit: bool,
+    previous_wrapped_days: u16,
+    halted: bool,
+    halted_elapsed: TimeDelta
 }
 
 impl MBC for MBC3 {
@@ -53,7 +65,17 @@ impl MBC for MBC3 {
         &self.backup_file
     }
 
-    fn read(&self, address: u16, rom: &[u8]) -> u8 {
+    fn save_rtc(&mut self) {
+        match serde_json::to_string::<RtcFile>(&RtcFile::new(self.start.timestamp() as usize)) {
+            Ok(result) => {
+                self.rtc_file.seek(SeekFrom::Start(0)).unwrap();
+                self.rtc_file.write_all(result.as_bytes()).unwrap();
+            }
+            Err(_) => ()
+        }
+    }
+
+    fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
                 rom[address as usize]
@@ -65,30 +87,7 @@ impl MBC for MBC3 {
             }
             0xa000..=0xbfff => if self.timer_ram_enable {
                 if self.ram_bank > 0x7 {
-                    let local_time = Local::now();
-
-                    let datetime = Utc.with_ymd_and_hms(
-                        local_time.year(),
-                        local_time.month(),
-                        local_time.day(),
-                        local_time.hour(),
-                        local_time.minute(),
-                        local_time.second()
-                    );
-                    let datetime2 = Utc.with_ymd_and_hms(local_time.year(), 1, 1, 0, 0, 0);
-
-                    let diff = datetime.unwrap().timestamp() - datetime2.unwrap().timestamp();
-
-                    let day = diff / 24 / 60 / 60;
-
-                    match self.selected_register {
-                        SelectedRegister::Dh => day as u8,
-                        SelectedRegister::Dl => ((day >> 8) & 0x1) as u8,
-                        SelectedRegister::H => local_time.hour() as u8,
-                        SelectedRegister::M => local_time.minute() as u8,
-                        SelectedRegister::S => local_time.second() as u8,
-                        SelectedRegister::None => unreachable!()
-                    }
+                    self.read_rtc()
                 } else if self.has_ram {
                     let actual_address = self.get_ram_address(address);
                     self.backup_file.read8(actual_address)
@@ -102,7 +101,7 @@ impl MBC for MBC3 {
         }
     }
 
-    fn read16(&self, address: u16, rom: &[u8]) -> u16 {
+    fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
         match address {
             0x0000..=0x3fff => {
                 unsafe { *(&rom[address as usize] as *const u8 as *const u16) }
@@ -115,30 +114,7 @@ impl MBC for MBC3 {
             }
             0xa000..=0xbfff => if self.timer_ram_enable {
                 if self.ram_bank > 0x7 {
-                    let local_time = Local::now();
-
-                    let datetime = Utc.with_ymd_and_hms(
-                        local_time.year(),
-                        local_time.month(),
-                        local_time.day(),
-                        local_time.hour(),
-                        local_time.minute(),
-                        local_time.second()
-                    );
-                    let datetime2 = Utc.with_ymd_and_hms(local_time.year(), 1, 1, 0, 0, 0);
-
-                    let diff = datetime.unwrap().timestamp() - datetime2.unwrap().timestamp();
-
-                    let day = diff / 24 / 60 / 60;
-
-                    match self.selected_register {
-                        SelectedRegister::Dh => day as u8 as u16,
-                        SelectedRegister::Dl => (day >> 8) as u16,
-                        SelectedRegister::H => local_time.hour() as u16,
-                        SelectedRegister::M => local_time.minute() as u16,
-                        SelectedRegister::S => local_time.second() as u16,
-                        SelectedRegister::None => unreachable!()
-                    }
+                    self.read_rtc() as u16
                 } else if self.has_ram {
                     let actual_address = self.get_ram_address(address);
                     self.backup_file.read16(actual_address)
@@ -168,14 +144,7 @@ impl MBC for MBC3 {
             0x6000..=0x7fff => self.latch_clock_value(value),
             0xa000..=0xbfff => if self.timer_ram_enable {
                 if self.ram_bank > 0x7 {
-                    match self.selected_register {
-                        SelectedRegister::Dh => self.clock.rtc_dh = value,
-                        SelectedRegister::Dl => self.clock.rtc_dl = value,
-                        SelectedRegister::H => self.clock.rtc_h = value,
-                        SelectedRegister::M => self.clock.rtc_m = value,
-                        SelectedRegister::S => self.clock.rtc_s = value,
-                        SelectedRegister::None => unreachable!()
-                    }
+                   self.write_rtc_latch(value);
                 } else if self.has_ram {
                     let actual_address = self.get_ram_address(address);
                     self.backup_file.write8(actual_address, value);
@@ -197,14 +166,7 @@ impl MBC for MBC3 {
             0x6000..=0x7fff => self.latch_clock_value(value as u8),
             0xa000..=0xbfff => if self.timer_ram_enable {
                 if self.ram_bank > 0x7 {
-                    match self.selected_register {
-                        SelectedRegister::Dh => self.clock.rtc_dh = value as u8,
-                        SelectedRegister::Dl => self.clock.rtc_dl = value as u8,
-                        SelectedRegister::H => self.clock.rtc_h = value as u8,
-                        SelectedRegister::M => self.clock.rtc_m = value as u8,
-                        SelectedRegister::S => self.clock.rtc_s = value as u8,
-                        SelectedRegister::None => unreachable!()
-                    }
+                    self.write_rtc_latch(value as u8);
                 } else {
                     let actual_address = self.get_ram_address(address);
                     self.backup_file.write16(actual_address, value);
@@ -216,6 +178,63 @@ impl MBC for MBC3 {
 }
 
 impl MBC3 {
+
+    fn write_rtc_latch(&mut self, value: u8) {
+        match self.ram_bank {
+            0xc => self.latch_clock.rtc_dh = value,
+            0xb => self.latch_clock.rtc_dl = value,
+            0xa => self.latch_clock.rtc_h = value,
+            0x9 => self.latch_clock.rtc_m = value,
+            0x8 => self.latch_clock.rtc_s = value,
+            _ => panic!("invalid option given for rtc register")
+        }
+
+        let previous_halted = self.halted;
+
+        self.carry_bit = ((self.latch_clock.rtc_dh >> 7) & 0x1) == 1;
+        self.halted = ((self.latch_clock.rtc_dh >> 6) & 0x1) == 1;
+
+        if !previous_halted && self.halted {
+            self.halted_elapsed = Local::now().signed_duration_since(self.start);
+        } else if previous_halted && !self.halted {
+            self.start = Local::now() - self.halted_elapsed;
+        }
+    }
+    fn read_rtc(&self) -> u8 {
+        match self.ram_bank {
+            0xc => self.latch_clock.rtc_dh,
+            0xb => self.latch_clock.rtc_dl,
+            0xa => self.latch_clock.rtc_h,
+            0x9 => self.latch_clock.rtc_m,
+            0x8 => self.latch_clock.rtc_s,
+            _ => panic!("invalid option given for rtc register")
+        }
+    }
+    fn update_rtc_latch(&mut self) {
+        let now = Local::now();
+
+        let delta = if self.halted { self.halted_elapsed } else { cmp::max(now.signed_duration_since(self.start), Duration::zero()) };
+
+        let seconds = delta.num_seconds() % 60;
+        let minutes = (delta.num_seconds() / 60) % 60;
+        let hours = (delta.num_seconds() / 60 / 60) % 24;
+
+        let days = hours / 24;
+
+        let new_wrapped_days = days & 0x1ff;
+
+        if new_wrapped_days < self.previous_wrapped_days as i64 {
+            self.carry_bit = true;
+        }
+        self.previous_wrapped_days = new_wrapped_days as u16;
+
+        self.latch_clock.rtc_dh = ((days >> 8) & 0x1) as u8 | (self.carry_bit as u8) << 7;
+        self.latch_clock.rtc_dl = days as u8;
+        self.latch_clock.rtc_h = hours as u8;
+        self.latch_clock.rtc_m = minutes as u8;
+        self.latch_clock.rtc_s = seconds as u8;
+    }
+
     fn get_ram_address(&self, address: u16) -> usize {
         (address & 0x1fff) as usize | (self.ram_bank as usize) << 13
     }
@@ -225,18 +244,52 @@ impl MBC3 {
     }
 
     pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, rom_path: &str) -> Self {
+        let mut split_str: Vec<&str> = rom_path.split('.').collect();
+
+        split_str.pop();
+
+        split_str.push("rtc");
+
+        let rtc_path = split_str.join(".");
+
+        let mut rtc_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(rtc_path)
+            .unwrap();
+
+        let mut str = "".to_string();
+
+        rtc_file.read_to_string( &mut str).unwrap();
+        rtc_file.seek(SeekFrom::Start(0)).unwrap();
+
+        let mut start = Local::now();
+
+        match serde_json::from_str::<RtcFile>(&str) {
+            Ok(result) => {
+                start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+            }
+            Err(_) => ()
+        }
+
         Self {
             rom_bank: 1,
             ram_bank: 0,
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
-            clock: ClockRegister::new(),
             backup_file: BackupFile::new(rom_path, ram_size, has_battery && has_ram),
             _rom_size: rom_size,
             has_ram,
             has_timer,
-            selected_register: SelectedRegister::None,
-            latch_value: None
+            start,
+            rtc_file,
+            latch_value: 0,
+            clock_latched: false,
+            carry_bit: false,
+            previous_wrapped_days: 0,
+            halted: false,
+            halted_elapsed: TimeDelta::new(0, 0).unwrap()
         }
     }
 
@@ -251,32 +304,18 @@ impl MBC3 {
     fn update_timer_ram_bank(&mut self, value: u8) {
         let id = value & 0xf;
 
-        if id < 0xa {
-            self.ram_bank = value;
-        } else if self.has_timer {
-            self.selected_register = match value {
-                0x8 => SelectedRegister::S,
-                0x9 => SelectedRegister::M,
-                0xa => SelectedRegister::H,
-                0xb => SelectedRegister::Dl,
-                0xc => SelectedRegister::Dh,
-                _ => panic!("invalid option received: 0x{:x}", value)
-            }
-        }
+        self.ram_bank = id;
     }
 
     fn latch_clock_value(&mut self, value: u8) {
         if self.has_timer {
-            if self.latch_value.is_none() && value == 0 {
-                self.latch_value = Some(0);
-            }
-
-            if let Some(latch_value) = &mut self.latch_value {
-                if *latch_value == 0 && value == 1 {
-                    self.latch_clock = self.clock.clone();
+            if self.latch_value == 0 && value == 1 {
+                self.clock_latched = !self.clock_latched;
+                if self.clock_latched {
+                    self.update_rtc_latch();
                 }
-                self.latch_value = None;
             }
+            self.latch_value = value;
         }
     }
 }

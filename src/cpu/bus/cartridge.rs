@@ -37,15 +37,15 @@ impl Cartridge {
     }
 
     pub fn mbc_read8(&mut self, address: u16) -> u8 {
-        if let Some(mbc) = &self.mbc {
+        if let Some(mbc) = &mut self.mbc {
             mbc.read(address, &self.rom)
         } else {
             0xff
         }
     }
 
-    pub fn mbc_read16(&self, address: u16) -> u16 {
-        if let Some(mbc) = &self.mbc {
+    pub fn mbc_read16(&mut self, address: u16) -> u16 {
+        if let Some(mbc) = &mut self.mbc {
             mbc.read16(address, &self.rom)
         } else {
             0xff

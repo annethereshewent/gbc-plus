@@ -24,11 +24,14 @@ impl MBC for MBC1 {
         &self.backup_file
     }
 
+    // Do nothing; MBC1 has no RTC
+    fn save_rtc(&mut self) {}
+
     fn save(&mut self) {
         self.backup_file.save_file();
     }
 
-    fn read(&self, address: u16, rom: &[u8]) -> u8 {
+    fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
                 let actual_address = self.get_rom_address_lower(address);
@@ -79,7 +82,7 @@ impl MBC for MBC1 {
         }
     }
 
-    fn read16(&self, address: u16, rom: &[u8]) -> u16 {
+    fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
         match address {
             0x0000..=0x3fff => {
                 let actual_address = self.get_rom_address_lower(address);

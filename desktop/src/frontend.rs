@@ -77,7 +77,8 @@ pub struct Frontend {
     game_controller_subsystem: GameControllerSubsystem,
     retry_attempts: usize,
     config: EmuConfig,
-    config_file: File
+    config_file: File,
+    last_check: Option<u128>
 }
 
 pub struct GbcAudioCallback {
@@ -246,7 +247,8 @@ impl Frontend {
             retry_attempts: 0,
             game_controller_subsystem,
             config,
-            config_file
+            config_file,
+            last_check: None
         }
     }
 
@@ -265,6 +267,27 @@ impl Frontend {
         self.canvas.copy(&texture, None, None).unwrap();
 
         self.canvas.present();
+    }
+
+    pub fn update_rtc(&mut self, cpu: &mut CPU) {
+
+        if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
+            let current_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("an error occurred")
+                .as_millis();
+            if let Some(last_check) = self.last_check {
+                if current_time - last_check >= 1500 {
+                    mbc.save_rtc();
+                    self.last_check = None;
+                }
+            } else {
+                self.last_check = Some(SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("an error occurred")
+                    .as_millis());
+            }
+        }
     }
 
     pub fn check_saves(&mut self, cpu: &mut CPU) {
