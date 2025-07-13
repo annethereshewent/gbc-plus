@@ -329,7 +329,6 @@ impl PPU {
 
     fn draw_line(&mut self) {
         if self.cgb_mode {
-
             self.draw_gbc_background();
             self.draw_gbc_window();
             self.draw_gbc_objects();
@@ -412,7 +411,7 @@ impl PPU {
 
                 let palette_index = lower_bit | (upper_bit << 1);
 
-                self.prev_background_pixels[x + i] = BgAttributes {
+                self.prev_window_pixels[x + i] = BgAttributes {
                     palette_index: palette_index as usize,
                     priority
                 };
@@ -873,7 +872,7 @@ impl PPU {
                 let prev_background = self.prev_background_pixels[x_pos as usize];
                 let prev_window = self.prev_window_pixels[x_pos as usize];
 
-                let draw_pixel = self.check_priority(prev_background, prev_window);
+                let draw_pixel = self.check_priority(&sprite, prev_background, prev_window);
 
                 if draw_pixel {
 
@@ -888,10 +887,13 @@ impl PPU {
         }
     }
 
-    fn check_priority(&self, prev_background: BgAttributes, prev_window: BgAttributes) -> bool {
+    fn check_priority(&self, obj: &OAMEntry, prev_background: BgAttributes, prev_window: BgAttributes) -> bool {
         if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
             if (prev_background.priority && prev_background.palette_index > 0) || (prev_window.priority && prev_window.palette_index > 0) {
                 return false
+            }
+            if obj.attributes.priority == OamPriority::Background && (prev_background.palette_index > 0 || prev_window.palette_index > 0) {
+                return false;
             }
         }
 
