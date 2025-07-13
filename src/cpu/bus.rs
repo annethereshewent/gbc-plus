@@ -7,8 +7,6 @@ use ppu::PPU;
 use interrupt_register::InterruptRegister;
 use timer::Timer;
 
-use super::CPU;
-
 pub mod interrupt_register;
 pub mod ppu;
 pub mod cartridge;
@@ -92,6 +90,7 @@ impl Bus {
 
     fn do_hdma_hblank(&mut self) {
         let actual_destination = self.curr_dma_dest | 0x8000;
+
         for i in 0..0x10 {
             let value = self.mem_read8(self.curr_dma_source + i as u16);
             self.mem_write8(actual_destination + i as u16, value);
@@ -104,7 +103,9 @@ impl Bus {
 
         self.ppu.in_hblank = false;
 
-        if self.hdma_length <= 0 {
+        self.tick(128);
+
+        if self.hdma_length == 0 {
             self.hdma_length = 0;
             self.hdma_hblank = false;
         }
@@ -119,7 +120,11 @@ impl Bus {
                 self.cartridge.rom[address as usize]
             }
             0xa000..=0xbfff => self.cartridge.mbc_read8(address),
-            0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize],
+            0x8000..=0x9fff => if self.ppu.cgb_mode {
+                self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize]
+            } else {
+                self.ppu.vram[0][(address - 0x8000) as usize]
+            },
             0xc000..=0xcfff => self.wram[0][(address - 0xc000) as usize],
             0xd000..=0xdfff => if self.ppu.cgb_mode {
                 self.wram[self.wram_bank][(address - 0xd000) as usize]
@@ -149,6 +154,7 @@ impl Bus {
             0xff4a => self.ppu.wy,
             0xff4b => self.ppu.wx,
             0xff4d => self.double_speed as u8,
+            0xff4f => self.ppu.vram_bank as u8,
             0xff55 => ((self.hdma_length - 1) / 0x10) as u8,
             0xff70 => self.wram_bank as u8,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
@@ -251,7 +257,7 @@ impl Bus {
     }
 
     fn start_hdma(&mut self, value: u8) {
-        let length = (value & 0x7f + 1) * 0x10;
+        let length = (((value as u16) & 0x7f) + 1) * 0x10;
 
         let mode = match (value >> 7) & 0x1 {
             0 => HdmaMode::General,
@@ -261,17 +267,19 @@ impl Bus {
 
         self.vram_dma_destination &= !(0xf);
         self.vram_dma_source &= !(0xf);
-        self.vram_dma_source &= 0x1fff;
+        self.vram_dma_destination &= 0x1fff;
 
         if mode == HdmaMode::General {
             // do transfer immediately
+            let actual_address = self.vram_dma_destination | 0x8000;
             for i in 0..length {
                 let value = self.mem_read8(self.vram_dma_source + i as u16);
-                self.mem_write8(self.vram_dma_destination + i as u16, value);
+                self.mem_write8(actual_address + i as u16, value);
             }
         } else {
             self.hdma_hblank = true;
             self.hdma_length = length as isize;
+
             self.curr_dma_source = self.vram_dma_source;
             self.curr_dma_dest = self.vram_dma_destination;
         }

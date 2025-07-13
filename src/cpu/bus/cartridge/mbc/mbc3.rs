@@ -11,8 +11,7 @@ use super::MBC;
 struct RtcFile {
     timestamp: usize,
     carry_bit: bool,
-    halted: bool,
-    halted_elapsed: usize
+    halted: bool
 }
 
 impl RtcFile {
@@ -20,14 +19,12 @@ impl RtcFile {
         timestamp: usize,
         halted: bool,
         carry_bit: bool,
-        halted_elapsed: usize
     ) -> Self
     {
         Self {
             timestamp,
             carry_bit,
-            halted,
-            halted_elapsed
+            halted
         }
     }
 }
@@ -81,8 +78,7 @@ impl MBC for MBC3 {
         let rtc_json = RtcFile::new(
             self.start.timestamp() as usize,
             self.halted,
-            self.carry_bit,
-            self.halted_elapsed.num_seconds() as usize
+            self.carry_bit
         );
 
         match serde_json::to_string::<RtcFile>(&rtc_json) {

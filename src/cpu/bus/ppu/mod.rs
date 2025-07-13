@@ -294,11 +294,9 @@ impl PPU {
             }
 
             self.mode = if self.line_y == 144 {
-                self.in_hblank = false;
                 interrupt_register.set(InterruptRegister::VBLANK, true);
                 LCDMode::VBlank
             } else {
-                self.in_hblank = false;
                 LCDMode::OAMScan
             };
         }
@@ -906,6 +904,7 @@ impl PPU {
     }
 
     fn handle_vblank(&mut self, interrupt_register: &mut InterruptRegister) {
+        self.in_hblank = false;
         if self.cycles >= MODE1_CYCLES {
             self.cycles -= MODE1_CYCLES;
 
@@ -938,6 +937,7 @@ impl PPU {
     }
 
     fn handle_oam_scan(&mut self, interrupt_register: &mut InterruptRegister) {
+        self.in_hblank = false;
         if self.cycles >= MODE2_CYCLES {
             self.cycles -= MODE2_CYCLES;
 
@@ -950,6 +950,7 @@ impl PPU {
     }
 
     fn handle_hdraw(&mut self) {
+        self.in_hblank = false;
         if self.cycles >= MODE3_CYCLES {
             self.cycles -= MODE3_CYCLES;
 
