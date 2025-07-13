@@ -315,13 +315,102 @@ impl PPU {
     fn draw_line(&mut self) {
         if self.cgb_mode {
             self.draw_gbc_background();
-            // self.draw_window();
+            self.draw_gbc_window();
             self.draw_gbc_objects();
         } else {
             self.draw_background();
             self.draw_window();
             self.draw_objects();
         }
+    }
+
+    fn draw_gbc_window(&mut self) {
+        if self.line_y < self.wy ||
+            !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) ||
+            !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) ||
+            (self.wx as isize - 7) >= SCREEN_WIDTH as isize ||
+            self.current_window_line as usize >= SCREEN_HEIGHT
+        {
+            return;
+        }
+
+        let base_tilemap_address = if !self.lcdc.contains(LCDControlRegister::WINDOW_TILEMAP) {
+            0x9800
+        } else {
+            0x9c00
+        };
+
+        let base_tile_address = if !self.lcdc.contains(LCDControlRegister::BG_AND_WINDOW_TILES) {
+            0x9000
+        } else {
+            0x8000
+        };
+
+        let mut x_pos = self.wx as i16 - 7;
+
+        if x_pos < 0 {
+            x_pos = 0;
+        }
+
+        for index in self.prev_window_indexes.iter_mut() { *index = 0; }
+
+        for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
+            let x_pos = (x - (self.wx as usize - 7)) & 0xff;
+
+            let tile_number = (x_pos as usize / 8) + (self.current_window_line as usize / 8) * 32;
+
+            let tilemap_address = base_tilemap_address + tile_number;
+            let tile_index = self.vram_read8(tilemap_address, 0);
+
+            let attributes = self.vram_read8(tilemap_address, 1);
+
+            let color_palette = attributes & 0x7;
+            let bank = (attributes >> 3) & 0x1;
+            let x_flip = (attributes >> 5) & 0x1 == 1;
+            let y_flip = (attributes >> 6) & 0x1 == 1;
+            let priority = (attributes >> 7) & 0x1 == 1;
+
+            let mut y_pos_in_tile = (self.current_window_line & 0x7) as usize;
+
+            if y_flip {
+                y_pos_in_tile = 7 - y_pos_in_tile;
+            }
+
+            let tile_address = if base_tile_address == 0x9000 {
+                (base_tile_address as i32 + (tile_index as i8 as i32) * 16) as usize + y_pos_in_tile * 2
+            } else {
+                base_tile_address as usize + tile_index as usize * 16 + y_pos_in_tile * 2
+            };
+
+            let lower = self.vram_read8(tile_address, bank as usize);
+            let upper = self.vram_read8(tile_address + 1, bank as usize);
+
+            for i in 0..8 {
+                if x + i >= SCREEN_WIDTH {
+                    break;
+                }
+                let shift = if x_flip { i } else { 7 - i };
+
+                let lower_bit = (lower >> shift) & 0x1;
+                let upper_bit = (upper >> shift) & 0x1;
+
+                let palette_index = lower_bit | (upper_bit << 1);
+
+                self.prev_background_indexes[x + i] = palette_index as usize;
+
+                let base_palette_address = color_palette * 4 * 2;
+
+                let palette_address = base_palette_address + palette_index * 2;
+
+                let color = self.bg_pal_read16(palette_address as usize);
+
+                let pixel = Self::convert_pixel(color);
+
+                self.picture.set_pixel(x + i, self.line_y as usize, pixel);
+            }
+        }
+
+        self.current_window_line += 1;
     }
 
     fn draw_window(&mut self) {
