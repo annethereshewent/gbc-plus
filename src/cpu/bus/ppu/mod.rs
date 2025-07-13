@@ -41,7 +41,9 @@ pub struct OamAttributes {
     pub priority: OamPriority,
     pub y_flip: bool,
     pub x_flip: bool,
-    pub dmg_palette: u8
+    pub dmg_palette: u8,
+    pub gbc_palette: u8,
+    pub bank: u8
 }
 
 impl OamAttributes {
@@ -55,6 +57,8 @@ impl OamAttributes {
             dmg_palette: (attributes >> 4) & 0x1,
             x_flip: (attributes >> 5) & 0x1 == 1,
             y_flip: (attributes >> 6) & 0x1 == 1,
+            gbc_palette: attributes & 0x7,
+            bank: (attributes >> 3) & 0x1
         }
     }
 }
@@ -167,7 +171,8 @@ pub struct PPU {
     pub bgpi: BgPaletteIndexRegister,
     pub palette_ram: [u8; 64],
     pub obj_palette_ram: [u8; 64],
-    pub obpi: ObjPaletteIndexRegister
+    pub obpi: ObjPaletteIndexRegister,
+    pub cgb_mode: bool
 }
 
 impl PPU {
@@ -212,7 +217,8 @@ impl PPU {
             bgpi: BgPaletteIndexRegister::new(),
             obpi: ObjPaletteIndexRegister::new(),
             palette_ram: [0; 64],
-            obj_palette_ram: [0; 64]
+            obj_palette_ram: [0; 64],
+            cgb_mode: false
         }
     }
 
@@ -307,9 +313,15 @@ impl PPU {
     }
 
     fn draw_line(&mut self) {
-        self.draw_background();
-        self.draw_window();
-        self.draw_objects();
+        if self.cgb_mode {
+            self.draw_gbc_background();
+            // self.draw_window();
+            self.draw_gbc_objects();
+        } else {
+            self.draw_background();
+            self.draw_window();
+            self.draw_objects();
+        }
     }
 
     fn draw_window(&mut self) {
@@ -388,6 +400,105 @@ impl PPU {
     pub fn read_stat(&self) -> u8 {
         let lcd_status = if !self.lcdc.contains(LCDControlRegister::LCD_AND_PPU_ENABLE) { 0 } else { self.mode as u8 };
         self.stat.read() | lcd_status | ((self.line_y == self.lyc) as u8) << 2
+    }
+
+    fn draw_gbc_background(&mut self) {
+      let base_tilemap_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_TILEMAP) {
+            0x9800
+        } else {
+            0x9c00
+        };
+
+        let base_tile_address: usize = if !self.lcdc.contains(LCDControlRegister::BG_AND_WINDOW_TILES) {
+            0x9000
+        } else {
+            0x8000
+        };
+
+        let scroll_x = self.scx;
+        let scroll_y = self.scy;
+        let y = self.line_y;
+
+        let scrolled_y = (scroll_y as usize + y as usize) & 0xff;
+        for x in 0..SCREEN_WIDTH {
+            if self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) {
+                let scrolled_x = (scroll_x as usize + x) & 0xff;
+                let tile_number = (scrolled_y / 8) * 32 + scrolled_x / 8;
+
+                let tilemap_address = base_tilemap_address as usize + tile_number;
+
+                let tile_id = self.vram_read8(tilemap_address, 0);
+                let attributes = self.vram_read8(tilemap_address, 1);
+
+                let color_palette = attributes & 0x7;
+                let bank = (attributes >> 3) & 0x1;
+                let x_flip = (attributes >> 5) & 0x1 == 1;
+                let y_flip = (attributes >> 6) & 0x1 == 1;
+                let priority = (attributes >> 7) & 0x1 == 1;
+
+                let base_bgp_index = color_palette * 4 * 2;
+
+                let x_in_tile = (x as usize + scroll_x as usize) % 8;
+                let mut y_in_tile = (y as usize + scroll_y as usize) % 8;
+
+                if y_flip {
+                    y_in_tile = 7 - y_in_tile;
+                }
+
+                let tile_address = if base_tile_address == 0x8000 {
+                    base_tile_address + tile_id as usize * 16 + y_in_tile * 2
+                } else {
+                    let offset = ((tile_id as i8 as i32) * 16) + ((y_in_tile as i32) * 2);
+
+                    (base_tile_address as i32 + offset) as usize
+                };
+
+                let lower_byte = self.vram_read8(tile_address, bank as usize);
+                let upper_byte = self.vram_read8(tile_address + 1, bank as usize);
+
+                let shift = if x_flip { x_in_tile } else { 7 - x_in_tile };
+
+                let palette_index = (upper_byte >> shift & 0x1) << 1 | lower_byte >> shift & 0x1;
+
+                let palette_address = (base_bgp_index + palette_index * 2) as usize;
+
+                let color = self.bg_pal_read16(palette_address);
+
+                let pixel = Self::convert_pixel(color);
+
+                self.picture.set_pixel(x, y as usize, pixel);
+
+                self.prev_background_indexes[x as usize] = color as usize;
+            } else {
+                let color = self.bg_pal_read16(0);
+
+                let pixel = Self::convert_pixel(color);
+
+                self.picture.set_pixel(x, y as usize, pixel);
+
+                self.prev_background_indexes[x as usize] = 0;
+            }
+        }
+    }
+
+    fn convert_pixel(color: u16) -> Color {
+        let mut r = color & 0x1f;
+        let mut g = (color >> 5) & 0x1f;
+        let mut b = (color >> 10) & 0x1f;
+
+        r = r << 3 | r >> 2;
+        g = g << 3 | g >> 2;
+        b = b << 3 | b >> 2;
+
+        Color::new(r as u8, g as u8, b as u8)
+    }
+
+    fn bg_pal_read16(&self, address: usize) -> u16 {
+        unsafe { *(&self.palette_ram[address] as *const u8 as *const u16 )}
+    }
+
+    fn obj_pal_read16(&self, address: usize) -> u16 {
+        unsafe { *(&self.obj_palette_ram[address] as *const u8 as *const u16 )}
     }
 
     fn draw_background(&mut self) {
@@ -549,6 +660,110 @@ impl PPU {
                 if sprite.attributes.priority == OamPriority::None || (self.prev_background_indexes[x_pos as usize] == 0 && self.prev_window_indexes[x_pos as usize] == 0) {
                     // draw the pixel!
                     let pixel = self.get_pixel(color);
+
+                    self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
+
+                    self.previous_objs[x_pos as usize] = Some(sprite);
+                }
+            }
+        }
+    }
+
+    fn draw_gbc_objects(&mut self) {
+        if !self.lcdc.contains(LCDControlRegister::OBJ_ENABLE) {
+            return;
+        }
+
+        let is8by16 = self.lcdc.contains(LCDControlRegister::OBJ_SIZE);
+
+        let sprite_height = if is8by16 {
+            16
+        } else {
+            8
+        };
+
+        let mut candidates: Vec<OAMEntry> = Vec::new();
+
+        for i in 0..self.oam.len() {
+            let entry = self.oam[i];
+             let y_diff: i16 = self.line_y as i16 - (entry.y_position as i16 - 16);
+            if y_diff >= 0 && y_diff < sprite_height as i16 {
+                let mut entry = entry.clone();
+
+                entry.address = i;
+
+                candidates.push(entry);
+
+                if candidates.len() == 10 {
+                    break;
+                }
+            }
+        }
+
+        // clear previously drawn sprites, otherwise data will be junk
+        for sprite in &mut self.previous_objs {
+            *sprite = None;
+        }
+
+        let base_tilemap_address: u16 = 0x8000;
+
+        for sprite in candidates {
+            for i in 0..8 {
+                let x_pos = i + (sprite.x_position as i16 - 8);
+
+                if x_pos < 0 || x_pos as usize >= SCREEN_WIDTH {
+                    continue;
+                }
+
+                let mut y_in_tile = self.line_y - (sprite.y_position - 16);
+
+                if sprite.attributes.y_flip {
+                    y_in_tile = sprite_height - 1 - y_in_tile;
+                }
+
+                let tile_index = if is8by16 {
+                    sprite.tile_index & 0xfe
+                } else {
+                    sprite.tile_index
+                };
+
+                let tile_address = base_tilemap_address + tile_index as u16 * 16 + y_in_tile as u16 * 2;
+
+                let lower_byte = self.vram_read8(tile_address as usize, sprite.attributes.bank as usize);
+                let upper_byte = self.vram_read8(tile_address as usize + 1, sprite.attributes.bank as usize);
+
+                let bit_index = if sprite.attributes.x_flip { i } else { 7 - i };
+
+                let lower_bit = (lower_byte >> bit_index) & 1;
+                let upper_bit = (upper_byte >> bit_index) & 1;
+
+                let palette_index = lower_bit | (upper_bit << 1);
+
+                if palette_index == 0 {
+                    continue;
+                }
+
+                // let color = if sprite.attributes.dmg_palette == 0 {
+                //     self.obp0.indexes[palette_index as usize]
+                // } else {
+                //     self.obp1.indexes[palette_index as usize]
+                // };
+
+                let base_obj_palette_address = sprite.attributes.gbc_palette * 4 * 2;
+
+                let obj_palette_address = base_obj_palette_address + palette_index * 2;
+
+                let color = self.obj_pal_read16(obj_palette_address as usize);
+
+                if let Some(prev_obj) = self.previous_objs[x_pos as usize] {
+                    if sprite.address > prev_obj.address {
+                        continue;
+                    }
+                }
+
+                if sprite.attributes.priority == OamPriority::None || (self.prev_background_indexes[x_pos as usize] == 0 && self.prev_window_indexes[x_pos as usize] == 0) {
+                    // draw the pixel!
+                    let pixel = Self::convert_pixel(color);
 
                     self.picture.set_pixel(x_pos as usize, self.line_y as usize, pixel);
 

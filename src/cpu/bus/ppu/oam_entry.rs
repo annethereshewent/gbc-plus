@@ -20,7 +20,9 @@ impl OAMEntry {
                 x_flip: false,
                 y_flip: false,
                 priority: OamPriority::None,
-                dmg_palette: 0
+                dmg_palette: 0,
+                gbc_palette: 0,
+                bank: 0
             }
         }
     }

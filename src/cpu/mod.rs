@@ -44,8 +44,7 @@ pub struct CPU {
     pub bus: Bus,
     found: HashSet<u16>,
     pub debug_on: bool,
-    is_halted: bool,
-    cgb_mode: bool
+    is_halted: bool
 }
 
 impl CPU {
@@ -58,8 +57,7 @@ impl CPU {
             bus: Bus::new(audio_buffer, rom_path),
             found: HashSet::new(),
             debug_on: false,
-            is_halted: false,
-            cgb_mode: false
+            is_halted: false
         }
     }
 
@@ -110,7 +108,7 @@ impl CPU {
     fn check_cgb_header(&mut self) {
         let cgb_flag = self.bus.cartridge.rom[CGB_ADDR];
         if [0x80, 0xc0].contains(&cgb_flag) {
-            self.cgb_mode = true;
+            self.bus.ppu.cgb_mode = true;
             self.update_cgb_registers();
         }
     }

@@ -103,6 +103,7 @@ impl Bus {
             } else {
                 unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }
             }
+            0x8000..=0x9fff => unsafe { *(&self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *const u8 as *const u16) },
             0xa000..=0xbfff => self.cartridge.mbc_read16(address),
             0xc000..=0xdfff => unsafe { *(&self.wram[(address - 0xc000) as usize] as *const u8 as *const u16) },
             0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
@@ -135,8 +136,6 @@ impl Bus {
 
     pub fn check_header(&mut self) {
         let cartridge_type = self.cartridge.rom[CARTRIDGE_TYPE_ADDR];
-
-
 
         let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
 
