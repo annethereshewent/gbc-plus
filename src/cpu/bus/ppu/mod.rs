@@ -1,10 +1,11 @@
 use std::{thread::sleep, time::{Duration, SystemTime, UNIX_EPOCH}};
 
 use bg_palette_register::{BGColor, BGPaletteRegister};
-use bg_palette_spec_register::BgPaletteSpecRegister;
+use bg_palette_index_register::BgPaletteIndexRegister;
 use lcd_control_register::LCDControlRegister;
 use lcd_status_register::LCDStatusRegister;
 use oam_entry::OAMEntry;
+use obj_palette_index_register::ObjPaletteIndexRegister;
 use obj_palette_register::ObjPaletteRegister;
 use picture::{Color, Picture};
 
@@ -16,7 +17,8 @@ pub mod bg_palette_register;
 pub mod obj_palette_register;
 pub mod oam_entry;
 pub mod picture;
-pub mod bg_palette_spec_register;
+pub mod bg_palette_index_register;
+pub mod obj_palette_index_register;
 
 const MODE2_CYCLES: usize = 80;
 const MODE3_CYCLES: usize = 172;
@@ -162,8 +164,10 @@ pub struct PPU {
     pub palette_colors: [[Color; 4]; 10],
     pub current_palette: usize,
     pub vram_bank: u8,
-    pub bgpi: BgPaletteSpecRegister,
-    pub palette_ram: [u8; 64]
+    pub bgpi: BgPaletteIndexRegister,
+    pub palette_ram: [u8; 64],
+    pub obj_palette_ram: [u8; 64],
+    pub obpi: ObjPaletteIndexRegister
 }
 
 impl PPU {
@@ -205,8 +209,10 @@ impl PPU {
             ],
             current_palette: 1,
             vram_bank: 0,
-            bgpi: BgPaletteSpecRegister::new(),
-            palette_ram: [0; 64]
+            bgpi: BgPaletteIndexRegister::new(),
+            obpi: ObjPaletteIndexRegister::new(),
+            palette_ram: [0; 64],
+            obj_palette_ram: [0; 64]
         }
     }
 
@@ -227,6 +233,13 @@ impl PPU {
         self.palette_ram[self.bgpi.address as usize] = value;
         if self.bgpi.auto_increment {
             self.bgpi.address += 1;
+        }
+    }
+
+    pub fn update_obj_palette_color(&mut self, value: u8) {
+        self.obj_palette_ram[self.obpi.address as usize] = value;
+        if self.obpi.auto_increment {
+            self.obpi.address += 1;
         }
     }
 

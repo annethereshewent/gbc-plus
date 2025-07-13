@@ -1,9 +1,9 @@
-pub struct BgPaletteSpecRegister {
+pub struct BgPaletteIndexRegister {
     pub address: u8,
     pub auto_increment: bool
 }
 
-impl BgPaletteSpecRegister {
+impl BgPaletteIndexRegister {
     pub fn new() -> Self {
         Self {
             address: 0,

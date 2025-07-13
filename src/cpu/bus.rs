@@ -249,6 +249,8 @@ impl Bus {
             0xff56 => (), // Infrared comms port for GBC, TODO
             0xff68 => self.ppu.bgpi.write(value),
             0xff69 => self.ppu.update_bg_palette_color(value),
+            0xff6a => self.ppu.obpi.write(value),
+            0xff6b => self.ppu.update_obj_palette_color(value),
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
