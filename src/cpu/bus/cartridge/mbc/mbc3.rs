@@ -9,13 +9,25 @@ use super::MBC;
 
 #[derive(Serialize, Deserialize)]
 struct RtcFile {
-    timestamp: usize
+    timestamp: usize,
+    carry_bit: bool,
+    halted: bool,
+    halted_elapsed: usize
 }
 
 impl RtcFile {
-    pub fn new(timestamp: usize) -> Self {
+    pub fn new(
+        timestamp: usize,
+        halted: bool,
+        carry_bit: bool,
+        halted_elapsed: usize
+    ) -> Self
+    {
         Self {
-            timestamp
+            timestamp,
+            carry_bit,
+            halted,
+            halted_elapsed
         }
     }
 }
@@ -66,7 +78,14 @@ impl MBC for MBC3 {
     }
 
     fn save_rtc(&mut self) {
-        match serde_json::to_string::<RtcFile>(&RtcFile::new(self.start.timestamp() as usize)) {
+        let rtc_json = RtcFile::new(
+            self.start.timestamp() as usize,
+            self.halted,
+            self.carry_bit,
+            self.halted_elapsed.num_seconds() as usize
+        );
+
+        match serde_json::to_string::<RtcFile>(&rtc_json) {
             Ok(result) => {
                 self.rtc_file.seek(SeekFrom::Start(0)).unwrap();
                 self.rtc_file.write_all(result.as_bytes()).unwrap();
@@ -196,6 +215,8 @@ impl MBC3 {
 
         if !previous_halted && self.halted {
             self.halted_elapsed = Local::now().signed_duration_since(self.start);
+
+
         } else if previous_halted && !self.halted {
             self.start = Local::now() - self.halted_elapsed;
         }
@@ -264,14 +285,15 @@ impl MBC3 {
         rtc_file.read_to_string( &mut str).unwrap();
         rtc_file.seek(SeekFrom::Start(0)).unwrap();
 
-        let mut start = Local::now();
-
-        match serde_json::from_str::<RtcFile>(&str) {
+        let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
             Ok(result) => {
-                start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                let halted_elapsed = TimeDelta::new(0, 0).unwrap();
+
+                (start, result.carry_bit, result.halted, halted_elapsed)
             }
-            Err(_) => ()
-        }
+            Err(_) => (Local::now(), false, false, Duration::seconds(0))
+        };
 
         Self {
             rom_bank: 1,
@@ -286,10 +308,10 @@ impl MBC3 {
             rtc_file,
             latch_value: 0,
             clock_latched: false,
-            carry_bit: false,
+            carry_bit,
             previous_wrapped_days: 0,
-            halted: false,
-            halted_elapsed: TimeDelta::new(0, 0).unwrap()
+            halted,
+            halted_elapsed
         }
     }
 
