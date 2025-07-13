@@ -17,7 +17,8 @@ pub struct PulseChannel<const IS_CHANNEL1: bool>  {
     duty_step: usize,
     envelope_timer: usize,
     sweep_enabled: bool,
-    sweep_timer: usize
+    sweep_timer: usize,
+    shadow_period: u16
 }
 
 const DUTY_PATTERNS: [[usize; 8]; 4] = [
@@ -43,7 +44,8 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
             duty_step: 0,
             envelope_timer: 0,
             sweep_enabled: false,
-            sweep_timer: 0
+            sweep_timer: 0,
+            shadow_period: 0
         }
     }
 
@@ -117,7 +119,7 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     pub fn tick_sweep(&mut self) {
         if let Some(nrx0) = &mut self.nrx0 {
-            let operand = self.period >> nrx0.step;
+            let operand = self.shadow_period >> nrx0.step;
 
             self.sweep_timer -= 1;
 
@@ -126,9 +128,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
                 if self.sweep_enabled && self.sweep_timer > 0 {
                     if nrx0.direction == SweepDirection::Addition {
-                        let new_period = self.period + operand;
+                        let new_period = self.shadow_period + operand;
 
-                        if new_period < 0x7ff {
+                        if new_period < 0x800 {
+                            self.shadow_period = new_period;
                             self.period = new_period
                         } else {
                             self.enabled = false;
@@ -136,9 +139,11 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
                     } else {
                         if self.period > 0 {
                             if operand <= self.period {
-                                self.period = self.period - operand
+                                self.period = self.shadow_period - operand;
+                                self.shadow_period = self.period;
                             } else {
                                 self.period = 0;
+                                self.shadow_period = 0;
                             }
                         }
                     }
@@ -161,9 +166,9 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if let Some(nrx0) = &mut self.nrx0 {
             self.sweep_timer = if nrx0.pace == 0 { 8 } else { nrx0.pace as usize };
 
-            if nrx0.pace > 0 || nrx0.step > 0 {
-                self.sweep_enabled = true;
-            }
+            self.sweep_enabled = nrx0.pace  > 0 || nrx0.step > 0;
+
+            self.shadow_period = self.period;
         }
     }
 
