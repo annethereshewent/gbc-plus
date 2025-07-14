@@ -298,10 +298,11 @@ impl PPU {
         self.vram_enabled = true;
 
         if self.cycles >= MODE0_CYCLES {
-
             self.cycles -= MODE0_CYCLES;
 
             self.line_y += 1;
+
+            self.hdma_init = false;
 
             if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
                 interrupt_register.set(InterruptRegister::LCD, true);

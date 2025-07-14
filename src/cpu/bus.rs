@@ -84,17 +84,23 @@ impl Bus {
 
     pub fn tick(&mut self, cycles: usize) {
         let actual_cycles = if self.double_speed { cycles / 2 } else { cycles };
-        if self.hdma_hblank && self.ppu.entering_hblank(actual_cycles) {
-            self.do_hdma_hblank();
+
+        if self.hdma_hblank {
+            self.ppu.hdma_init = true;
         }
 
-        self.timer.tick(actual_cycles, &mut self.IF);
+        let hdma_cycles = if self.hdma_hblank && self.ppu.entering_hblank(actual_cycles) {
+            self.do_hdma_hblank()
+        } else {
+            0
+        };
 
-        self.ppu.tick(actual_cycles, &mut self.IF);
-        self.apu.tick(actual_cycles);
+        self.timer.tick(actual_cycles + hdma_cycles, &mut self.IF);
+        self.ppu.tick(actual_cycles + hdma_cycles, &mut self.IF);
+        self.apu.tick(actual_cycles + hdma_cycles);
     }
 
-    fn do_hdma_hblank(&mut self) {
+    fn do_hdma_hblank(&mut self) -> usize {
         let actual_destination = self.curr_dma_dest | 0x8000;
 
         for i in 0..0x10 {
@@ -114,7 +120,7 @@ impl Bus {
             self.hdma_hblank = false;
             self.hdma_finished = true;
         }
-        self.tick(if self.double_speed { 64 } else { 32 });
+        32
     }
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
@@ -149,6 +155,7 @@ impl Bus {
             0xff01..=0xff02 => 0, // serial ports, can safely ignore (hopefully!)
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
+            0xff07 => self.timer.tac.bits(),
             0xff0f => self.IF.bits(),
             0xff11 => self.apu.channel1.read_length(),
             0xff12 => self.apu.channel1.read_volume(),
@@ -192,7 +199,7 @@ impl Bus {
             0xff49 => self.ppu.obp1.read(),
             0xff4a => self.ppu.wy,
             0xff4b => self.ppu.wx,
-            0xff4d => self.double_speed as u8,
+            0xff4d => (self.double_speed as u8) << 7,
             0xff4f => self.ppu.vram_bank as u8,
             0xff55 => if self.hdma_length == 0 && self.hdma_finished { 0xff } else { ((self.hdma_length - 1) / 0x10) as u8 },
             0xff68 => self.ppu.bgpi.read(),
@@ -436,7 +443,7 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
-            0xff4d => self.double_speed = value >> 7 == 1,
+            0xff4d => if value & 0x1 == 1 { self.double_speed = !self.double_speed },
             0xff4f => self.ppu.set_vram_bank(value & 0x1),
             0xff51 => self.vram_dma_source = (self.vram_dma_source & 0xff) | (value as u16) << 8,
             0xff52 => self.vram_dma_source = (self.vram_dma_source & 0xff00) | value as u16,
