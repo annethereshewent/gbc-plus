@@ -173,9 +173,11 @@ impl Bus {
                     0
                 }
             }
+            0xff1e => self.apu.channel3.nr34.read(),
             0xff1f => 0xff, // see above comment
             0xff20 => 0xff, // write only register
             0xff21 => self.apu.channel4.nr42.read(),
+            0xff22 => self.apu.channel4.nr43.read(),
             0xff23 => self.apu.channel4.nr44.read(),
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),

@@ -1,8 +1,8 @@
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum LFSRWidth {
-    Bit15,
-    Bit7
+    Bit15 = 0,
+    Bit7 = 1
 }
 
 const DIVIDERS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
@@ -32,5 +32,9 @@ impl ChannelFreqRandomRegister {
         };
 
         self.clock_shift = (value >> 4) & 0xf;
+    }
+
+    pub fn read(&self) -> u8 {
+        self.clock_divider | (self.lfsr_width as u8) << 3 | self.clock_shift << 4
     }
 }
