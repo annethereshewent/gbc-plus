@@ -152,9 +152,11 @@ impl Bus {
             0xff0f => self.IF.bits(),
             0xff11 => self.apu.channel1.read_length(),
             0xff12 => self.apu.channel1.read_volume(),
+            0xff14 => self.apu.channel1.nrx4.read(),
             0xff15 => 0xff, // i have no idea what this does, but Pokemon Gold seems to use it despite it not being an official register.
             0xff16 => self.apu.channel2.read_length(),
             0xff17 => self.apu.channel2.read_volume(),
+            0xff19 => self.apu.channel2.nrx4.read(),
             0xff1a => self.apu.channel3.dac_enable as u8,
             0xff1c => {
                 if let Some(output) = self.apu.channel3.output {
@@ -171,7 +173,9 @@ impl Bus {
                 }
             }
             0xff1f => 0xff, // see above comment
+            0xff20 => 0xff, // write only register
             0xff21 => self.apu.channel4.nr42.read(),
+            0xff23 => self.apu.channel4.nr44.read(),
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
             0xff26 => self.apu.read_channel_status(),

@@ -110,7 +110,6 @@ impl MBC for MBC5 {
 
 impl MBC5 {
     pub fn new(has_ram: bool, has_battery: bool, has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: &str,) -> Self {
-        println!("rom size = 0x{:x}", _rom_size);
         Self {
             rom_bank: 0,
             ram_bank: 0,
