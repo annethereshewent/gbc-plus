@@ -83,15 +83,15 @@ impl Bus {
     }
 
     pub fn tick(&mut self, cycles: usize) {
-        let double_cycles = if self.double_speed { cycles / 2 } else { cycles };
-        if self.hdma_hblank && self.ppu.entering_hblank(cycles) {
+        let actual_cycles = if self.double_speed { cycles / 2 } else { cycles };
+        if self.hdma_hblank && self.ppu.entering_hblank(actual_cycles) {
             self.do_hdma_hblank();
         }
 
-        self.timer.tick(double_cycles, &mut self.IF);
+        self.timer.tick(actual_cycles, &mut self.IF);
 
-        self.ppu.tick(cycles, &mut self.IF);
-        self.apu.tick(cycles);
+        self.ppu.tick(actual_cycles, &mut self.IF);
+        self.apu.tick(actual_cycles);
     }
 
     fn do_hdma_hblank(&mut self) {
@@ -114,7 +114,7 @@ impl Bus {
             self.hdma_hblank = false;
             self.hdma_finished = true;
         }
-        self.tick(32);
+        self.tick(if self.double_speed { 64 } else { 32 });
     }
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
@@ -252,7 +252,7 @@ impl Bus {
             self.mem_write8(0xfe00 + i, value);
         }
 
-        self.tick( if self.double_speed { 320 } else { 640 });
+        self.tick( 640);
     }
 
     pub fn check_header(&mut self) {
@@ -336,7 +336,7 @@ impl Bus {
             self.mem_write8(actual_address + i, value);
         }
 
-        self.tick(cycles as usize);
+        self.tick(if self.double_speed { cycles * 2 } else { cycles } as usize);
     }
 
     fn restart_hdma_hblank(&mut self, length: u16) {
