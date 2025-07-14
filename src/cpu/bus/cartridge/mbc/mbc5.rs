@@ -7,6 +7,7 @@ pub struct MBC5 {
     ram_bank: u8,
     ram_enable: bool,
     has_rumble: bool,
+    ram_size: usize,
     has_ram: bool,
     backup_file: BackupFile
 }
@@ -29,7 +30,7 @@ impl MBC for MBC5 {
             0xa000..=0xbfff => if self.ram_enable {
                 if self.has_ram && self.ram_enable {
                     let actual_address = self.get_ram_address(address);
-                    self.backup_file.read8(actual_address)
+                    self.backup_file.read8(actual_address % self.ram_size)
                 } else {
                     0xff
                 }
@@ -41,6 +42,7 @@ impl MBC for MBC5 {
     }
 
     fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
+
         match address {
             0x0000..=0x3fff => {
                 unsafe { *(&rom[address as usize] as *const u8 as *const u16) }
@@ -80,10 +82,10 @@ impl MBC for MBC5 {
             0x3000..=0x3fff => self.rom_bank = (self.rom_bank & 0xff) | (value as u16 & 0x1) << 8,
             0x4000..=0x5fff => self.ram_bank = value & 0xf,
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
-                let actual_address = self.get_ram_address(address);
+                let actual_address = self.get_ram_address(address) % self.ram_size;
                 self.backup_file.write8(actual_address, value);
             }
-            _ => panic!("oh no")
+            _ => () // panic!("invalid address received: 0x{:x}", address)
         }
     }
 
@@ -99,7 +101,7 @@ impl MBC for MBC5 {
             0x4000..=0x5fff => self.ram_bank = (value as u8) & 0xf,
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
                 let actual_address = self.get_ram_address(address);
-                self.backup_file.write16(actual_address, value);
+                self.backup_file.write16((actual_address % self.ram_size), value);
             }
             _ => ()
         }
@@ -114,6 +116,7 @@ impl MBC5 {
             ram_bank: 0,
             ram_enable: false,
             has_ram,
+            ram_size,
             has_rumble,
             backup_file: BackupFile::new(rom_path, ram_size, has_battery)
         }

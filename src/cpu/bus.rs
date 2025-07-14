@@ -188,6 +188,8 @@ impl Bus {
             0xff4d => self.double_speed as u8,
             0xff4f => self.ppu.vram_bank as u8,
             0xff55 => if self.hdma_length == 0 && self.hdma_finished { 0xff } else { ((self.hdma_length - 1) / 0x10) as u8 },
+            0xff69 => self.ppu.bgpd_byte,
+            0xff6b => self.ppu.obpd_byte,
             0xff70 => self.wram_bank as u8,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),

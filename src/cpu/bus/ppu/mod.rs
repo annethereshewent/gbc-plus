@@ -191,7 +191,9 @@ pub struct PPU {
     pub in_hblank: bool,
     pub vram_enabled: bool,
     pub debug_on: bool,
-    pub hdma_init: bool
+    pub hdma_init: bool,
+    pub bgpd_byte: u8,
+    pub obpd_byte: u8
 }
 
 impl PPU {
@@ -241,7 +243,9 @@ impl PPU {
             in_hblank: false,
             vram_enabled: true,
             debug_on: false,
-            hdma_init: false
+            hdma_init: false,
+            bgpd_byte: 0,
+            obpd_byte: 0
         }
     }
 
@@ -263,6 +267,7 @@ impl PPU {
         if self.bgpi.auto_increment {
             self.bgpi.address += 1;
         }
+        self.bgpd_byte = value;
     }
 
     pub fn update_obj_palette_color(&mut self, value: u8) {
@@ -270,6 +275,7 @@ impl PPU {
         if self.obpi.auto_increment {
             self.obpi.address += 1;
         }
+        self.obpd_byte = value;
     }
 
     pub fn set_vram_bank(&mut self, value: u8) {
@@ -335,6 +341,8 @@ impl PPU {
             if diff < FPS_INTERVAL {
                 sleep(Duration::from_millis((FPS_INTERVAL - diff) as u64));
             }
+
+
         }
 
         self.previous_time = SystemTime::now()
