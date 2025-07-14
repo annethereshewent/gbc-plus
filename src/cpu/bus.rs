@@ -155,6 +155,7 @@ impl Bus {
             0xff01..=0xff02 => 0, // serial ports, can safely ignore (hopefully!)
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
+            0xff06 => self.timer.tma,
             0xff07 => self.timer.tac.bits(),
             0xff0f => self.IF.bits(),
             0xff11 => self.apu.channel1.read_length(),
@@ -164,7 +165,7 @@ impl Bus {
             0xff16 => self.apu.channel2.read_length(),
             0xff17 => self.apu.channel2.read_volume(),
             0xff19 => self.apu.channel2.nrx4.read(),
-            0xff1a => self.apu.channel3.dac_enable as u8,
+            0xff1a => (self.apu.channel3.dac_enable as u8) << 7,
             0xff1b => 0xff, // write only
             0xff1c => {
                 if let Some(output) = self.apu.channel3.output {

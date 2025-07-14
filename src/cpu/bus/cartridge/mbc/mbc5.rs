@@ -6,7 +6,7 @@ pub struct MBC5 {
     rom_bank: u16,
     ram_bank: u8,
     ram_enable: bool,
-    has_rumble: bool,
+    _has_rumble: bool,
     ram_size: usize,
     has_ram: bool,
     backup_file: BackupFile
@@ -101,7 +101,7 @@ impl MBC for MBC5 {
             0x4000..=0x5fff => self.ram_bank = (value as u8) & 0xf,
             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
                 let actual_address = self.get_ram_address(address);
-                self.backup_file.write16((actual_address % self.ram_size), value);
+                self.backup_file.write16(actual_address % self.ram_size, value);
             }
             _ => ()
         }
@@ -109,14 +109,14 @@ impl MBC for MBC5 {
 }
 
 impl MBC5 {
-    pub fn new(has_ram: bool, has_battery: bool, has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: &str,) -> Self {
+    pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: &str,) -> Self {
         Self {
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,
             has_ram,
             ram_size,
-            has_rumble,
+            _has_rumble,
             backup_file: BackupFile::new(rom_path, ram_size, has_battery)
         }
     }
