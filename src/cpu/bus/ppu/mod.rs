@@ -263,7 +263,7 @@ impl PPU {
     }
 
     pub fn update_bg_palette_color(&mut self, value: u8) {
-        self.palette_ram[self.bgpi.address as usize] = value;
+        self.palette_ram[self.bgpi.address as usize % self.palette_ram.len()] = value;
         if self.bgpi.auto_increment {
             self.bgpi.address += 1;
         }
