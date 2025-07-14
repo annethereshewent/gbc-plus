@@ -83,11 +83,12 @@ impl Bus {
     }
 
     pub fn tick(&mut self, cycles: usize) {
+        let double_cycles = if self.double_speed { cycles / 2 } else { cycles };
         if self.hdma_hblank && self.ppu.entering_hblank(cycles) {
             self.do_hdma_hblank();
         }
 
-        self.timer.tick(cycles, &mut self.IF);
+        self.timer.tick(double_cycles, &mut self.IF);
 
         self.ppu.tick(cycles, &mut self.IF);
         self.apu.tick(cycles);
@@ -145,14 +146,32 @@ impl Bus {
                 self.wram[1][(address - 0xd000) as usize]
             }
             0xff00 => self.joypad.read(),
+            0xff01..=0xff02 => 0, // serial ports, can safely ignore (hopefully!)
             0xff04 => self.timer.div,
             0xff05 => self.timer.tima,
             0xff0f => self.IF.bits(),
             0xff11 => self.apu.channel1.read_length(),
+            0xff12 => self.apu.channel1.read_volume(),
             0xff15 => 0xff, // i have no idea what this does, but Pokemon Gold seems to use it despite it not being an official register.
             0xff16 => self.apu.channel2.read_length(),
+            0xff17 => self.apu.channel2.read_volume(),
             0xff1a => self.apu.channel3.dac_enable as u8,
+            0xff1c => {
+                if let Some(output) = self.apu.channel3.output {
+                    let value = match output {
+                        0 => 1,
+                        1 => 2,
+                        2 => 3,
+                        _ => unreachable!()
+                    };
+
+                    value << 5
+                } else {
+                    0
+                }
+            }
             0xff1f => 0xff, // see above comment
+            0xff21 => self.apu.channel4.nr42.read(),
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
             0xff26 => self.apu.read_channel_status(),
@@ -231,7 +250,7 @@ impl Bus {
             self.mem_write8(0xfe00 + i, value);
         }
 
-        self.tick(640);
+        self.tick( if self.double_speed { 320 } else { 640 });
     }
 
     pub fn check_header(&mut self) {
@@ -273,7 +292,12 @@ impl Bus {
             0x11 => self.cartridge.set_mbc3(false, false, false),
             0x12 => self.cartridge.set_mbc3(true, false, false),
             0x13 => self.cartridge.set_mbc3(true, true, false),
-
+            0x19 => self.cartridge.set_mbc5(false, false, false),
+            0x1a => self.cartridge.set_mbc5(true, false, false),
+            0x1b => self.cartridge.set_mbc5(true, true, false),
+            0x1c => self.cartridge.set_mbc5(false, false, true),
+            0x1d => self.cartridge.set_mbc5(true, false, true),
+            0x1e => self.cartridge.set_mbc5(true, true, true),
             _ => panic!("unsupported mbc type: 0x{:x}", cartridge_type)
         }
     }
@@ -401,6 +425,7 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
+            0xff4d => self.double_speed = true,
             0xff4f => self.ppu.set_vram_bank(value & 0x1),
             0xff51 => self.vram_dma_source = (self.vram_dma_source & 0xff) | (value as u16) << 8,
             0xff52 => self.vram_dma_source = (self.vram_dma_source & 0xff00) | value as u16,

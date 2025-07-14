@@ -152,6 +152,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
+    pub fn read_volume(&self) -> u8 {
+        self.nrx2.read()
+    }
+
     fn restart_channel(&mut self) {
         self.nrx4.trigger = false;
 

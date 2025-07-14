@@ -1,4 +1,4 @@
-use mbc::{mbc1::MBC1, mbc3::MBC3, MBC};
+use mbc::{mbc1::MBC1, mbc3::MBC3, mbc5::MBC5, MBC};
 
 pub mod backup_file;
 pub mod mbc;
@@ -28,6 +28,10 @@ impl Cartridge {
 
     pub fn set_mbc3(&mut self, ram: bool, battery: bool, timer: bool) {
         self.mbc = Some(Box::new(MBC3::new(ram, battery, timer, self.rom_size, self.ram_size, &self.rom_path)));
+    }
+
+    pub fn set_mbc5(&mut self, ram: bool, battery: bool, rumble: bool) {
+        self.mbc = Some(Box::new(MBC5::new(ram, battery, rumble, self.rom_size, self.ram_size, &self.rom_path)));
     }
 
     pub fn mbc_write8(&mut self, address: u16, value: u8) {

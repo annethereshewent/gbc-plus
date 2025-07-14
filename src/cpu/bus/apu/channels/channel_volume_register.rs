@@ -1,7 +1,7 @@
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum EnvelopeDirection {
-    Decrease,
-    Increase
+    Decrease = 0,
+    Increase = 1
 }
 
 pub struct ChannelVolumeRegister {
@@ -28,5 +28,9 @@ impl ChannelVolumeRegister {
         };
 
         self.initial_volume = (value >> 4) & 0xf;
+    }
+
+    pub fn read(&self) -> u8 {
+        self.sweep_pace | (self.env_dir as u8) << 3 | self.initial_volume << 4
     }
 }
