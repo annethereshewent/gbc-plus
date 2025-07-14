@@ -42,7 +42,9 @@ pub struct Bus {
     hdma_hblank: bool,
     hdma_length: isize,
     curr_dma_source: u16,
-    curr_dma_dest: u16
+    curr_dma_dest: u16,
+    hdma_finished: bool,
+    pub debug_on: bool
 }
 
 impl Bus {
@@ -74,7 +76,9 @@ impl Bus {
             hdma_hblank: false,
             hdma_length: 0,
             curr_dma_source: 0,
-            curr_dma_dest: 0
+            curr_dma_dest: 0,
+            hdma_finished: false,
+            debug_on: false
         }
     }
 
@@ -106,6 +110,7 @@ impl Bus {
         if self.hdma_length == 0 {
             self.hdma_length = 0;
             self.hdma_hblank = false;
+            self.hdma_finished = true;
         }
         self.tick(32);
     }
@@ -120,9 +125,17 @@ impl Bus {
             }
             0xa000..=0xbfff => self.cartridge.mbc_read8(address),
             0x8000..=0x9fff => if self.ppu.cgb_mode {
-                self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize]
+                 if self.ppu.vram_enabled {
+                    self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize]
+                } else {
+                    0xff
+                }
             } else {
-                self.ppu.vram[0][(address - 0x8000) as usize]
+                if self.ppu.vram_enabled {
+                    self.ppu.vram[0][(address - 0x8000) as usize]
+                } else {
+                    0xff
+                }
             },
             0xc000..=0xcfff => self.wram[0][(address - 0xc000) as usize],
             0xd000..=0xdfff => if self.ppu.cgb_mode {
@@ -154,7 +167,7 @@ impl Bus {
             0xff4b => self.ppu.wx,
             0xff4d => self.double_speed as u8,
             0xff4f => self.ppu.vram_bank as u8,
-            0xff55 => ((self.hdma_length - 1) / 0x10) as u8,
+            0xff55 => if self.hdma_length == 0 && self.hdma_finished { 0xff } else { ((self.hdma_length - 1) / 0x10) as u8 },
             0xff70 => self.wram_bank as u8,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
@@ -169,7 +182,11 @@ impl Bus {
             } else {
                 unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }
             }
-            0x8000..=0x9fff => unsafe { *(&self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *const u8 as *const u16) },
+            0x8000..=0x9fff => if self.ppu.cgb_mode {
+                if self.ppu.vram_enabled { unsafe { *(&self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *const u8 as *const u16) } } else { 0xff }
+            } else {
+                if self.ppu.vram_enabled { unsafe { *(&self.ppu.vram[0][(address - 0x8000) as usize] as *const u8 as *const u16) } } else { 0xff }
+            },
             0xa000..=0xbfff => self.cartridge.mbc_read16(address),
             0xc000..=0xcfff => unsafe { *(&self.wram[0][(address - 0xc000) as usize] as *const u8 as *const u16) },
             0xd000..=0xdfff => if self.ppu.cgb_mode {
@@ -184,7 +201,13 @@ impl Bus {
 
     pub fn mem_write16(&mut self, address: u16, value: u16) {
         match address {
-            0x8000..=0x9fff => unsafe { *(&mut self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value },
+            0x8000..=0x9fff => if self.ppu.cgb_mode {
+                if self.ppu.vram_enabled {
+                    unsafe { *(&mut self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value }
+                } else {
+                    unsafe { *(&mut self.ppu.vram[0][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value }
+                }
+            }
             0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
             0xc000..=0xcfff => unsafe { *(&mut self.wram[0][(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
             0xd000..=0xdfff => if self.ppu.cgb_mode {
@@ -250,7 +273,6 @@ impl Bus {
             0x12 => self.cartridge.set_mbc3(true, false, false),
             0x13 => self.cartridge.set_mbc3(true, true, false),
 
-
             _ => panic!("unsupported mbc type: 0x{:x}", cartridge_type)
         }
     }
@@ -269,18 +291,29 @@ impl Bus {
         self.vram_dma_destination &= 0x1fff;
 
         if mode == HdmaMode::General {
-            // do transfer immediately
-            let actual_address = self.vram_dma_destination | 0x8000;
-            for i in 0..length {
-                let value = self.mem_read8(self.vram_dma_source + i as u16);
-                self.mem_write8(actual_address + i as u16, value);
-            }
+            self.do_hdma_general(length);
         } else {
             self.restart_hdma_hblank(length);
         }
     }
 
+    fn do_hdma_general(&mut self, length: u16) {
+        self.hdma_hblank = false;
+        // do transfer immediately
+        let actual_address = self.vram_dma_destination | 0x8000;
+
+        let cycles = (length / 0x10) * 32;
+
+        for i in 0..length {
+            let value = self.mem_read8(self.vram_dma_source + i);
+            self.mem_write8(actual_address + i, value);
+        }
+
+        self.tick(cycles as usize);
+    }
+
     fn restart_hdma_hblank(&mut self, length: u16) {
+        self.hdma_finished = false;
         self.hdma_hblank = true;
         self.hdma_length = length as isize;
 
@@ -291,7 +324,15 @@ impl Bus {
     pub fn mem_write8(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x7fff | 0xa000..=0xbfff => self.cartridge.mbc_write8(address, value),
-            0x8000..=0x9fff => self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] = value,
+            0x8000..=0x9fff => if self.ppu.cgb_mode {
+                if self.ppu.vram_enabled {
+                    self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] = value;
+                }
+            } else {
+                if self.ppu.vram_enabled {
+                    self.ppu.vram[0][(address - 0x8000) as usize] = value;
+                }
+            },
             0xc000..=0xcfff => self.wram[0][(address - 0xc000) as usize] = value,
             0xd000..=0xdfff => if self.ppu.cgb_mode {
                 self.wram[self.wram_bank][(address - 0xd000) as usize] = value

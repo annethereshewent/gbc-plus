@@ -337,6 +337,9 @@ impl Frontend {
                         if let Some(button) = self.keyboard_map.get(&keycode) {
                             cpu.bus.joypad.press_button(*button);
                         } else if keycode == Keycode::G {
+
+                            cpu.bus.ppu.debug_on = !cpu.bus.ppu.debug_on;
+                            cpu.bus.debug_on = !cpu.bus.debug_on;
                             cpu.debug_on = !cpu.debug_on;
                         } else if keycode == Keycode::F2 {
                             cpu.bus.ppu.current_palette = (cpu.bus.ppu.current_palette + 1) % cpu.bus.ppu.palette_colors.len();

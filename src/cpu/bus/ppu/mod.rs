@@ -134,7 +134,7 @@ pub const VOID_DREAM: [Color; 4] = [
 ];
 
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LCDMode {
     HBlank = 0,
     VBlank = 1,
@@ -168,7 +168,7 @@ pub struct PPU {
     pub vram: [Box<[u8]>; 2],
     pub cycles: usize,
     pub bgp: BGPaletteRegister,
-    mode: LCDMode,
+    pub mode: LCDMode,
     pub obp0: ObjPaletteRegister,
     pub obp1: ObjPaletteRegister,
     pub oam: [OAMEntry; 0xa0],
@@ -188,7 +188,9 @@ pub struct PPU {
     pub obj_palette_ram: [u8; 64],
     pub obpi: ObjPaletteIndexRegister,
     pub cgb_mode: bool,
-    pub in_hblank: bool
+    pub in_hblank: bool,
+    pub vram_enabled: bool,
+    pub debug_on: bool
 }
 
 impl PPU {
@@ -235,7 +237,9 @@ impl PPU {
             palette_ram: [0; 64],
             obj_palette_ram: [0; 64],
             cgb_mode: false,
-            in_hblank: false
+            in_hblank: false,
+            vram_enabled: true,
+            debug_on: false
         }
     }
 
@@ -279,13 +283,16 @@ impl PPU {
     }
 
     fn handle_hblank(&mut self, interrupt_register: &mut InterruptRegister) {
+        self.in_hblank = false;
+        self.vram_enabled = true;
         if self.cycles >= MODE0_CYCLES {
-            self.in_hblank = true;
+
             self.cycles -= MODE0_CYCLES;
 
+            self.in_hblank = true;
             self.line_y += 1;
 
-             if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
+            if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {
                 interrupt_register.set(InterruptRegister::LCD, true);
             }
 
@@ -295,6 +302,7 @@ impl PPU {
 
             self.mode = if self.line_y == 144 {
                 interrupt_register.set(InterruptRegister::VBLANK, true);
+                self.in_hblank = false;
                 LCDMode::VBlank
             } else {
                 LCDMode::OAMScan
@@ -905,6 +913,7 @@ impl PPU {
 
     fn handle_vblank(&mut self, interrupt_register: &mut InterruptRegister) {
         self.in_hblank = false;
+        self.vram_enabled = true;
         if self.cycles >= MODE1_CYCLES {
             self.cycles -= MODE1_CYCLES;
 
@@ -938,6 +947,7 @@ impl PPU {
 
     fn handle_oam_scan(&mut self, interrupt_register: &mut InterruptRegister) {
         self.in_hblank = false;
+        self.vram_enabled = true;
         if self.cycles >= MODE2_CYCLES {
             self.cycles -= MODE2_CYCLES;
 
@@ -951,6 +961,7 @@ impl PPU {
 
     fn handle_hdraw(&mut self) {
         self.in_hblank = false;
+        self.vram_enabled = false;
         if self.cycles >= MODE3_CYCLES {
             self.cycles -= MODE3_CYCLES;
 
