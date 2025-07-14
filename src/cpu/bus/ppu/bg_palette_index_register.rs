@@ -15,4 +15,8 @@ impl BgPaletteIndexRegister {
         self.auto_increment = (value >> 7) & 0x1 == 1;
 
     }
+
+    pub fn read(&self) -> u8 {
+        self.address | (self.auto_increment as u8) << 7
+    }
 }
