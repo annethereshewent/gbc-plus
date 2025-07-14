@@ -190,7 +190,8 @@ pub struct PPU {
     pub cgb_mode: bool,
     pub in_hblank: bool,
     pub vram_enabled: bool,
-    pub debug_on: bool
+    pub debug_on: bool,
+    pub hdma_init: bool
 }
 
 impl PPU {
@@ -239,7 +240,8 @@ impl PPU {
             cgb_mode: false,
             in_hblank: false,
             vram_enabled: true,
-            debug_on: false
+            debug_on: false,
+            hdma_init: false
         }
     }
 
@@ -282,14 +284,17 @@ impl PPU {
         }
     }
 
+    pub fn entering_hblank(&self, cycles: usize) -> bool {
+        self.mode == LCDMode::HBlank && self.cycles + cycles >= MODE0_CYCLES && self.hdma_init
+    }
+
     fn handle_hblank(&mut self, interrupt_register: &mut InterruptRegister) {
-        self.in_hblank = false;
         self.vram_enabled = true;
+
         if self.cycles >= MODE0_CYCLES {
 
             self.cycles -= MODE0_CYCLES;
 
-            self.in_hblank = true;
             self.line_y += 1;
 
             if self.stat.contains(LCDStatusRegister::LYC_INT) && self.line_y == self.lyc {

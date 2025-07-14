@@ -83,13 +83,14 @@ impl Bus {
     }
 
     pub fn tick(&mut self, cycles: usize) {
-        self.timer.tick(cycles, &mut self.IF);
-        self.ppu.tick(cycles, &mut self.IF);
-        self.apu.tick(cycles);
-
-        if self.hdma_hblank && self.ppu.in_hblank {
+        if self.hdma_hblank && self.ppu.entering_hblank(cycles) {
             self.do_hdma_hblank();
         }
+
+        self.timer.tick(cycles, &mut self.IF);
+
+        self.ppu.tick(cycles, &mut self.IF);
+        self.apu.tick(cycles);
     }
 
     fn do_hdma_hblank(&mut self) {
@@ -105,7 +106,7 @@ impl Bus {
 
         self.hdma_length -= 0x10;
 
-        self.ppu.in_hblank = false;
+        self.ppu.hdma_init = false;
 
         if self.hdma_length == 0 {
             self.hdma_length = 0;
@@ -315,6 +316,7 @@ impl Bus {
     fn restart_hdma_hblank(&mut self, length: u16) {
         self.hdma_finished = false;
         self.hdma_hblank = true;
+        self.ppu.hdma_init = true;
         self.hdma_length = length as isize;
 
         self.curr_dma_source = self.vram_dma_source;
