@@ -243,10 +243,14 @@ impl Bus {
             0x8000..=0x9fff => if self.ppu.cgb_mode {
                 if self.ppu.vram_enabled {
                     unsafe { *(&mut self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value }
-                } else {
+                }
+            } else {
+                if self.ppu.vram_enabled {
                     unsafe { *(&mut self.ppu.vram[0][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value }
                 }
             }
+
+
             0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
             0xc000..=0xcfff => unsafe { *(&mut self.wram[0][(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
             0xd000..=0xdfff => if self.ppu.cgb_mode {
@@ -350,6 +354,7 @@ impl Bus {
 
         for i in 0..length {
             let value = self.mem_read8(self.vram_dma_source + i);
+
             self.mem_write8(actual_address + i, value);
         }
 

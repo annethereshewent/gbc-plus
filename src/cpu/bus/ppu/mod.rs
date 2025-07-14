@@ -365,6 +365,7 @@ impl PPU {
     }
 
     fn draw_gbc_window(&mut self) {
+        for index in self.prev_window_pixels.iter_mut() { *index = BgAttributes::new(); }
         if self.line_y < self.wy ||
             !self.lcdc.contains(LCDControlRegister::WINDOW_ENABLE) ||
             !self.lcdc.contains(LCDControlRegister::BG_WINDOW_ENABLE_PRIORITY) ||
@@ -391,8 +392,6 @@ impl PPU {
         if x_pos < 0 {
             x_pos = 0;
         }
-
-        for index in self.prev_window_pixels.iter_mut() { *index = BgAttributes::new(); }
 
         for x in ((x_pos as usize)..SCREEN_WIDTH).step_by(8) {
             let x_pos = (x - (self.wx as usize - 7)) & 0xff;
@@ -876,12 +875,6 @@ impl PPU {
                     continue;
                 }
 
-                // let color = if sprite.attributes.dmg_palette == 0 {
-                //     self.obp0.indexes[palette_index as usize]
-                // } else {
-                //     self.obp1.indexes[palette_index as usize]
-                // };
-
                 let base_obj_palette_address = sprite.attributes.gbc_palette * 4 * 2;
 
                 let obj_palette_address = base_obj_palette_address + palette_index * 2;
@@ -900,7 +893,6 @@ impl PPU {
                 let draw_pixel = self.check_priority(&sprite, prev_background, prev_window);
 
                 if draw_pixel {
-
                     // draw the pixel!
                     let pixel = Self::convert_pixel(color);
 
