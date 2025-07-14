@@ -151,6 +151,9 @@ impl Bus {
             } else {
                 self.wram[1][(address - 0xd000) as usize]
             }
+            // echo ram, for some reason zelda oracle of seasons tries to access it.
+            // TODO: properly emulate? probably not worth it haha
+            0xe000..=0xfdff => 0xff,
             0xff00 => self.joypad.read(),
             0xff01..=0xff02 => 0, // serial ports, can safely ignore (hopefully!)
             0xff04 => self.timer.div,
