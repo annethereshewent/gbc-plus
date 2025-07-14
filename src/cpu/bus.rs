@@ -434,7 +434,7 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
-            0xff4d => self.double_speed = true,
+            0xff4d => self.double_speed = value >> 7 == 1,
             0xff4f => self.ppu.set_vram_bank(value & 0x1),
             0xff51 => self.vram_dma_source = (self.vram_dma_source & 0xff) | (value as u16) << 8,
             0xff52 => self.vram_dma_source = (self.vram_dma_source & 0xff00) | value as u16,
