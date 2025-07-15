@@ -158,7 +158,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     fn restart_channel(&mut self) {
         self.nrx4.trigger = false;
-
         self.enabled = true;
 
         self.frequency_timer = (2048 - self.period as isize) * 4;

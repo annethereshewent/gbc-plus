@@ -78,6 +78,7 @@ impl CPU {
     pub fn step(&mut self) {
         self.handle_interrupts();
 
+        let previous_pc = self.pc;
         if self.is_halted {
             self.bus.tick(4);
 
@@ -89,7 +90,7 @@ impl CPU {
         self.pc += 1;
 
         if !self.found.contains(&(self.pc - 1)) && self.debug_on {
-            println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, self.pc - 1, self.disassemble(opcode));
+            println!("[Opcode: 0x{:x}] [Address: 0x{:x}] {}", opcode, previous_pc, self.disassemble(opcode));
             self.found.insert(self.pc - 1);
         }
 

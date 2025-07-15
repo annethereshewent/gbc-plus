@@ -17,6 +17,6 @@ impl Channel4ControlRegister {
     }
 
     pub fn read(&self) -> u8 {
-        (self.length_enable as u8) << 6
+        0x3f | (self.length_enable as u8) << 6 | 1 << 7
     }
 }

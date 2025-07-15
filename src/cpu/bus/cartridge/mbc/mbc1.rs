@@ -94,6 +94,12 @@ impl MBC for MBC1 {
 
                 unsafe { *(&rom[actual_address as usize] as *const u8 as *const u16) }
             }
+             0xa000..=0xbfff => if self.has_ram && self.ram_enable {
+                let actual_address = self.get_ram_address(address);
+                self.backup_file.read16(actual_address)
+            } else {
+                0xff
+            }
             _ => panic!("(mbc_read16): unsupported address given: 0x{:x}", address)
         }
     }

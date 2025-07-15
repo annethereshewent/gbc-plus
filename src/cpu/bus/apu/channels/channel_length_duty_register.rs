@@ -17,6 +17,6 @@ impl ChannelLengthDutyRegister {
     }
 
     pub fn read(&self) -> u8 {
-        self.initial_timer | self.wave_duty << 6
+        0x3f | self.wave_duty << 6
     }
 }

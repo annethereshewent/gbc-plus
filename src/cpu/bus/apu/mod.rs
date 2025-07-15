@@ -109,7 +109,51 @@ impl APU {
     pub fn read_channel_status(&self) -> u8 {
         let audio_on = self.nr52.read();
 
-        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel3.enabled as u8) << 3 | audio_on << 7
+        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel3.enabled as u8) << 3 | 0x7 << 4 | audio_on << 7
+    }
+
+    pub fn write_audio_master(&mut self, value: u8) {
+        let previous_audio_on = self.nr52.audio_on;
+        self.nr52.write(value);
+
+        if previous_audio_on && !self.nr52.audio_on {
+            self.channel1.enabled = false;
+            self.channel2.enabled = false;
+            self.channel3.enabled = false;
+            self.channel4.enabled = false;
+
+            self.reset_registers();
+        }
+    }
+
+    fn reset_registers(&mut self) {
+        self.nr50.write(0);
+        self.nr51 = SoundPanningRegister::from_bits_truncate(0);
+        self.nr52.write(0);
+
+        if let Some(nrx0) = &mut self.channel1.nrx0 {
+            nrx0.write(0);
+        }
+
+        self.channel1.nrx1.write(0);
+        self.channel1.nrx2.write(0);
+        self.channel1.nrx4.write(0);
+        self.channel1.period = 0;
+
+        self.channel2.nrx1.write(0);
+        self.channel2.nrx2.write(0);
+        self.channel2.nrx4.write(0);
+        self.channel2.period = 0;
+
+        self.channel3.dac_enable = false;
+        self.channel3.nr34.write(0);
+        self.channel3.period = 0;
+        self.channel3.length = 0;
+        self.channel3.output = None;
+
+        self.channel4.nr42.write(0);
+        self.channel4.nr43.write(0);
+        self.channel4.nr44.write(0);
     }
 
     // i wanted to dry up all these tick_length and tick_envelope methods, but rust literally will *not* let me.

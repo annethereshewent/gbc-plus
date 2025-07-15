@@ -161,14 +161,17 @@ impl Bus {
             0xff06 => self.timer.tma,
             0xff07 => self.timer.tac.bits(),
             0xff0f => self.IF.bits(),
+            0xff10 => self.apu.channel1.nrx0.as_ref().unwrap().read(),
             0xff11 => self.apu.channel1.read_length(),
             0xff12 => self.apu.channel1.read_volume(),
+            0xff13 =>  0xff, // write only
             0xff14 => self.apu.channel1.nrx4.read(),
             0xff15 => 0xff, // i have no idea what this does, but Pokemon Gold seems to use it despite it not being an official register.
             0xff16 => self.apu.channel2.read_length(),
             0xff17 => self.apu.channel2.read_volume(),
+            0xff18 => 0xff, // write only
             0xff19 => self.apu.channel2.nrx4.read(),
-            0xff1a => (self.apu.channel3.dac_enable as u8) << 7,
+            0xff1a => 0x7f | (self.apu.channel3.dac_enable as u8) << 7,
             0xff1b => 0xff, // write only
             0xff1c => {
                 if let Some(output) = self.apu.channel3.output {
@@ -179,11 +182,14 @@ impl Bus {
                         _ => unreachable!()
                     };
 
-                    value << 5
+                    // value << 5
+
+                    1 << 7 | value << 5 | 0x1f
                 } else {
-                    0
+                    1 << 7 | 0x1f
                 }
             }
+            0xff1d => 0xff, // write only register
             0xff1e => self.apu.channel3.nr34.read(),
             0xff1f => 0xff, // see above comment
             0xff20 => 0xff, // write only register
@@ -193,6 +199,8 @@ impl Bus {
             0xff24 => self.apu.nr50.read(),
             0xff25 => self.apu.nr51.bits(),
             0xff26 => self.apu.read_channel_status(),
+            0xff27..=0xff2f => 0xff,
+            0xff30..=0xff3f => self.apu.channel3.wave_ram[address as usize - 0xff30],
             0xff40 => self.ppu.lcdc.bits(),
             0xff41 => self.ppu.read_stat(),
             0xff42 => self.ppu.scy,
@@ -401,44 +409,53 @@ impl Bus {
             0xff06 => self.timer.tma = value,
             0xff07 => self.timer.update_tac(value),
             0xff0f => self.IF = InterruptRegister::from_bits_retain(value),
-            0xff10 => self.apu.channel1.write_sweep(value),
-            0xff11 => self.apu.channel1.write_length_register(value),
-            0xff12 => self.apu.channel1.write_volume_register(value),
+            0xff10 => if self.apu.nr52.audio_on { self.apu.channel1.write_sweep(value) },
+            0xff11 => if self.apu.nr52.audio_on { self.apu.channel1.write_length_register(value) },
+            0xff12 => if self.apu.nr52.audio_on { self.apu.channel1.write_volume_register(value) },
             0xff13 => {
-                self.apu.channel1.period &= 0x700;
-                self.apu.channel1.period |= value as u16;
+                if self.apu.nr52.audio_on {
+                    self.apu.channel1.period &= 0x700;
+                    self.apu.channel1.period |= value as u16;
+                }
             }
-            0xff14 => self.apu.channel1.write_period_high_control(value),
+            0xff14 => if self.apu.nr52.audio_on { self.apu.channel1.write_period_high_control(value) },
             0xff15 => (),
-            0xff16 => self.apu.channel2.write_length_register(value),
-            0xff17 => self.apu.channel2.write_volume_register(value),
+            0xff16 => if self.apu.nr52.audio_on { self.apu.channel2.write_length_register(value) },
+            0xff17 => if self.apu.nr52.audio_on { self.apu.channel2.write_volume_register(value) },
             0xff18 => {
-                self.apu.channel2.period &= 0x700;
-                self.apu.channel2.period |= value as u16;
+                if self.apu.nr52.audio_on {
+                    self.apu.channel2.period &= 0x700;
+                    self.apu.channel2.period |= value as u16;
+                }
             }
-            0xff19 => self.apu.channel2.write_period_high_control(value),
-            0xff1a => self.apu.channel3.write_dac_enable(value),
-            0xff1b => self.apu.channel3.length = value,
-            0xff1c => self.apu.channel3.output = match (value >> 5) & 0x3 {
-                0 => None,
-                1 => Some(0),
-                2 => Some(1),
-                3 => Some(2),
-                _ => unreachable!()
-            },
+            0xff19 => if self.apu.nr52.audio_on { self.apu.channel2.write_period_high_control(value) },
+            0xff1a => if self.apu.nr52.audio_on { self.apu.channel3.write_dac_enable(value) },
+            0xff1b => if self.apu.nr52.audio_on { self.apu.channel3.length = value },
+            0xff1c => if self.apu.nr52.audio_on {
+                self.apu.channel3.output = match (value >> 5) & 0x3 {
+                    0 => None,
+                    1 => Some(0),
+                    2 => Some(1),
+                    3 => Some(2),
+                    _ => unreachable!()
+                }
+            }
             0xff1d => {
-                self.apu.channel3.period &= 0x700;
-                self.apu.channel3.period |= value as u16;
+                if self.apu.nr52.audio_on {
+                    self.apu.channel3.period &= 0x700;
+                    self.apu.channel3.period |= value as u16;
+                }
             }
-            0xff1e => self.apu.channel3.write_period_high_control(value),
+            0xff1e => if self.apu.nr52.audio_on { self.apu.channel3.write_period_high_control(value) },
             0xff1f => (), // used by pokemon gold but doesn't seem to do or be anything.
-            0xff20 => self.apu.channel4.length = value & 0x3f,
-            0xff21 => self.apu.channel4.nr42.write(value),
-            0xff22 => self.apu.channel4.nr43.write(value),
-            0xff23 => self.apu.channel4.write_control(value),
-            0xff24 => self.apu.nr50.write(value),
-            0xff25 => self.apu.nr51 = SoundPanningRegister::from_bits_retain(value),
-            0xff26 => self.apu.nr52.write(value),
+            0xff20 => if self.apu.nr52.audio_on { self.apu.channel4.length = value & 0x3f },
+            0xff21 => if self.apu.nr52.audio_on { self.apu.channel4.nr42.write(value) },
+            0xff22 => if self.apu.nr52.audio_on { self.apu.channel4.nr43.write(value) },
+            0xff23 => if self.apu.nr52.audio_on { self.apu.channel4.write_control(value) },
+            0xff24 => if self.apu.nr52.audio_on { self.apu.nr50.write(value) },
+            0xff25 => if self.apu.nr52.audio_on { self.apu.nr51 = SoundPanningRegister::from_bits_truncate(value) },
+            0xff26 => self.apu.write_audio_master(value),
+            0xff27..=0xff2f => (),
             0xff30..=0xff3f => self.apu.channel3.wave_ram[(address - 0xff30) as usize] = value,
             0xff40 => self.ppu.update_lcdc(value),
             0xff41 => self.ppu.update_stat(value, &mut self.IF),
@@ -452,7 +469,9 @@ impl Bus {
             0xff49 => self.ppu.obp1.write(value),
             0xff4a => self.ppu.wy = value,
             0xff4b => self.ppu.wx = value,
-            0xff4d => if value & 0x1 == 1 { self.double_speed = !self.double_speed },
+            0xff4d => if value & 0x1 == 1 {
+                self.double_speed = !self.double_speed
+            }
             0xff4f => self.ppu.set_vram_bank(value & 0x1),
             0xff51 => self.vram_dma_source = (self.vram_dma_source & 0xff) | (value as u16) << 8,
             0xff52 => self.vram_dma_source = (self.vram_dma_source & 0xff00) | value as u16,
