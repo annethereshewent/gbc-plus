@@ -95,7 +95,7 @@ impl Bus {
             0
         };
 
-        self.timer.tick(actual_cycles + hdma_cycles, &mut self.IF);
+        self.timer.tick(actual_cycles * 2 + hdma_cycles, &mut self.IF);
         self.ppu.tick(actual_cycles + hdma_cycles, &mut self.IF);
         self.apu.tick(actual_cycles + hdma_cycles);
     }
