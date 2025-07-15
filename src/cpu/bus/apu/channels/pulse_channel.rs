@@ -66,6 +66,8 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     pub fn write_length_register(&mut self, value: u8) {
         self.nrx1.write(value);
+
+        self.current_timer = self.nrx1.initial_timer as usize;
     }
 
     pub fn write_sweep(&mut self, value: u8) {
@@ -112,7 +114,6 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
             if self.current_timer >= 64 {
                 self.enabled = false;
-                self.current_timer = self.nrx1.initial_timer as usize;
             }
         }
     }
@@ -158,13 +159,17 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     fn restart_channel(&mut self) {
         self.nrx4.trigger = false;
+
         self.enabled = true;
 
         self.frequency_timer = (2048 - self.period as isize) * 4;
-        self.current_timer = self.nrx1.initial_timer as usize;
         self.envelope_timer = self.nrx2.sweep_pace as usize;
 
         self.current_volume = self.nrx2.initial_volume as usize;
+
+        if self.current_timer >= 64 {
+            self.current_timer = 0;
+        }
 
         if let Some(nrx0) = &mut self.nrx0 {
             self.sweep_timer = if nrx0.pace == 0 { 8 } else { nrx0.pace as usize };

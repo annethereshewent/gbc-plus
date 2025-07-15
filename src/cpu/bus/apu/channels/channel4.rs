@@ -41,6 +41,12 @@ impl Channel4 {
         }
     }
 
+    pub fn write_length(&mut self, value: u8) {
+        self.length = value & 0x3f;
+
+        self.current_timer = self.length as usize;
+    }
+
     pub fn write_control(&mut self, value: u8) {
         self.nr44.write(value);
     }
@@ -50,7 +56,11 @@ impl Channel4 {
 
         self.enabled = true;
         self.frequency_timer = self.get_frequency_timer();
-        self.current_timer = self.length as usize;
+
+        if self.current_timer >= 64 {
+            self.current_timer = 0;
+        }
+
         self.envelope_timer = self.nr42.sweep_pace as usize;
         self.current_volume = self.nr42.initial_volume as usize;
         self.lfsr = 1;
@@ -62,8 +72,6 @@ impl Channel4 {
                 self.current_timer += 1;
 
                 if self.current_timer >= 64 {
-                    self.current_timer = self.length as usize;
-
                     self.enabled = false;
                 }
             }

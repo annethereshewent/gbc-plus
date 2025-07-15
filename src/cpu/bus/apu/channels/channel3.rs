@@ -31,6 +31,12 @@ impl Channel3 {
         }
     }
 
+    pub fn write_length(&mut self, value: u8) {
+        self.length = value;
+
+        self.current_timer = self.length as usize;
+    }
+
     pub fn write_period_high_control(&mut self, value: u8) {
         self.period &= 0xff;
         self.period |= ((value as u16) & 0x7) << 8;
@@ -66,7 +72,9 @@ impl Channel3 {
 
         self.enabled = true;
 
-        self.current_timer = self.length as usize;
+        if self.current_timer >= 256 {
+            self.current_timer = 0;
+        }
 
         // could also be calculated as CLOCK_SPEED / sample_frequency where sample_frequency = 2097152 / (2048 - period)
         self.frequency_timer = (2048 - self.period as isize) * 2;
@@ -76,21 +84,17 @@ impl Channel3 {
 
     pub fn tick_length(&mut self) {
         if self.nr34.length_enable {
-            if self.current_timer > 0 {
-                self.current_timer += 1;
+            self.current_timer += 1;
 
-                if self.current_timer >= 256 {
-                    self.current_timer = self.length as usize;
+            if self.current_timer >= 256 {
+                self.enabled = false;
 
-                    self.enabled = false;
-
-                }
             }
         }
     }
 
     pub fn tick(&mut self, cycles: usize) {
-        if self.nr34.trigger {
+        if self.nr34.trigger && self.dac_enable {
             self.restart_channel();
         }
 

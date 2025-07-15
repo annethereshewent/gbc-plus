@@ -430,7 +430,7 @@ impl Bus {
             }
             0xff19 => if self.apu.nr52.audio_on { self.apu.channel2.write_period_high_control(value) },
             0xff1a => if self.apu.nr52.audio_on { self.apu.channel3.write_dac_enable(value) },
-            0xff1b => if self.apu.nr52.audio_on { self.apu.channel3.length = value },
+            0xff1b => if self.apu.nr52.audio_on { self.apu.channel3.write_length(value) },
             0xff1c => if self.apu.nr52.audio_on {
                 self.apu.channel3.output = match (value >> 5) & 0x3 {
                     0 => None,
@@ -448,7 +448,7 @@ impl Bus {
             }
             0xff1e => if self.apu.nr52.audio_on { self.apu.channel3.write_period_high_control(value) },
             0xff1f => (), // used by pokemon gold but doesn't seem to do or be anything.
-            0xff20 => if self.apu.nr52.audio_on { self.apu.channel4.length = value & 0x3f },
+            0xff20 => if self.apu.nr52.audio_on { self.apu.channel4.write_length(value) },
             0xff21 => if self.apu.nr52.audio_on { self.apu.channel4.nr42.write(value) },
             0xff22 => if self.apu.nr52.audio_on { self.apu.channel4.nr43.write(value) },
             0xff23 => if self.apu.nr52.audio_on { self.apu.channel4.write_control(value) },
