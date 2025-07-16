@@ -48,7 +48,7 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: &str) -> CPU {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>) -> CPU {
         CPU {
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
@@ -97,6 +97,12 @@ impl CPU {
         let cycles = self.decode_instruction(opcode);
 
         self.bus.tick(cycles);
+    }
+
+    pub fn step_frame(&mut self) {
+        while !self.bus.ppu.frame_finished {
+            self.step();
+        }
     }
 
     pub fn load_rom(&mut self, bytes: &[u8]) {

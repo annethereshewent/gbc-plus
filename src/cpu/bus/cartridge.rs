@@ -8,30 +8,30 @@ pub struct Cartridge {
     pub rom_size: usize,
     pub ram_size: usize,
     pub mbc: Option<Box<dyn MBC>>,
-    pub rom_path: String
+    pub rom_path: Option<String>
 }
 
 impl Cartridge {
-    pub fn new(rom_path: &str) -> Self {
+    pub fn new(rom_path: Option<String>) -> Self {
         Self {
             rom: Vec::new(),
             rom_size: 0,
             ram_size: 0,
             mbc: None,
-            rom_path: rom_path.to_string(),
+            rom_path
         }
     }
 
     pub fn set_mbc1(&mut self, ram: bool, battery: bool) {
-        self.mbc = Some(Box::new(MBC1::new(ram, battery, self.rom_size, self.ram_size, &self.rom_path)));
+        self.mbc = Some(Box::new(MBC1::new(ram, battery, self.rom_size, self.ram_size, self.rom_path.clone())));
     }
 
     pub fn set_mbc3(&mut self, ram: bool, battery: bool, timer: bool) {
-        self.mbc = Some(Box::new(MBC3::new(ram, battery, timer, self.rom_size, self.ram_size, &self.rom_path)));
+        self.mbc = Some(Box::new(MBC3::new(ram, battery, timer, self.rom_size, self.ram_size, self.rom_path.clone())));
     }
 
     pub fn set_mbc5(&mut self, ram: bool, battery: bool, rumble: bool) {
-        self.mbc = Some(Box::new(MBC5::new(ram, battery, rumble, self.rom_size, self.ram_size, &self.rom_path)));
+        self.mbc = Some(Box::new(MBC5::new(ram, battery, rumble, self.rom_size, self.ram_size, self.rom_path.clone())));
     }
 
     pub fn mbc_write8(&mut self, address: u16, value: u8) {

@@ -62,7 +62,7 @@ pub struct MBC3 {
     has_timer: bool,
     latch_value: u8,
     clock_latched: bool,
-    rtc_file: File,
+    rtc_file: Option<File>,
     carry_bit: bool,
     previous_wrapped_days: u16,
     halted: bool,
@@ -81,12 +81,15 @@ impl MBC for MBC3 {
             self.carry_bit
         );
 
-        match serde_json::to_string::<RtcFile>(&rtc_json) {
-            Ok(result) => {
-                self.rtc_file.seek(SeekFrom::Start(0)).unwrap();
-                self.rtc_file.write_all(result.as_bytes()).unwrap();
+
+        if let Some(file) = &mut self.rtc_file {
+            match serde_json::to_string::<RtcFile>(&rtc_json) {
+                Ok(result) => {
+                    file.seek(SeekFrom::Start(0)).unwrap();
+                    file.write_all(result.as_bytes()).unwrap();
+                }
+                Err(_) => ()
             }
-            Err(_) => ()
         }
     }
 
@@ -260,35 +263,42 @@ impl MBC3 {
         (address as usize) & 0x3fff | (self.rom_bank as usize) << 14
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, rom_path: &str) -> Self {
-        let mut split_str: Vec<&str> = rom_path.split('.').collect();
+    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
+        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(rom_path) = &rom_path {
+            let mut split_str: Vec<&str> = rom_path.split('.').collect();
 
-        split_str.pop();
+            split_str.pop();
 
-        split_str.push("rtc");
+            split_str.push("rtc");
 
-        let rtc_path = split_str.join(".");
+            let rtc_path = split_str.join(".");
 
-        let mut rtc_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(rtc_path)
-            .unwrap();
+            let mut rtc_file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(rtc_path)
+                .unwrap();
 
-        let mut str = "".to_string();
+            let mut str = "".to_string();
 
-        rtc_file.read_to_string( &mut str).unwrap();
-        rtc_file.seek(SeekFrom::Start(0)).unwrap();
+            rtc_file.read_to_string( &mut str).unwrap();
+            rtc_file.seek(SeekFrom::Start(0)).unwrap();
 
-        let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
-            Ok(result) => {
-                let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
-                let halted_elapsed = TimeDelta::new(0, 0).unwrap();
+            let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
+                Ok(result) => {
+                    let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                    let halted_elapsed = TimeDelta::new(0, 0).unwrap();
 
-                (start, result.carry_bit, result.halted, halted_elapsed)
-            }
-            Err(_) => (Local::now(), false, false, Duration::seconds(0))
+                    (start, result.carry_bit, result.halted, halted_elapsed)
+                }
+                Err(_) => (Local::now(), false, false, Duration::seconds(0))
+            };
+
+            (start, carry_bit, halted, halted_elapsed, Some(rtc_file))
+        } else {
+            // TODO: parse some json sent by web emulator
+            (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
         };
 
         Self {
@@ -296,7 +306,7 @@ impl MBC3 {
             ram_bank: 0,
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery && has_ram),
+            backup_file: BackupFile::new(rom_path.clone(), ram_size, has_battery && has_ram),
             _rom_size: rom_size,
             has_ram,
             has_timer,

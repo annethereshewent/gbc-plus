@@ -1,3 +1,4 @@
 /target
 /desktop/target
 *.log
+web/target

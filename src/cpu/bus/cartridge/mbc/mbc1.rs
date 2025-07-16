@@ -106,7 +106,7 @@ impl MBC for MBC1 {
 }
 
 impl MBC1 {
-    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, rom_path: &str) -> Self {
+    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
         Self {
             _ram_size: ram_size,
             rom_size: rom_size,

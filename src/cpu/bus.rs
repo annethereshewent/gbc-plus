@@ -48,7 +48,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: &str) -> Self {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
             wram: [

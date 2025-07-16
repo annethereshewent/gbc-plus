@@ -8,34 +8,39 @@ pub struct BackupFile {
 }
 
 impl BackupFile {
-    pub fn new(rom_path: &str, ram_size: usize, has_backup: bool) -> Self {
-        let mut split_vec: Vec<&str> = rom_path.split('.').collect();
+    pub fn new(rom_path: Option<String>, ram_size: usize, has_backup: bool) -> Self {
+         let mut ram = vec![0; ram_size];
+        let file = if let Some(rom_path) = rom_path {
+            let mut split_vec: Vec<&str> = rom_path.split('.').collect();
 
-        // remove the extension
-        split_vec.pop();
+            // remove the extension
+            split_vec.pop();
 
-        let filename = format!("{}.sav", split_vec.join("."));
+            let filename = format!("{}.sav", split_vec.join("."));
 
-        let mut ram = vec![0; ram_size];
+            let file = if has_backup {
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .unwrap();
 
-        let file = if has_backup {
-            let mut file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(filename)
-                .unwrap();
+                let file_length = file.metadata().unwrap().len();
 
-            let file_length = file.metadata().unwrap().len();
+                if file_length == ram_size as u64 {
+                    file.read_exact(&mut ram).unwrap();
+                    file.seek(SeekFrom::Start(0)).unwrap();
+                } else {
+                    file.set_len(ram_size as u64).unwrap();
+                }
 
-            if file_length == ram_size as u64 {
-                file.read_exact(&mut ram).unwrap();
-                file.seek(SeekFrom::Start(0)).unwrap();
+                Some(file)
             } else {
-                file.set_len(ram_size as u64).unwrap();
-            }
+                None
+            };
 
-             Some(file)
+            file
         } else {
             None
         };

@@ -1,0 +1,15 @@
+[package]
+name = "gb-plus-web"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path="src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies.gbc-plus]
+path = "../"
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+wasm-bindgen = "0.2.100"
