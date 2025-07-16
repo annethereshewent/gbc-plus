@@ -12,7 +12,7 @@ export class GBC {
   private canvas: HTMLCanvasElement = document.getElementById('game-canvas')! as HTMLCanvasElement
   private context = this.canvas.getContext("2d")
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
-  private audio: AudioInterface = new AudioInterface()
+  private audio: AudioInterface|null = null
   private previousTime = 0
 
   async onGameChange(file: File) {
@@ -48,13 +48,13 @@ export class GBC {
       this.emulator.load_rom(byteArr)
 
 
+      this.audio = new AudioInterface()
+
       this.video.setEmulator(this.emulator)
       this.video.setMemory(this.wasm)
 
       this.audio.setEmulator(this.emulator)
       this.audio.setMemory(this.wasm)
-
-      this.audio.playSamples()
 
       requestAnimationFrame((time) => this.runFrame(time))
     }
@@ -63,6 +63,7 @@ export class GBC {
   runFrame(time: number) {
     const diff = time - this.previousTime
 
+    this.audio!.pushSamples()
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
       this.emulator!.step_frame()
       this.video.updateCanvas()

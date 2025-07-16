@@ -7,7 +7,23 @@ export class AudioInterface {
   private wasm: InitOutput|null = null
   private emulator: WebEmulator|null = null
   private audioContext = new AudioContext({ sampleRate: SAMPLE_RATE })
-  private scriptProcessor: ScriptProcessorNode = this.audioContext.createScriptProcessor(BUFFER_SIZE, 0, 2)
+  private workletNode: AudioWorkletNode|null = null
+
+  constructor() {
+    this.initAudio()
+  }
+
+  async initAudio() {
+    await this.audioContext.audioWorklet.addModule("audio_processing_node.js")
+
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
+      numberOfOutputs: 1,
+      outputChannelCount: [2]
+    })
+    this.workletNode.connect(this.audioContext.destination)
+
+    await this.audioContext.resume()
+  }
 
   setMemory(wasm: InitOutput|null) {
     this.wasm = wasm
@@ -17,52 +33,12 @@ export class AudioInterface {
     this.emulator = emulator
   }
 
-  playSamples() {
-    this.scriptProcessor.onaudioprocess = (e) => {
-      const leftData = e.outputBuffer.getChannelData(0)
-      const rightData = e.outputBuffer.getChannelData(1)
+  pushSamples() {
+    const ptr = this.emulator!.read_ringbuffer()
+    const length = this.emulator!.get_buffer_len()
+    const f32arr = new Float32Array(this.wasm!.memory.buffer, ptr, length)
+    const samples = Array.from(f32arr)
 
-      let isLeft = false
-
-      let left = 0
-      let right = 0
-
-      let sample = this.emulator!.pop_sample()
-      while (sample != null) {
-        if (isLeft) {
-          if (left < leftData.length) {
-            leftData[left] = sample
-            left++
-          }
-        } else if (right < rightData.length) {
-          rightData[right] = sample
-          right++
-        } else {
-          break
-        }
-
-        sample = this.emulator!.pop_sample()
-        isLeft = !isLeft
-      }
-    }
-
-    this.scriptProcessor.connect(this.audioContext.destination)
-    this.audioContext.resume()
+    this.workletNode?.port.postMessage({ type: "samples", samples: samples })
   }
-
-  // pushSamples() {
-  //   const length = this.emulator!.get_buffer_len()
-  //   console.log(`length = ${length}`)
-  //   const float32Samples = new Float32Array(this.wasm!.memory.buffer, this.emulator!.read_ringbuffer(), length)
-
-  //   console.log(`float32Samples.length = ${float32Samples.length}`)
-
-  //   const arr = Array.from(float32Samples)
-
-  //   console.log(`arr.length = ${arr.length}`)
-
-  //   this.samples = this.samples.concat(arr)
-
-  //   console.log(`this.samples.length = ${this.samples.length}`)
-  // }
 }
