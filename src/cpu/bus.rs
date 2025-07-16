@@ -49,7 +49,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, rom_path: Option<String>, is_desktop: bool) -> Self {
+    pub fn new(producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>, rom_path: Option<String>, is_desktop: bool) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
             wram: [

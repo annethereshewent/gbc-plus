@@ -3,6 +3,7 @@ import init, { WebEmulator, InitOutput } from "../../pkg/gb_plus_web"
 import wasmData from '../../pkg/gb_plus_web_bg.wasm'
 import { VideoInterface } from './output/video_interface'
 import { AudioInterface } from './output/audio_interface'
+import { Joypad } from './input/joypad'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -14,6 +15,7 @@ export class GBC {
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
   private audio: AudioInterface|null = null
   private previousTime = 0
+  private joypad: Joypad = new Joypad()
 
   async onGameChange(file: File) {
     const fileName = file.name
@@ -56,6 +58,8 @@ export class GBC {
       this.audio.setEmulator(this.emulator)
       this.audio.setMemory(this.wasm)
 
+      this.joypad.setEmulator(this.emulator)
+
       requestAnimationFrame((time) => this.runFrame(time))
     }
   }
@@ -64,9 +68,12 @@ export class GBC {
     const diff = time - this.previousTime
 
     this.audio!.pushSamples()
+
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
       this.emulator!.step_frame()
       this.video.updateCanvas()
+
+      this.joypad.handleInput()
 
       this.previousTime = time - (diff % FPS_INTERVAL)
     }

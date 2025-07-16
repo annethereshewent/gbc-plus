@@ -25,16 +25,34 @@ pub struct WebEmulator {
     sample_buffer: Vec<f32>
 }
 
+const BUTTON_CROSS: usize = 0;
+const BUTTON_SQUARE: usize = 2;
+const SELECT: usize = 8;
+const START: usize = 9;
+const UP: usize = 12;
+const DOWN: usize = 13;
+const LEFT: usize = 14;
+const RIGHT: usize = 15;
+
 #[wasm_bindgen]
 impl WebEmulator {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let joypad_map = HashMap::<usize, JoypadButtons>::new();
+        let joypad_map = HashMap::<usize, JoypadButtons>::from([
+            (BUTTON_CROSS, JoypadButtons::A),
+            (BUTTON_SQUARE, JoypadButtons::B),
+            (SELECT, JoypadButtons::Select),
+            (START, JoypadButtons::Start),
+            (UP, JoypadButtons::Up),
+            (DOWN, JoypadButtons::Down),
+            (LEFT, JoypadButtons::Left),
+            (RIGHT, JoypadButtons::Right)
+        ]);
 
         Self {
-            cpu: CPU::new(None, false),
+            cpu: CPU::new(None, None, false),
             joypad_map,
             sample_buffer: Vec::new()
         }
@@ -57,39 +75,6 @@ impl WebEmulator {
     pub fn get_screen_length(&self) -> usize {
         self.cpu.bus.ppu.picture.data.len()
     }
-
-    // pub fn modify_samples(&self, left: &mut [f32], right: &mut [f32]) {
-    //     let mut samples = self.audio_buffer.lock().unwrap();
-    //     let mut left_sample = 0.0;
-    //     let mut right_sample = 0.0;
-    //     if samples.len() > 1 {
-    //         left_sample = samples[samples.len() - 2] * 0.05;
-    //         right_sample = samples[samples.len() - 1] * 0.05;
-    //     }
-
-
-    //     console_log!("samples len = {}", samples.len());
-
-    //     let mut is_left_sample = false;
-
-    //     let mut left_index = 0;
-    //     let mut right_index = 0;
-
-    //     while let Some(sample) = samples.pop_back() {
-    //         if is_left_sample {
-    //             if left_index < left.len()  {
-    //                 left[left_index] = sample * 0.075;
-    //                 left_index += 1;
-    //             }
-    //         } else if right_index < right.len() {
-    //             right[right_index] = sample * 0.075;
-    //             right_index += 1;
-    //         } else {
-    //             break;
-    //         }
-    //         is_left_sample = !is_left_sample;
-    //     }
-    // }
 
     pub fn read_ringbuffer(&mut self) -> *mut f32 {
         self.sample_buffer = Vec::new();
@@ -115,10 +100,11 @@ impl WebEmulator {
     }
 
     pub fn update_input(&mut self, button: usize, pressed: bool) {
-        // if pressed {
-        //     self.cpu.bus.joypad.press_button(button);
-        // } else {
-        //     self.cpu.bus.joypad.release_button(button);
-        // }
+        console_log!("hello!");
+        if pressed {
+            self.cpu.bus.joypad.press_button(*self.joypad_map.get(&button).unwrap());
+        } else {
+            self.cpu.bus.joypad.release_button(*self.joypad_map.get(&button).unwrap());
+        }
     }
 }

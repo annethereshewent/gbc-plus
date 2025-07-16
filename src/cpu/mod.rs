@@ -49,7 +49,7 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, rom_path: Option<String>, is_desktop: bool) -> CPU {
+    pub fn new(producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>, rom_path: Option<String>, is_desktop: bool) -> CPU {
         CPU {
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,

@@ -30,14 +30,14 @@ pub struct APU {
     pub channel3: Channel3,
     pub channel4: Channel4,
     cycles: usize,
-    pub producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+    pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     pub ring_buffer: Option<HeapRb<f32>>,
     sequencer_cycles: usize,
     sequencer_step: usize
 }
 
 impl APU {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, is_desktop: bool) -> Self {
+    pub fn new(producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>, is_desktop: bool) -> Self {
         Self {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
@@ -69,19 +69,13 @@ impl APU {
             ring_buffer.push_overwrite(left_sample);
             ring_buffer.push_overwrite(right_sample);
         } else {
-            // let audio_buffer = &mut self.audio_buffer.lock().unwrap();
-            // if audio_buffer.len() < NUM_SAMPLES {
-            //     audio_buffer.push_back(left_sample);
-            // }
-            // if audio_buffer.len() < NUM_SAMPLES {
-            //     audio_buffer.push_back(right_sample);
-            // }
-
-            if !self.producer.is_full() {
-                self.producer.try_push(left_sample).unwrap_or_default();
-            }
-            if !self.producer.is_full() {
-                self.producer.try_push(right_sample).unwrap_or_default();
+            if let Some(producer) = &mut self.producer {
+                if !producer.is_full() {
+                    producer.try_push(left_sample).unwrap_or_default();
+                }
+                if !producer.is_full() {
+                    producer.try_push(right_sample).unwrap_or_default();
+                }
             }
         }
     }
