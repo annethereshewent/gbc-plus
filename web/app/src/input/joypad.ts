@@ -27,10 +27,10 @@ export class Joypad {
           this.keyMap.set(UP, true)
           break
         case "a":
-          this.keyMap.set(DOWN, true)
+          this.keyMap.set(LEFT, true)
           break
         case "s":
-          this.keyMap.set(LEFT, true)
+          this.keyMap.set(DOWN, true)
           break
         case "d":
           this.keyMap.set(RIGHT, true)
@@ -58,10 +58,10 @@ export class Joypad {
           this.keyMap.set(UP, false)
           break
         case "a":
-          this.keyMap.set(DOWN, false)
+          this.keyMap.set(LEFT, false)
           break
         case "s":
-          this.keyMap.set(LEFT, false)
+          this.keyMap.set(DOWN, false)
           break
         case "d":
           this.keyMap.set(RIGHT, false)
