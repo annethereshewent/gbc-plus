@@ -159,7 +159,7 @@ impl Frontend {
         let audio_subsystem = sdl_context.audio().unwrap();
 
         let spec = AudioSpecDesired {
-            freq: Some(44100),
+            freq: Some(48000),
             channels: Some(2),
             samples: Some(4096)
         };

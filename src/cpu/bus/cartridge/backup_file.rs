@@ -57,10 +57,10 @@ impl BackupFile {
         self.ram[address] = value;
         self.is_dirty = true;
 
-        self.last_updated = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("an error occurred")
-            .as_millis();
+        // self.last_updated = SystemTime::now()
+        //     .duration_since(UNIX_EPOCH)
+        //     .expect("an error occurred")
+        //     .as_millis();
     }
 
     pub fn write16(&mut self, address: usize, value: u16) {
@@ -68,6 +68,11 @@ impl BackupFile {
         if self.file.is_some() {
             self.is_dirty = true;
         }
+
+        // self.last_updated = SystemTime::now()
+        //     .duration_since(UNIX_EPOCH)
+        //     .expect("an error occurred")
+        //     .as_millis();
     }
 
     pub fn read8(&self, address: usize) -> u8 {

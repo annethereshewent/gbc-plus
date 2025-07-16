@@ -26,7 +26,8 @@ export class GBC {
     if (extension.toLowerCase() == 'zip') {
       const zipFile = await JSZip.loadAsync(file)
 
-      data = await zipFile?.file(fileName)?.async('arraybuffer')
+      const zipFileName = Object.keys(zipFile.files)[0]
+      data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
       data = await this.readFile(file) as ArrayBuffer
     }
@@ -53,7 +54,6 @@ export class GBC {
       this.audio.setEmulator(this.emulator)
       this.audio.setMemory(this.wasm)
 
-      console.log('playing samples')
       this.audio.playSamples()
 
       requestAnimationFrame((time) => this.runFrame(time))

@@ -1,7 +1,7 @@
 import { InitOutput, WebEmulator } from "../../../pkg/gb_plus_web";
 
 const SAMPLE_RATE = 44100
-const BUFFER_SIZE = 4096
+const BUFFER_SIZE = 8192
 
 export class AudioInterface {
   private wasm: InitOutput|null = null
@@ -25,9 +25,8 @@ export class AudioInterface {
       this.emulator!.modify_samples(leftData, rightData)
     }
 
-
     this.scriptProcessor.connect(this.audioContext.destination)
-    await this.audioContext.resume()
+    this.audioContext.resume()
   }
 
 }

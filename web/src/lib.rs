@@ -63,9 +63,12 @@ impl WebEmulator {
         let mut left_sample = 0.0;
         let mut right_sample = 0.0;
         if samples.len() > 1 {
-            left_sample = samples[samples.len() - 2];
-            right_sample = samples[samples.len() - 1];
+            left_sample = samples[samples.len() - 2] * 0.05;
+            right_sample = samples[samples.len() - 1] * 0.05;
         }
+
+
+        console_log!("samples len = {}", samples.len());
 
         let mut is_left_sample = false;
 
@@ -74,26 +77,16 @@ impl WebEmulator {
 
         while let Some(sample) = samples.pop_back() {
             if is_left_sample {
-                left[left_index] = sample;
-                left_index += 1;
-            }  else {
-                right[right_index] = sample;
+                if left_index < left.len()  {
+                    left[left_index] = sample * 0.075;
+                    left_index += 1;
+                }
+            } else if right_index < right.len() {
+                right[right_index] = sample * 0.075;
                 right_index += 1;
-            }
-            is_left_sample = !is_left_sample;
-        }
-
-        console_log!("this shit still sucks");
-
-        while left_index < left.len() || right_index < right.len() {
-            if is_left_sample {
-                left[left_index] = left_sample;
-                left_index += 1;
             } else {
-                right[right_index] = right_sample;
-                right_index += 1;
+                break;
             }
-
             is_left_sample = !is_left_sample;
         }
     }
