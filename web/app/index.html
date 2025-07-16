@@ -4,14 +4,14 @@
 <body>
   <nav class="navbar is-link">
     <div class="navbar-brand">
-      <a class="navbar-item" href="https://www.github.com/annethereshewent"><i class="fa-brands logo fa-github"></i>NDS+</a>
+      <a class="navbar-item" href="https://www.github.com/annethereshewent"><i class="fa-brands logo fa-github"></i>GBC+</a>
     </div>
 
     <div id="navbar-main" class="navbar-menu">
       <div class="navbar-start">
         <div class="navbar-item">
           <div class="buttons">
-            <button id="game-button" class="button is-primary is-small">
+            <button id="game-button" class="button is-primary">
               <i class="fa-solid fa-upload"></i>
               Load game
             </button>
@@ -19,11 +19,11 @@
         </div>
         <div class="navbar-item">
           <div class="buttons">
-            <button id="cloud-button" class="button is-info is-small">
+            <button id="cloud-button" class="button is-info">
               <i class="fa-solid fa-cloud"></i>
               Google sign In
             </button>
-            <button id="cloud-logged-in" class="button is-danger is-small">
+            <button id="cloud-logged-in" class="button is-danger">
               <i class="fa-solid fa-cloud"></i>
               Log out of Google
             </span>
@@ -46,11 +46,11 @@
           </div>
         </div>
         <div class="navbar-item">
-            <button class="button is-info is-small" onclick="displayHelpModal()">
+            <button class="button is-info" onclick="displayHelpModal()">
               <i class="fa-solid fa-circle-info"></i>
               Help
             </button>
-            <button class="button is-danger is-small" onclick="enterFullscreen()">
+            <button class="button is-danger" onclick="enterFullscreen()">
               <i class="fa-solid fa-expand"></i>
               Full screen
             </button>
@@ -64,10 +64,7 @@
   </div>
   <div style="clear: right"></div>
   <div id="emulator">
-    <input type="file" id="bios7-input" class="file-input" accept=".bin">
-    <input type="file" id="bios9-input" class="file-input" accept=".bin">
-    <input type="file" id="firmware-input" class="file-input" accept=".bin">
-    <input type="file" id="game-input" class="file-input" accept=".nds">
+    <input type="file" id="game-input" class="file-input" accept=".gbc,.gb">
     <input type="file" id="save-input" class="file-input" accept=".sav">
     <p id="fps-counter"></p>
     <div>
@@ -157,7 +154,7 @@
             <button id="states-modal-close" class="modal-close" aria-label="close">Close</button>
             <div id="states-list"></div>
             <div class="state-buttons">
-              <button id="create-save-state" class="button is-success is-small">Create new save state</button>
+              <button id="create-save-state" class="button is-success">Create new save state</button>
             </div>
           </div>
         </div>
@@ -174,7 +171,9 @@
       document.documentElement.requestFullscreen()
     }
     function displayHelpModal() {
-      document.getElementById("help-modal").className = "modal show"
+      const helpModal = document.getElementById("help-modal")
+      helpModal.className = "modal show"
+      helpModal.style.display = "block"
     }
 
     function hideHelpModal() {
