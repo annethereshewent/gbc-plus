@@ -9,3 +9,18 @@
 .show {
   display: block;
 }
+.canvas-wrapper {
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  #game-canvas {
+    width: 640px;
+    height: 576px;
+    margin: 150px auto;
+  }
+}
+
+
+#game-input, #save-input {
+  display: none;
+}

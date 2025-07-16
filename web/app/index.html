@@ -67,14 +67,11 @@
     <input type="file" id="game-input" class="file-input" accept=".gbc,.gb">
     <input type="file" id="save-input" class="file-input" accept=".sav">
     <p id="fps-counter"></p>
-    <div>
-      <canvas width="256" height="192" id="top-canvas" />
+    <div class="canvas-wrapper">
+      <canvas width="160" height="144" id="game-canvas" />
     </div>
     <div>
-      <canvas width="256" height="192" id="bottom-canvas" />
-    </div>
-    <div>
-      <canvas width="256" height="384" id="save-state-canvas" style="display: none" />
+      <canvas width="160" height="144" id="save-state-canvas" style="display: none" />
     </div>
   </div>
   <div id="help-modal" class="modal hide">
