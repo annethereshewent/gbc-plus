@@ -22,7 +22,6 @@ macro_rules! console_log {
 pub struct WebEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
-    audio_buffer: Arc<Mutex<VecDeque<f32>>>,
     sample_buffer: Vec<f32>
 }
 
@@ -34,11 +33,9 @@ impl WebEmulator {
 
         let joypad_map = HashMap::<usize, JoypadButtons>::new();
 
-        let audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
         Self {
-            cpu: CPU::new(audio_buffer.clone(), None, true),
+            cpu: CPU::new(None, false),
             joypad_map,
-            audio_buffer,
             sample_buffer: Vec::new()
         }
     }

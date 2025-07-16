@@ -1,7 +1,5 @@
 use std::{
-    collections::{
-        HashMap, VecDeque
-    },
+    collections::HashMap,
     fs::{
         self,
         File,
@@ -14,10 +12,7 @@ use std::{
         Write
     },
     process::exit,
-    sync::{
-        Arc,
-        Mutex
-    },
+    sync::Arc,
     time::{
         SystemTime,
         UNIX_EPOCH
@@ -35,6 +30,7 @@ use gbc_plus::cpu::{
     },
     CPU
 };
+use ringbuf::{storage::Heap, traits::{Consumer, Observer}, wrap::caching::Caching, SharedRb};
 use sdl2::{
     audio::{
         AudioCallback,
@@ -82,28 +78,25 @@ pub struct Frontend {
 }
 
 pub struct GbcAudioCallback {
-    pub audio_samples: Arc<Mutex<VecDeque<f32>>>,
+    pub consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
 }
 
 impl AudioCallback for GbcAudioCallback {
     type Channel = f32;
 
     fn callback(&mut self, buf: &mut [Self::Channel]) {
-        let mut audio_samples = self.audio_samples.lock().unwrap();
-        let len = audio_samples.len();
-
         let mut left_sample: f32 = 0.0;
         let mut right_sample: f32 = 0.0;
 
-        if len > 2 {
-            left_sample = audio_samples[len - 2];
-            right_sample = audio_samples[len - 1];
+        if self.consumer.vacant_len() > 2 {
+            left_sample = *self.consumer.try_peek().unwrap_or(&0.0);
+            right_sample = *self.consumer.try_peek().unwrap_or(&0.0);
         }
 
         let mut is_left_sample = true;
 
         for b in buf.iter_mut() {
-            *b = if let Some(sample) = audio_samples.pop_front() {
+            *b = if let Some(sample) = self.consumer.try_pop() {
                 sample
             } else {
                 if is_left_sample {
@@ -112,6 +105,7 @@ impl AudioCallback for GbcAudioCallback {
                     right_sample
                 }
             };
+
             is_left_sample = !is_left_sample;
         }
     }
@@ -134,7 +128,7 @@ impl Frontend {
         }
     }
 
-    pub fn new(cpu: &mut CPU, audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
+    pub fn new(cpu: &mut CPU, consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
@@ -167,7 +161,7 @@ impl Frontend {
         let _device = audio_subsystem.open_playback(
             None,
             &spec,
-            |_| GbcAudioCallback { audio_samples: audio_buffer.clone() }
+            |_| GbcAudioCallback { consumer }
         ).unwrap();
 
         _device.resume();

@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, sync::{Arc, Mutex}};
+use std::sync::Arc;
 
 use audio_master_register::AudioMasterRegister;
 use channels::{
@@ -7,7 +7,7 @@ use channels::{
     channel4::Channel4,
 };
 use master_volume_vin_register::MasterVolumeVinRegister;
-use ringbuf::{traits::{Producer, RingBuffer}, HeapRb};
+use ringbuf::{storage::Heap, traits::{Observer, Producer, RingBuffer}, wrap::caching::Caching, HeapRb, SharedRb};
 use sound_panning_register::SoundPanningRegister;
 
 use crate::cpu::CLOCK_SPEED;
@@ -30,14 +30,14 @@ pub struct APU {
     pub channel3: Channel3,
     pub channel4: Channel4,
     cycles: usize,
-    pub audio_buffer: Arc<Mutex<VecDeque<f32>>>,
+    pub producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
     pub ring_buffer: Option<HeapRb<f32>>,
     sequencer_cycles: usize,
     sequencer_step: usize
 }
 
 impl APU {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, use_ring_buffer: bool) -> Self {
+    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, is_desktop: bool) -> Self {
         Self {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
@@ -47,10 +47,10 @@ impl APU {
             channel3: Channel3::new(),
             channel4: Channel4::new(),
             cycles: 0,
-            audio_buffer,
+            producer,
             sequencer_cycles: 0,
             sequencer_step: 0,
-            ring_buffer: if use_ring_buffer { Some(HeapRb::new(NUM_SAMPLES)) } else { None }
+            ring_buffer: if !is_desktop { Some(HeapRb::new(NUM_SAMPLES)) } else { None }
         }
     }
 
@@ -69,12 +69,19 @@ impl APU {
             ring_buffer.push_overwrite(left_sample);
             ring_buffer.push_overwrite(right_sample);
         } else {
-            let audio_buffer = &mut self.audio_buffer.lock().unwrap();
-            if audio_buffer.len() < NUM_SAMPLES {
-                audio_buffer.push_back(left_sample);
+            // let audio_buffer = &mut self.audio_buffer.lock().unwrap();
+            // if audio_buffer.len() < NUM_SAMPLES {
+            //     audio_buffer.push_back(left_sample);
+            // }
+            // if audio_buffer.len() < NUM_SAMPLES {
+            //     audio_buffer.push_back(right_sample);
+            // }
+
+            if !self.producer.is_full() {
+                self.producer.try_push(left_sample).unwrap_or_default();
             }
-            if audio_buffer.len() < NUM_SAMPLES {
-                audio_buffer.push_back(right_sample);
+            if !self.producer.is_full() {
+                self.producer.try_push(right_sample).unwrap_or_default();
             }
         }
     }

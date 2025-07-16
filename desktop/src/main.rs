@@ -1,16 +1,15 @@
 use std::{
-    collections::VecDeque,
     env,
     fs,
     io::Read,
-    path::Path,
-    sync::{Arc, Mutex}
+    path::Path
 };
 
 extern crate gbc_plus;
 
 use frontend::Frontend;
-use gbc_plus::cpu::CPU;
+use gbc_plus::cpu::{bus::apu::NUM_SAMPLES, CPU};
+use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
 pub mod frontend;
@@ -25,7 +24,10 @@ fn main() {
 
     let mut rom_path = args[1].clone();
 
-    let audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
+    // let audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
+    let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+    let (producer, consumer) = ringbuffer.split();
 
     let mut rom_bytes = fs::read(rom_path.clone()).unwrap();
 
@@ -61,9 +63,9 @@ fn main() {
         }
     }
 
-    let mut cpu = CPU::new(audio_buffer.clone(), Some(rom_path.clone()), false);
+    let mut cpu = CPU::new(producer, Some(rom_path.clone()), true);
 
-    let mut frontend = Frontend::new(&mut cpu, audio_buffer);
+    let mut frontend = Frontend::new(&mut cpu, consumer);
 
     cpu.load_rom(&rom_bytes);
 

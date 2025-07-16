@@ -267,6 +267,7 @@ version = "0.1.0"
 dependencies = [
  "dirs-next",
  "gbc-plus",
+ "ringbuf",
  "sdl2",
  "serde",
  "serde_json",

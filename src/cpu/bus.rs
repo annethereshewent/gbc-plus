@@ -1,10 +1,11 @@
-use std::{collections::VecDeque, sync::{Arc, Mutex}};
+use std::sync::Arc;
 
 use apu::{sound_panning_register::SoundPanningRegister, APU};
 use cartridge::Cartridge;
 use joypad::Joypad;
 use ppu::PPU;
 use interrupt_register::InterruptRegister;
+use ringbuf::{storage::Heap, wrap::caching::Caching, SharedRb};
 use timer::Timer;
 
 pub mod interrupt_register;
@@ -48,7 +49,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>, use_ring_buffer: bool) -> Self {
+    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, rom_path: Option<String>, is_desktop: bool) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
             wram: [
@@ -66,7 +67,7 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new(audio_buffer, use_ring_buffer),
+            apu: APU::new(producer, is_desktop),
             joypad: Joypad::new(),
             timer: Timer::new(),
             wram_bank: 1,
