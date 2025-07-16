@@ -100,7 +100,6 @@ impl WebEmulator {
     }
 
     pub fn update_input(&mut self, button: usize, pressed: bool) {
-        console_log!("hello!");
         if pressed {
             self.cpu.bus.joypad.press_button(*self.joypad_map.get(&button).unwrap());
         } else {

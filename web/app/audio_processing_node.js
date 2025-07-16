@@ -33,6 +33,9 @@ export class AudioProcessingNode extends AudioWorkletProcessor {
 
       isLeft = !isLeft
     }
+    if (this.sampleBuffer.length > 8192 * 2) {
+      this.sampleBuffer = this.sampleBuffer.slice(0, 8192 * 2)
+    }
 
     return true
   }
