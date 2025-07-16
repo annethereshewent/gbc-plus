@@ -48,13 +48,13 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>) -> CPU {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>, use_ring_buffer: bool) -> CPU {
         CPU {
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
-            bus: Bus::new(audio_buffer, rom_path),
+            bus: Bus::new(audio_buffer, rom_path, use_ring_buffer),
             found: HashSet::new(),
             debug_on: false,
             is_halted: false

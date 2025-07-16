@@ -2,6 +2,7 @@
 use std::{collections::{HashMap, VecDeque}, panic, sync::{Arc, Mutex}};
 
 use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
+use ringbuf::traits::Consumer;
 use wasm_bindgen::prelude::*;
 
 extern crate gbc_plus;
@@ -21,7 +22,8 @@ macro_rules! console_log {
 pub struct WebEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
-    audio_buffer: Arc<Mutex<VecDeque<f32>>>
+    audio_buffer: Arc<Mutex<VecDeque<f32>>>,
+    sample_buffer: Vec<f32>
 }
 
 #[wasm_bindgen]
@@ -34,9 +36,10 @@ impl WebEmulator {
 
         let audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
         Self {
-            cpu: CPU::new(audio_buffer.clone(), None),
+            cpu: CPU::new(audio_buffer.clone(), None, true),
             joypad_map,
-            audio_buffer
+            audio_buffer,
+            sample_buffer: Vec::new()
         }
     }
 
@@ -58,37 +61,60 @@ impl WebEmulator {
         self.cpu.bus.ppu.picture.data.len()
     }
 
-    pub fn modify_samples(&self, left: &mut [f32], right: &mut [f32]) {
-        let mut samples = self.audio_buffer.lock().unwrap();
-        let mut left_sample = 0.0;
-        let mut right_sample = 0.0;
-        if samples.len() > 1 {
-            left_sample = samples[samples.len() - 2] * 0.05;
-            right_sample = samples[samples.len() - 1] * 0.05;
-        }
+    // pub fn modify_samples(&self, left: &mut [f32], right: &mut [f32]) {
+    //     let mut samples = self.audio_buffer.lock().unwrap();
+    //     let mut left_sample = 0.0;
+    //     let mut right_sample = 0.0;
+    //     if samples.len() > 1 {
+    //         left_sample = samples[samples.len() - 2] * 0.05;
+    //         right_sample = samples[samples.len() - 1] * 0.05;
+    //     }
 
 
-        console_log!("samples len = {}", samples.len());
+    //     console_log!("samples len = {}", samples.len());
 
-        let mut is_left_sample = false;
+    //     let mut is_left_sample = false;
 
-        let mut left_index = 0;
-        let mut right_index = 0;
+    //     let mut left_index = 0;
+    //     let mut right_index = 0;
 
-        while let Some(sample) = samples.pop_back() {
-            if is_left_sample {
-                if left_index < left.len()  {
-                    left[left_index] = sample * 0.075;
-                    left_index += 1;
-                }
-            } else if right_index < right.len() {
-                right[right_index] = sample * 0.075;
-                right_index += 1;
-            } else {
-                break;
+    //     while let Some(sample) = samples.pop_back() {
+    //         if is_left_sample {
+    //             if left_index < left.len()  {
+    //                 left[left_index] = sample * 0.075;
+    //                 left_index += 1;
+    //             }
+    //         } else if right_index < right.len() {
+    //             right[right_index] = sample * 0.075;
+    //             right_index += 1;
+    //         } else {
+    //             break;
+    //         }
+    //         is_left_sample = !is_left_sample;
+    //     }
+    // }
+
+    pub fn read_ringbuffer(&mut self) -> *mut f32 {
+        self.sample_buffer = Vec::new();
+        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
+            for sample in ring_buffer.pop_iter() {
+                self.sample_buffer.push(sample);
             }
-            is_left_sample = !is_left_sample;
         }
+
+        self.sample_buffer.as_mut_ptr()
+    }
+
+    pub fn pop_sample(&mut self) -> Option<f32> {
+        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
+            return ring_buffer.try_pop()
+        }
+
+        None
+    }
+
+    pub fn get_buffer_len(&self) -> usize {
+        self.sample_buffer.len()
     }
 
     pub fn update_input(&mut self, button: usize, pressed: bool) {

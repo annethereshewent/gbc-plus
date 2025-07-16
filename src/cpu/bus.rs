@@ -48,7 +48,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>) -> Self {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, rom_path: Option<String>, use_ring_buffer: bool) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
             wram: [
@@ -66,7 +66,7 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new(audio_buffer),
+            apu: APU::new(audio_buffer, use_ring_buffer),
             joypad: Joypad::new(),
             timer: Timer::new(),
             wram_bank: 1,

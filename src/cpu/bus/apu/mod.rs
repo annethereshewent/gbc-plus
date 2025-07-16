@@ -7,6 +7,7 @@ use channels::{
     channel4::Channel4,
 };
 use master_volume_vin_register::MasterVolumeVinRegister;
+use ringbuf::{traits::{Producer, RingBuffer}, HeapRb};
 use sound_panning_register::SoundPanningRegister;
 
 use crate::cpu::CLOCK_SPEED;
@@ -17,7 +18,7 @@ pub mod master_volume_vin_register;
 pub mod channels;
 
 pub const TICKS_PER_SAMPLE: usize = CLOCK_SPEED / 44100;
-pub const NUM_SAMPLES: usize = 16384 * 2;
+pub const NUM_SAMPLES: usize = 8192 * 2;
 pub const HZ_512: usize = CLOCK_SPEED / 512;
 
 pub struct APU {
@@ -30,12 +31,13 @@ pub struct APU {
     pub channel4: Channel4,
     cycles: usize,
     pub audio_buffer: Arc<Mutex<VecDeque<f32>>>,
+    pub ring_buffer: Option<HeapRb<f32>>,
     sequencer_cycles: usize,
     sequencer_step: usize
 }
 
 impl APU {
-    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Self {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>, use_ring_buffer: bool) -> Self {
         Self {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
@@ -47,7 +49,8 @@ impl APU {
             cycles: 0,
             audio_buffer,
             sequencer_cycles: 0,
-            sequencer_step: 0
+            sequencer_step: 0,
+            ring_buffer: if use_ring_buffer { Some(HeapRb::new(NUM_SAMPLES)) } else { None }
         }
     }
 
@@ -62,13 +65,17 @@ impl APU {
         let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
         let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
 
-        let audio_buffer = &mut self.audio_buffer.lock().unwrap();
-
-        if audio_buffer.len() < NUM_SAMPLES {
-            audio_buffer.push_back(left_sample);
-        }
-        if audio_buffer.len() < NUM_SAMPLES {
-            audio_buffer.push_back(right_sample);
+        if let Some(ring_buffer) = &mut self.ring_buffer {
+            ring_buffer.push_overwrite(left_sample);
+            ring_buffer.push_overwrite(right_sample);
+        } else {
+            let audio_buffer = &mut self.audio_buffer.lock().unwrap();
+            if audio_buffer.len() < NUM_SAMPLES {
+                audio_buffer.push_back(left_sample);
+            }
+            if audio_buffer.len() < NUM_SAMPLES {
+                audio_buffer.push_back(right_sample);
+            }
         }
     }
     // https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
