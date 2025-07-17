@@ -74,6 +74,18 @@ impl MBC for MBC3 {
         &self.backup_file
     }
 
+    fn load_save(&mut self, buf: &[u8]) {
+        self.backup_file.load_save(buf);
+    }
+
+    fn save_web_mobile(&self) -> *const u8 {
+        self.backup_file.ram.as_ptr()
+    }
+
+    fn clear_is_dirty(&mut self) {
+        self.backup_file.is_dirty = false;
+    }
+
     fn save_rtc(&mut self) {
         let rtc_json = RtcFile::new(
             self.start.timestamp() as usize,

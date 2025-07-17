@@ -12,4 +12,7 @@ pub trait MBC {
     fn backup_file(&self) -> &BackupFile;
     fn save(&mut self);
     fn save_rtc(&mut self);
+    fn clear_is_dirty(&mut self);
+    fn save_web_mobile(&self) -> *const u8;
+    fn load_save(&mut self, buf: &[u8]);
 }

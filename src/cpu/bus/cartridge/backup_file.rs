@@ -3,7 +3,7 @@ use std::{fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{Sys
 pub struct BackupFile {
     file: Option<File>,
     pub is_dirty: bool,
-    ram: Box<[u8]>,
+    pub ram: Box<[u8]>,
     pub last_updated: u128
 }
 
@@ -53,26 +53,33 @@ impl BackupFile {
         }
     }
 
+    pub fn clear_is_dirty(&mut self) {
+        self.is_dirty = false;
+    }
+
+
     pub fn write8(&mut self, address: usize, value: u8) {
         self.ram[address] = value;
         self.is_dirty = true;
 
-        // self.last_updated = SystemTime::now()
-        //     .duration_since(UNIX_EPOCH)
-        //     .expect("an error occurred")
-        //     .as_millis();
+        if self.file.is_some() {
+            self.last_updated = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("an error occurred")
+                .as_millis();
+        }
     }
 
     pub fn write16(&mut self, address: usize, value: u16) {
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
-        if self.file.is_some() {
-            self.is_dirty = true;
-        }
+        self.is_dirty = true;
 
-        // self.last_updated = SystemTime::now()
-        //     .duration_since(UNIX_EPOCH)
-        //     .expect("an error occurred")
-        //     .as_millis();
+        if self.file.is_some() {
+            self.last_updated = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("an error occurred")
+                .as_millis();
+        }
     }
 
     pub fn read8(&self, address: usize) -> u8 {
@@ -90,6 +97,10 @@ impl BackupFile {
             file.seek(SeekFrom::Start(0)).unwrap();
             file.write_all(&self.ram).unwrap();
         }
+    }
+
+    pub fn load_save(&mut self, buf: &[u8]) {
+        self.ram = buf.to_vec().into_boxed_slice();
     }
 }
 

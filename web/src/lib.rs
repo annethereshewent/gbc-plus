@@ -95,6 +95,44 @@ impl WebEmulator {
         None
     }
 
+    pub fn load_save(&mut self, buf: &[u8]) {
+        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
+            mbc.load_save(buf);
+        }
+    }
+
+    pub fn has_saved(&mut self) -> bool {
+        let return_val = if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
+            let return_val = mbc.backup_file().is_dirty;
+
+            mbc.clear_is_dirty();
+
+            return_val
+        } else {
+            false
+        };
+
+        return_val
+    }
+
+    pub fn get_save_length(&self) -> usize {
+        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
+            mbc.backup_file().ram.len()
+        } else {
+            0
+        }
+    }
+
+    pub fn save_game(&mut self) -> *const u8 {
+        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
+            mbc.save_web_mobile()
+        } else {
+            let vec = Vec::new();
+
+            vec.as_ptr()
+        }
+    }
+
     pub fn get_buffer_len(&self) -> usize {
         self.sample_buffer.len()
     }

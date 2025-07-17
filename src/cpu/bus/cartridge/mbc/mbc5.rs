@@ -17,6 +17,18 @@ impl MBC for MBC5 {
         &self.backup_file
     }
 
+    fn load_save(&mut self, buf: &[u8]) {
+        self.backup_file.load_save(buf);
+    }
+
+    fn save_web_mobile(&self) -> *const u8 {
+        self.backup_file.ram.as_ptr()
+    }
+
+    fn clear_is_dirty(&mut self) {
+        self.backup_file.is_dirty = false;
+    }
+
     fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
        match address {
             0x0000..=0x3fff => {

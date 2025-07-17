@@ -17,24 +17,46 @@ export class GBC {
   private previousTime = 0
   private joypad: Joypad = new Joypad()
 
+  private saveName = ""
+
+  private timeoutIndex: any|null = null
+
   async onGameChange(file: File) {
     const fileName = file.name
 
     const tokens = fileName.split('/')
 
-    const extension = fileName.split('.').pop()!
+    let gameName = tokens.pop()!
+
+    const gameNameTokens = gameName.split('.')
+
+    const extension = gameNameTokens.pop()!
+
+    gameName = gameNameTokens.join('.')
+
+    let saveName = gameName + ".sav"
 
     let data = null
     if (extension.toLowerCase() == 'zip') {
       const zipFile = await JSZip.loadAsync(file)
 
       const zipFileName = Object.keys(zipFile.files)[0]
+
+      const zipTokens = zipFileName.split('.')
+
+      zipTokens.pop()
+
+      saveName = zipTokens.join('.') + ".sav"
+
       data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
       data = await this.readFile(file) as ArrayBuffer
     }
 
     if (data != null) {
+      this.saveName = saveName
+
+      // check if save exists in localStorage
       this.startGame(data)
     }
   }
@@ -48,6 +70,13 @@ export class GBC {
     if (this.emulator != null) {
       const byteArr = new Uint8Array(data)
       this.emulator.load_rom(byteArr)
+
+      const saveArr = JSON.parse(localStorage.getItem(this.saveName) || '[]')
+
+      if (saveArr.length > 0) {
+        const saveBuffer = new Uint8Array(saveArr)
+        this.emulator!.load_save(saveBuffer)
+      }
 
 
       this.audio = new AudioInterface()
@@ -64,6 +93,28 @@ export class GBC {
     }
   }
 
+  checkSaveGame() {
+    if (this.emulator!.has_saved()) {
+      clearTimeout(this.timeoutIndex)
+      this.timeoutIndex = setTimeout(() => this.saveGame(), 1000)
+    }
+  }
+
+  saveGame() {
+    if (this.saveName != "") {
+      const dataPointer = this.emulator!.save_game()
+      const saveLength = this.emulator!.get_save_length()
+
+      if (saveLength > 0) {
+        const data = new Uint8Array(this.wasm!.memory.buffer, dataPointer, saveLength)
+
+        const saveArr = Array.from(data)
+
+        localStorage.setItem(this.saveName, JSON.stringify(saveArr))
+      }
+    }
+  }
+
   runFrame(time: number) {
     const diff = time - this.previousTime
 
@@ -74,6 +125,7 @@ export class GBC {
       this.video.updateCanvas()
 
       this.joypad.handleInput()
+      this.checkSaveGame()
 
       this.previousTime = time - (diff % FPS_INTERVAL)
     }
