@@ -74,6 +74,40 @@ impl MBC for MBC3 {
         &self.backup_file
     }
 
+    fn has_timer(&self) -> bool {
+        self.has_timer
+    }
+
+    fn load_rtc(&mut self, json: String) {
+        if self.has_timer {
+            match serde_json::from_str::<RtcFile>(&json) {
+                Ok(result) => {
+                    let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                    let halted_elapsed = TimeDelta::new(0, 0).unwrap();
+
+                    self.carry_bit = result.carry_bit;
+                    self.halted = result.halted;
+                    self.start = start;
+                    self.halted_elapsed = halted_elapsed;
+                }
+                Err(_) => ()
+            }
+        }
+    }
+
+    fn save_rtc_web_mobile(&self) -> String {
+        if self.has_timer {
+            let rtc_json = RtcFile::new(
+                self.start.timestamp() as usize,
+                self.halted,
+                self.carry_bit
+            );
+            serde_json::to_string::<RtcFile>(&rtc_json).unwrap_or("".to_string())
+        } else {
+            "".to_string()
+        }
+    }
+
     fn load_save(&mut self, buf: &[u8]) {
         self.backup_file.load_save(buf);
     }

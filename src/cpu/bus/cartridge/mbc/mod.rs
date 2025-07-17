@@ -14,5 +14,8 @@ pub trait MBC {
     fn save_rtc(&mut self);
     fn clear_is_dirty(&mut self);
     fn save_web_mobile(&self) -> *const u8;
+    fn save_rtc_web_mobile(&self) -> String;
+    fn load_rtc(&mut self, json: String);
     fn load_save(&mut self, buf: &[u8]);
+    fn has_timer(&self) -> bool;
 }

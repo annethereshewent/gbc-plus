@@ -17,6 +17,18 @@ impl MBC for MBC5 {
         &self.backup_file
     }
 
+    fn save_rtc_web_mobile(&self) -> String {
+        "".to_string()
+    }
+
+    fn has_timer(&self) -> bool {
+        false
+    }
+
+    fn load_rtc(&mut self, json: String) {
+
+    }
+
     fn load_save(&mut self, buf: &[u8]) {
         self.backup_file.load_save(buf);
     }

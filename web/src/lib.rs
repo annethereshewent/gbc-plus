@@ -58,6 +58,28 @@ impl WebEmulator {
         }
     }
 
+    pub fn has_timer(&self) -> bool {
+        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
+            mbc.has_timer()
+        } else {
+            false
+        }
+    }
+
+    pub fn fetch_rtc(&self) -> String {
+        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
+            mbc.save_rtc_web_mobile()
+        } else {
+            "".to_string()
+        }
+    }
+
+    pub fn load_rtc(&mut self, json: String) {
+        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
+            mbc.load_rtc(json);
+        }
+    }
+
     pub fn load_rom(&mut self, data: &[u8]) {
         self.cpu.load_rom(data);
     }

@@ -18,6 +18,7 @@ export class GBC {
   private joypad: Joypad = new Joypad()
 
   private saveName = ""
+  private rtcName = ""
 
   private timeoutIndex: any|null = null
 
@@ -71,6 +72,12 @@ export class GBC {
       const byteArr = new Uint8Array(data)
       this.emulator.load_rom(byteArr)
 
+      if (this.emulator.has_timer()) {
+        this.rtcName = this.saveName.replace(/\.sav$/, '.rtc')
+
+        this.fetchRtc()
+      }
+
       const saveArr = JSON.parse(localStorage.getItem(this.saveName) || '[]')
 
       if (saveArr.length > 0) {
@@ -88,6 +95,10 @@ export class GBC {
       this.audio.setMemory(this.wasm)
 
       this.joypad.setEmulator(this.emulator)
+
+      setInterval(() => {
+        this.updateRtc()
+      }, 5 * 60 * 1000)
 
       requestAnimationFrame((time) => this.runFrame(time))
     }
@@ -146,6 +157,30 @@ export class GBC {
 
       fileReader.readAsArrayBuffer(file)
     })
+  }
+
+  loadRtc(json: string) {
+    this.emulator!.load_rtc(json)
+  }
+
+  fetchRtc() {
+    if (this.rtcName != "") {
+      let json = localStorage.getItem(this.rtcName) || ""
+
+      if (json === "") {
+        this.updateRtc()
+      } else  {
+        this.loadRtc(json)
+      }
+    }
+  }
+
+  updateRtc() {
+    const json = this.emulator!.fetch_rtc()
+
+    if (json !== "" && this.rtcName != null) {
+      localStorage.setItem(this.rtcName, json)
+    }
   }
 
   addEventListeners() {
