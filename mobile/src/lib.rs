@@ -16,6 +16,48 @@ const RIGHT: usize = 15;
 mod ffi {
     extern "Rust" {
         type GBCMobileEmulator;
+
+        #[swift_bridge(swift_name="hasTimer")]
+        fn has_timer(&self) -> bool;
+
+        #[swift_bridge(swift_name="fetchRtc")]
+        fn fetch_rtc(&self) -> String;
+
+        #[swift_bridge(swift_name="loadRtc")]
+        fn load_rtc(&mut self, json: String);
+
+        #[swift_bridge(swift_name="loadRom")]
+        fn load_rom(&mut self, data: &[u8]);
+
+        #[swift_bridge(swift_name="stepFrame")]
+        fn step_frame(&mut self);
+
+        #[swift_bridge(swift_name="getScreen")]
+        fn get_screen(&self) -> *const u8;
+
+        #[swift_bridge(swift_name="getScreenLength")]
+        fn get_screen_length(&self) -> usize;
+
+        #[swift_bridge(swift_name="readRingBuffer")]
+        fn read_ringbuffer(&mut self) -> *mut f32;
+
+        #[swift_bridge(swift_name="loadSave")]
+        fn load_save(&mut self, buf: &[u8]);
+
+        #[swift_bridge(swift_name="hasSaved")]
+        fn has_saved(&mut self) -> bool;
+
+        #[swift_bridge(swift_name="getSaveLength")]
+        fn get_save_length(&self) -> usize;
+
+        #[swift_bridge(swift_name="saveGame")]
+        fn save_game(&mut self) -> *const u8;
+
+        #[swift_bridge(swift_name="getBufferLength")]
+        fn get_buffer_len(&self) -> usize;
+
+        #[swift_bridge(swift_name="updateInput")]
+        fn update_input(&mut self, button: usize, pressed: bool);
     }
 }
 
@@ -95,14 +137,6 @@ impl GBCMobileEmulator {
         }
 
         self.sample_buffer.as_mut_ptr()
-    }
-
-    pub fn pop_sample(&mut self) -> Option<f32> {
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            return ring_buffer.try_pop()
-        }
-
-        None
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
