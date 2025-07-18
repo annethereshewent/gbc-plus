@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::sleep, time::Duration};
 
 use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
 use ringbuf::traits::Consumer;
@@ -39,7 +39,7 @@ mod ffi {
         fn get_screen_length(&self) -> usize;
 
         #[swift_bridge(swift_name="readRingBuffer")]
-        fn read_ringbuffer(&mut self) -> *mut f32;
+        fn read_ringbuffer(&mut self) -> *const f32;
 
         #[swift_bridge(swift_name="loadSave")]
         fn load_save(&mut self, buf: &[u8]);
@@ -58,13 +58,17 @@ mod ffi {
 
         #[swift_bridge(swift_name="updateInput")]
         fn update_input(&mut self, button: usize, pressed: bool);
+
+        #[swift_bridge(swift_name="setPaused")]
+        fn set_paused(&mut self, val: bool);
     }
 }
 
 pub struct GBCMobileEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
-    sample_buffer: Vec<f32>
+    sample_buffer: Vec<f32>,
+    paused: bool
 }
 
 impl GBCMobileEmulator {
@@ -84,7 +88,8 @@ impl GBCMobileEmulator {
         Self {
             cpu: CPU::new(None, None, false),
             joypad_map,
-            sample_buffer: Vec::new()
+            sample_buffer: Vec::new(),
+            paused: false
         }
     }
 
@@ -115,9 +120,17 @@ impl GBCMobileEmulator {
     }
 
     pub fn step_frame(&mut self) {
-        self.cpu.step_frame();
+        if !self.paused {
+            self.cpu.step_frame();
+        } else {
+            sleep(Duration::from_millis(100));
+        }
 
         self.cpu.bus.ppu.frame_finished = false;
+    }
+
+    pub fn set_paused(&mut self, val: bool) {
+        self.paused = val;
     }
 
     pub fn get_screen(&self) -> *const u8 {
@@ -128,7 +141,7 @@ impl GBCMobileEmulator {
         self.cpu.bus.ppu.picture.data.len()
     }
 
-    pub fn read_ringbuffer(&mut self) -> *mut f32 {
+    pub fn read_ringbuffer(&mut self) -> *const f32 {
         self.sample_buffer = Vec::new();
         if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
             for sample in ring_buffer.pop_iter() {
@@ -136,7 +149,7 @@ impl GBCMobileEmulator {
             }
         }
 
-        self.sample_buffer.as_mut_ptr()
+        self.sample_buffer.as_ptr()
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
