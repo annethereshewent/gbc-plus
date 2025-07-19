@@ -1,21 +1,32 @@
 use std::{collections::HashMap, thread::sleep, time::Duration};
 
 use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
-use ringbuf::traits::Consumer;
+use ringbuf::traits::{Consumer, Observer};
 
 const BUTTON_CROSS: usize = 0;
+const BUTTON_CIRCLE: usize = 1;
 const BUTTON_SQUARE: usize = 2;
-const SELECT: usize = 8;
-const START: usize = 9;
+const BUTTON_TRIANGLE: usize = 3;
+const SELECT: usize = 4;
+const START: usize = 6;
+const BUTTON_L: usize = 9;
+const BUTTON_R: usize = 10;
 const UP: usize = 12;
 const DOWN: usize = 13;
 const LEFT: usize = 14;
 const RIGHT: usize = 15;
+const BUTTON_HOME: usize = 16;
+const GAME_MENU: usize = 17;
+const QUICK_LOAD: usize = 18;
+const QUICK_SAVE: usize = 19;
 
 #[swift_bridge::bridge]
 mod ffi {
     extern "Rust" {
         type GBCMobileEmulator;
+
+        #[swift_bridge(init)]
+        fn new() -> GBCMobileEmulator;
 
         #[swift_bridge(swift_name="hasTimer")]
         fn has_timer(&self) -> bool;
@@ -38,8 +49,11 @@ mod ffi {
         #[swift_bridge(swift_name="getScreenLength")]
         fn get_screen_length(&self) -> usize;
 
-        #[swift_bridge(swift_name="readRingBuffer")]
-        fn read_ringbuffer(&mut self) -> *const f32;
+        #[swift_bridge(swift_name="popSample")]
+        fn pop_sample(&mut self) -> f32;
+
+        #[swift_bridge(swift_name="hasSamples")]
+        fn has_samples(&self) -> bool;
 
         #[swift_bridge(swift_name="loadSave")]
         fn load_save(&mut self, buf: &[u8]);
@@ -61,6 +75,9 @@ mod ffi {
 
         #[swift_bridge(swift_name="setPaused")]
         fn set_paused(&mut self, val: bool);
+
+        #[swift_bridge(swift_name="readRingBuffer")]
+        fn read_ringbuffer(&mut self) -> *const f32;
     }
 }
 
@@ -68,6 +85,7 @@ pub struct GBCMobileEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
     sample_buffer: Vec<f32>,
+    buffer_clone: Vec<f32>,
     paused: bool
 }
 
@@ -75,8 +93,8 @@ impl GBCMobileEmulator {
         pub fn new() -> Self {
 
         let joypad_map = HashMap::<usize, JoypadButtons>::from([
-            (BUTTON_CROSS, JoypadButtons::A),
-            (BUTTON_SQUARE, JoypadButtons::B),
+            (BUTTON_CIRCLE, JoypadButtons::A),
+            (BUTTON_CROSS, JoypadButtons::B),
             (SELECT, JoypadButtons::Select),
             (START, JoypadButtons::Start),
             (UP, JoypadButtons::Up),
@@ -89,6 +107,7 @@ impl GBCMobileEmulator {
             cpu: CPU::new(None, None, false),
             joypad_map,
             sample_buffer: Vec::new(),
+            buffer_clone: Vec::new(),
             paused: false
         }
     }
@@ -126,6 +145,8 @@ impl GBCMobileEmulator {
             sleep(Duration::from_millis(100));
         }
 
+        self.cpu.bus.ppu.cap_fps();
+
         self.cpu.bus.ppu.frame_finished = false;
     }
 
@@ -139,17 +160,6 @@ impl GBCMobileEmulator {
 
     pub fn get_screen_length(&self) -> usize {
         self.cpu.bus.ppu.picture.data.len()
-    }
-
-    pub fn read_ringbuffer(&mut self) -> *const f32 {
-        self.sample_buffer = Vec::new();
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            for sample in ring_buffer.pop_iter() {
-                self.sample_buffer.push(sample);
-            }
-        }
-
-        self.sample_buffer.as_ptr()
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
@@ -190,15 +200,47 @@ impl GBCMobileEmulator {
         }
     }
 
+    pub fn read_ringbuffer(&mut self) -> *const f32 {
+        self.sample_buffer = Vec::new();
+        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
+            for sample in ring_buffer.pop_iter() {
+                self.sample_buffer.push(sample);
+            }
+        }
+
+        self.sample_buffer.as_ptr()
+    }
+
+
+    pub fn pop_sample(&mut self) -> f32 {
+        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
+            return ring_buffer.try_pop().unwrap_or(0.0)
+        }
+
+        return 0.0
+    }
+
     pub fn get_buffer_len(&self) -> usize {
         self.sample_buffer.len()
     }
 
+    pub fn has_samples(&self) -> bool {
+        if let Some(ring_buffer) = &self.cpu.bus.apu.ring_buffer {
+            return !ring_buffer.is_empty();
+        }
+
+        return false
+    }
+
     pub fn update_input(&mut self, button: usize, pressed: bool) {
         if pressed {
-            self.cpu.bus.joypad.press_button(*self.joypad_map.get(&button).unwrap());
+            if let Some(joypad_button) = self.joypad_map.get(&button) {
+                self.cpu.bus.joypad.press_button(*joypad_button);
+            }
         } else {
-            self.cpu.bus.joypad.release_button(*self.joypad_map.get(&button).unwrap());
+            if let Some(joypad_button) = self.joypad_map.get(&button) {
+                self.cpu.bus.joypad.release_button(*joypad_button);
+            }
         }
     }
 }
