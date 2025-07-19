@@ -1,0 +1,25 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_webemulator_free: (a: number, b: number) => void;
+export const webemulator_new: () => number;
+export const webemulator_has_timer: (a: number) => number;
+export const webemulator_fetch_rtc: (a: number) => [number, number];
+export const webemulator_load_rtc: (a: number, b: number, c: number) => void;
+export const webemulator_load_rom: (a: number, b: number, c: number) => void;
+export const webemulator_step_frame: (a: number) => void;
+export const webemulator_get_screen: (a: number) => number;
+export const webemulator_get_screen_length: (a: number) => number;
+export const webemulator_read_ringbuffer: (a: number) => number;
+export const webemulator_pop_sample: (a: number) => number;
+export const webemulator_load_save: (a: number, b: number, c: number) => void;
+export const webemulator_has_saved: (a: number) => number;
+export const webemulator_get_save_length: (a: number) => number;
+export const webemulator_save_game: (a: number) => number;
+export const webemulator_get_buffer_len: (a: number) => number;
+export const webemulator_update_input: (a: number, b: number, c: number) => void;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_export_3: WebAssembly.Table;
+export const __wbindgen_start: () => void;

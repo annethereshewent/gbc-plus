@@ -79,7 +79,6 @@ pub struct GBCMobileEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
     sample_buffer: Vec<f32>,
-    buffer_clone: Vec<f32>,
     paused: bool
 }
 
@@ -101,7 +100,6 @@ impl GBCMobileEmulator {
             cpu: CPU::new(None, None, false),
             joypad_map,
             sample_buffer: Vec::new(),
-            buffer_clone: Vec::new(),
             paused: false
         }
     }
