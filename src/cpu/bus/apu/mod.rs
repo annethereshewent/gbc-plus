@@ -66,8 +66,8 @@ impl APU {
         let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
 
         if let Some(ring_buffer) = &mut self.ring_buffer {
-            ring_buffer.push_overwrite(left_sample);
-            ring_buffer.push_overwrite(right_sample);
+            ring_buffer.try_push(left_sample).unwrap_or(());
+            ring_buffer.try_push(right_sample).unwrap_or(());
         } else {
             if let Some(producer) = &mut self.producer {
                 if !producer.is_full() {

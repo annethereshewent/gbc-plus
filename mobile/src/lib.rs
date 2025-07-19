@@ -72,6 +72,12 @@ mod ffi {
 
         #[swift_bridge(swift_name="readRingBuffer")]
         fn read_ringbuffer(&mut self) -> *const f32;
+
+        #[swift_bridge(swift_name="hasSamples")]
+        fn has_samples(&self) -> bool;
+
+        #[swift_bridge(swift_name="popSample")]
+        fn pop_sample(&mut self) -> f32;
     }
 }
 
@@ -200,7 +206,28 @@ impl GBCMobileEmulator {
             }
         }
 
+        if self.sample_buffer.iter().all(|sample| self.sample_buffer[0] == *sample) {
+            let buffer_len = self.sample_buffer.len();
+            self.sample_buffer = vec![0.0; buffer_len];
+        }
+
         self.sample_buffer.as_ptr()
+    }
+
+    pub fn has_samples(&self) -> bool {
+        if let Some(ring_buffer) = &self.cpu.bus.apu.ring_buffer {
+            return !ring_buffer.is_empty()
+        }
+
+        false
+    }
+
+    pub fn pop_sample(&mut self) -> f32 {
+         if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
+            return ring_buffer.try_pop().unwrap_or(0.0);
+        }
+
+        0.0
     }
 
     pub fn get_buffer_len(&self) -> usize {
