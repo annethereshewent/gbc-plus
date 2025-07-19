@@ -49,12 +49,6 @@ mod ffi {
         #[swift_bridge(swift_name="getScreenLength")]
         fn get_screen_length(&self) -> usize;
 
-        #[swift_bridge(swift_name="popSample")]
-        fn pop_sample(&mut self) -> f32;
-
-        #[swift_bridge(swift_name="hasSamples")]
-        fn has_samples(&self) -> bool;
-
         #[swift_bridge(swift_name="loadSave")]
         fn load_save(&mut self, buf: &[u8]);
 
@@ -211,25 +205,8 @@ impl GBCMobileEmulator {
         self.sample_buffer.as_ptr()
     }
 
-
-    pub fn pop_sample(&mut self) -> f32 {
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            return ring_buffer.try_pop().unwrap_or(0.0)
-        }
-
-        return 0.0
-    }
-
     pub fn get_buffer_len(&self) -> usize {
         self.sample_buffer.len()
-    }
-
-    pub fn has_samples(&self) -> bool {
-        if let Some(ring_buffer) = &self.cpu.bus.apu.ring_buffer {
-            return !ring_buffer.is_empty();
-        }
-
-        return false
     }
 
     pub fn update_input(&mut self, button: usize, pressed: bool) {
