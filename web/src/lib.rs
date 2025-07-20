@@ -1,8 +1,8 @@
 
 use std::{collections::{HashMap, VecDeque}, panic, sync::{Arc, Mutex}};
 
-use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
-use ringbuf::traits::Consumer;
+use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, joypad::JoypadButtons}, CPU};
+use ringbuf::{storage::Heap, traits::{Consumer, Split}, wrap::caching::Caching, HeapRb, SharedRb};
 use wasm_bindgen::prelude::*;
 
 extern crate gbc_plus;
@@ -22,7 +22,8 @@ macro_rules! console_log {
 pub struct WebEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
-    sample_buffer: Vec<f32>
+    sample_buffer: Vec<f32>,
+    consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>
 }
 
 const BUTTON_CROSS: usize = 0;
@@ -51,10 +52,15 @@ impl WebEmulator {
             (RIGHT, JoypadButtons::Right)
         ]);
 
+        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+        let (producer, consumer) = ringbuffer.split();
+
         Self {
-            cpu: CPU::new(None, None, false),
+            cpu: CPU::new(producer, None, false),
             joypad_map,
-            sample_buffer: Vec::new()
+            sample_buffer: Vec::new(),
+            consumer
         }
     }
 
@@ -100,21 +106,16 @@ impl WebEmulator {
 
     pub fn read_ringbuffer(&mut self) -> *mut f32 {
         self.sample_buffer = Vec::new();
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            for sample in ring_buffer.pop_iter() {
-                self.sample_buffer.push(sample);
-            }
+
+        for sample in self.consumer.pop_iter() {
+            self.sample_buffer.push(sample);
         }
 
         self.sample_buffer.as_mut_ptr()
     }
 
     pub fn pop_sample(&mut self) -> Option<f32> {
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            return ring_buffer.try_pop()
-        }
-
-        None
+        return self.consumer.try_pop()
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {

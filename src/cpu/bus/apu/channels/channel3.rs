@@ -58,13 +58,11 @@ impl Channel3 {
     pub fn generate_sample(&self) -> f32 {
         if self.enabled && self.dac_enable  {
             if let Some(output) = self.output {
-                (((self.current_sample >> output) as f32) / 15.0) * 2.0 - 1.0
-            } else {
-                -1.0
+                 return (self.current_sample >> output) as f32
             }
-        } else {
-            0.0
         }
+
+        0.0
     }
 
     fn restart_channel(&mut self) {

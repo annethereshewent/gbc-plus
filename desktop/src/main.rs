@@ -63,7 +63,7 @@ fn main() {
         }
     }
 
-    let mut cpu = CPU::new(Some(producer), Some(rom_path.clone()), true);
+    let mut cpu = CPU::new(producer, Some(rom_path.clone()), false);
 
     let mut frontend = Frontend::new(&mut cpu, consumer);
 

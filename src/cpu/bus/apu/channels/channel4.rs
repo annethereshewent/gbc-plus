@@ -80,7 +80,7 @@ impl Channel4 {
 
     pub fn generate_sample(&self) -> f32 {
         if self.enabled {
-            (self.output as f32 / 7.5) - 1.0
+            self.output as f32
         } else {
             0.0
         }

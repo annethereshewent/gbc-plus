@@ -30,14 +30,14 @@ pub struct APU {
     pub channel3: Channel3,
     pub channel4: Channel4,
     cycles: usize,
-    pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
-    pub ring_buffer: Option<HeapRb<f32>>,
+    pub producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
     sequencer_cycles: usize,
-    sequencer_step: usize
+    sequencer_step: usize,
+    is_ios: bool
 }
 
 impl APU {
-    pub fn new(producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>, is_desktop: bool) -> Self {
+    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, is_ios: bool) -> Self {
         Self {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
@@ -47,37 +47,92 @@ impl APU {
             channel3: Channel3::new(),
             channel4: Channel4::new(),
             cycles: 0,
-            producer,
             sequencer_cycles: 0,
             sequencer_step: 0,
-            ring_buffer: if !is_desktop { Some(HeapRb::new(NUM_SAMPLES)) } else { None }
+            producer,
+            is_ios
         }
     }
 
     fn generate_samples(&mut self) {
-        let ch1_sample = self.channel1.generate_sample();
-        let ch2_sample = self.channel2.generate_sample();
-        let ch3_sample = self.channel3.generate_sample();
-        let ch4_sample = self.channel4.generate_sample();
+        let mut ch1_left_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
+        let mut ch1_right_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
 
-        let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
+        ch1_left_sample = (ch1_left_sample / 7.5) - 1.0;
+        ch1_right_sample = (ch1_right_sample / 7.5) - 1.0;
 
-        let left_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
-        let right_sample = sample * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
+        let mut ch2_left_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_LEFT) as i16 as f32;
+        let mut ch2_right_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_RIGHT) as i16 as f32;
 
-        if let Some(ring_buffer) = &mut self.ring_buffer {
-            ring_buffer.try_push(left_sample).unwrap_or(());
-            ring_buffer.try_push(right_sample).unwrap_or(());
-        } else {
-            if let Some(producer) = &mut self.producer {
-                if !producer.is_full() {
-                    producer.try_push(left_sample).unwrap_or_default();
-                }
-                if !producer.is_full() {
-                    producer.try_push(right_sample).unwrap_or_default();
-                }
-            }
-        }
+        ch2_left_sample = (ch2_left_sample / 7.5) - 1.0;
+        ch2_right_sample = (ch2_right_sample / 7.5) - 1.0;
+
+        let mut ch3_left_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_LEFT) as i16 as f32;
+        let mut ch3_right_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_RIGHT) as i16 as f32;
+
+        ch3_left_sample = (ch3_left_sample / 7.5) - 1.0;
+        ch3_right_sample = (ch3_right_sample / 7.5) - 1.0;
+
+        let mut ch4_left_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_LEFT) as i16 as f32;
+        let mut ch4_right_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_RIGHT) as i16 as f32;
+
+        ch4_left_sample = (ch4_left_sample / 7.5) - 1.0;
+        ch4_right_sample = (ch4_right_sample / 7.5) - 1.0;
+
+        let mut left_sample = (ch1_left_sample + ch2_left_sample + ch3_left_sample + ch4_left_sample) / 4.0;
+        let mut right_sample = (ch1_right_sample + ch2_right_sample + ch3_right_sample + ch4_right_sample) / 4.0;
+
+        left_sample *= self.nr50.left_volume as f32 / 7.0;
+        right_sample *= self.nr50.right_volume as f32 / 7.0;
+
+        left_sample = left_sample.clamp(-1.0, 1.0);
+        right_sample = right_sample.clamp(-1.0, 1.0);
+
+        self.push_ringbuffer(left_sample, right_sample);
+    }
+
+    /*
+     *  This is a hacky method that only outputs positive sample values.
+     *  This is because iOS does *not* like dealing with nonzero samples
+     *  that are all the same value, instead of treating it like silence
+     *  iOS will produce a ton of consistent pops. however apple seems to
+     *  like this function well enough and audio sounds mostly fine,
+     *  so sticking with this for now.
+     *  TODO: find a better way to do this.
+     */
+    pub fn generate_ios_samples(&mut self) {
+        let ch1_left_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
+        let ch1_right_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
+
+        let ch2_left_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_LEFT) as i16 as f32;
+        let ch2_right_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_RIGHT) as i16 as f32;
+
+        let ch3_left_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_LEFT) as i16 as f32;
+        let ch3_right_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_RIGHT) as i16 as f32;
+
+        let ch4_left_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_LEFT) as i16 as f32;
+        let ch4_right_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_RIGHT) as i16 as f32;
+
+
+        let mut left_sample = (ch1_left_sample + ch2_left_sample + ch3_left_sample + ch4_left_sample) / 4.0;
+        let mut right_sample =(ch1_right_sample + ch2_right_sample + ch3_right_sample + ch4_right_sample) / 4.0;
+
+        left_sample /= 15.0;
+        right_sample /= 15.0;
+
+        left_sample *= self.nr50.left_volume as f32 / 7.0;
+        right_sample *= self.nr50.right_volume as f32 / 7.0;
+
+        left_sample = left_sample.clamp(0.0, 1.0);
+        right_sample = right_sample.clamp(0.0, 1.0);
+
+        self.push_ringbuffer(left_sample, right_sample);
+
+    }
+
+    fn push_ringbuffer(&mut self, left_sample: f32, right_sample: f32) {
+        self.producer.try_push(left_sample).unwrap_or(());
+        self.producer.try_push(right_sample).unwrap_or(());
     }
     // https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
     // Step   Length Ctr  Vol Env     Sweep
@@ -200,7 +255,7 @@ impl APU {
 
         if self.cycles >= TICKS_PER_SAMPLE {
             self.cycles -= TICKS_PER_SAMPLE;
-            self.generate_samples();
+            if self.is_ios { self.generate_ios_samples(); } else { self.generate_samples(); }
         }
     }
 }

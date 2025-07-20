@@ -1,7 +1,7 @@
-use std::{collections::HashMap, thread::sleep, time::Duration};
+use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
-use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
-use ringbuf::traits::{Consumer, Observer};
+use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, joypad::JoypadButtons}, CPU};
+use ringbuf::{storage::Heap, traits::{Consumer, Observer, Split}, wrap::caching::Caching, HeapRb, SharedRb};
 
 const BUTTON_CROSS: usize = 0;
 const BUTTON_CIRCLE: usize = 1;
@@ -85,7 +85,8 @@ pub struct GBCMobileEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
     sample_buffer: Vec<f32>,
-    paused: bool
+    paused: bool,
+    consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
 }
 
 impl GBCMobileEmulator {
@@ -102,11 +103,16 @@ impl GBCMobileEmulator {
             (RIGHT, JoypadButtons::Right)
         ]);
 
+        let ringbuffer = HeapRb::<f32>::new(4096 * 2);
+
+        let (producer, consumer) = ringbuffer.split();
+
         Self {
-            cpu: CPU::new(None, None, false),
+            cpu: CPU::new(producer, None, true),
             joypad_map,
             sample_buffer: Vec::new(),
-            paused: false
+            paused: false,
+            consumer
         }
     }
 
@@ -200,34 +206,20 @@ impl GBCMobileEmulator {
 
     pub fn read_ringbuffer(&mut self) -> *const f32 {
         self.sample_buffer = Vec::new();
-        if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            for sample in ring_buffer.pop_iter() {
-                self.sample_buffer.push(sample);
-            }
-        }
 
-        if self.sample_buffer.iter().all(|sample| self.sample_buffer[0] == *sample) {
-            let buffer_len = self.sample_buffer.len();
-            self.sample_buffer = vec![0.0; buffer_len];
+        for sample in self.consumer.pop_iter() {
+            self.sample_buffer.push(sample);
         }
 
         self.sample_buffer.as_ptr()
     }
 
     pub fn has_samples(&self) -> bool {
-        if let Some(ring_buffer) = &self.cpu.bus.apu.ring_buffer {
-            return !ring_buffer.is_empty()
-        }
-
-        false
+        !self.consumer.is_empty()
     }
 
     pub fn pop_sample(&mut self) -> f32 {
-         if let Some(ring_buffer) = &mut self.cpu.bus.apu.ring_buffer {
-            return ring_buffer.try_pop().unwrap_or(0.0);
-        }
-
-        0.0
+        self.consumer.try_pop().unwrap_or(0.0)
     }
 
     pub fn get_buffer_len(&self) -> usize {

@@ -84,9 +84,9 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.enabled {
             let bit = DUTY_PATTERNS[self.nrx1.wave_duty as usize][self.duty_step];
 
-            (((bit * self.current_volume) as f32) / 15.0) * 2.0 - 1.0
+            (bit * self.current_volume) as f32
         } else {
-            -1.0
+            0.0
         }
     }
 
