@@ -20,15 +20,16 @@ pub struct Picture {
 impl Picture {
     pub fn new() -> Self {
         Self {
-            data: vec![0; 3 * SCREEN_WIDTH * SCREEN_HEIGHT]
+            data: vec![0; 4 * SCREEN_WIDTH * SCREEN_HEIGHT]
         }
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, pixel: Color) {
-        let i = (x + y * SCREEN_WIDTH) * 3;
+        let i = (x + y * SCREEN_WIDTH) * 4;
         self.data[i] = pixel.r;
         self.data[i + 1] = pixel.g;
         self.data[i + 2] = pixel.b;
+        self.data[i + 3] = 0xff;
 
     }
 }
