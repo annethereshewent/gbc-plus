@@ -7,7 +7,7 @@ use channels::{
     channel4::Channel4,
 };
 use master_volume_vin_register::MasterVolumeVinRegister;
-use ringbuf::{storage::Heap, traits::{Observer, Producer, RingBuffer}, wrap::caching::Caching, HeapRb, SharedRb};
+use ringbuf::{storage::Heap, traits::Producer, wrap::caching::Caching, SharedRb};
 use sound_panning_register::SoundPanningRegister;
 
 use crate::cpu::CLOCK_SPEED;
