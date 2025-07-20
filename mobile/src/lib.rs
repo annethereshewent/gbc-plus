@@ -9,16 +9,16 @@ const BUTTON_SQUARE: usize = 2;
 const BUTTON_TRIANGLE: usize = 3;
 const SELECT: usize = 4;
 const START: usize = 6;
+const LEFT_STICK: usize = 7;
+const RIGHT_STICK: usize = 8;
 const BUTTON_L: usize = 9;
 const BUTTON_R: usize = 10;
 const UP: usize = 12;
 const DOWN: usize = 13;
 const LEFT: usize = 14;
 const RIGHT: usize = 15;
-const BUTTON_HOME: usize = 16;
-const GAME_MENU: usize = 17;
-const QUICK_LOAD: usize = 18;
-const QUICK_SAVE: usize = 19;
+const LEFT_TRIGGER: usize = 16;
+const RIGHT_TRIGGER: usize = 17;
 
 #[swift_bridge::bridge]
 mod ffi {

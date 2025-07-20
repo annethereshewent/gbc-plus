@@ -55,35 +55,20 @@ impl APU {
     }
 
     fn generate_samples(&mut self) {
-        let mut ch1_left_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
-        let mut ch1_right_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
+       let mut ch1_sample = self.channel1.generate_sample();
+        let mut ch2_sample = self.channel2.generate_sample();
+        let mut ch3_sample = self.channel3.generate_sample();
+        let mut ch4_sample = self.channel4.generate_sample();
 
-        ch1_left_sample = (ch1_left_sample / 7.5) - 1.0;
-        ch1_right_sample = (ch1_right_sample / 7.5) - 1.0;
+        ch1_sample = (ch1_sample / 7.5) - 1.0;
+        ch2_sample = (ch2_sample / 7.5) - 1.0;
+        ch3_sample = (ch3_sample / 7.5) - 1.0;
+        ch4_sample = (ch4_sample / 7.5) - 1.0;
 
-        let mut ch2_left_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_LEFT) as i16 as f32;
-        let mut ch2_right_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_RIGHT) as i16 as f32;
+        let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        ch2_left_sample = (ch2_left_sample / 7.5) - 1.0;
-        ch2_right_sample = (ch2_right_sample / 7.5) - 1.0;
-
-        let mut ch3_left_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_LEFT) as i16 as f32;
-        let mut ch3_right_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_RIGHT) as i16 as f32;
-
-        ch3_left_sample = (ch3_left_sample / 7.5) - 1.0;
-        ch3_right_sample = (ch3_right_sample / 7.5) - 1.0;
-
-        let mut ch4_left_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_LEFT) as i16 as f32;
-        let mut ch4_right_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_RIGHT) as i16 as f32;
-
-        ch4_left_sample = (ch4_left_sample / 7.5) - 1.0;
-        ch4_right_sample = (ch4_right_sample / 7.5) - 1.0;
-
-        let mut left_sample = (ch1_left_sample + ch2_left_sample + ch3_left_sample + ch4_left_sample) / 4.0;
-        let mut right_sample = (ch1_right_sample + ch2_right_sample + ch3_right_sample + ch4_right_sample) / 4.0;
-
-        left_sample *= self.nr50.left_volume as f32 / 7.0;
-        right_sample *= self.nr50.right_volume as f32 / 7.0;
+        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
+        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(-1.0, 1.0);
         right_sample = right_sample.clamp(-1.0, 1.0);
@@ -101,27 +86,20 @@ impl APU {
      *  TODO: find a better way to do this.
      */
     pub fn generate_ios_samples(&mut self) {
-        let ch1_left_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_LEFT) as i16 as f32;
-        let ch1_right_sample = self.channel1.generate_sample() * self.nr51.contains(SoundPanningRegister::CH1_RIGHT) as i16 as f32;
+        let mut ch1_sample = self.channel1.generate_sample();
+        let mut ch2_sample = self.channel2.generate_sample();
+        let mut ch3_sample = self.channel3.generate_sample();
+        let mut ch4_sample = self.channel4.generate_sample();
 
-        let ch2_left_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_LEFT) as i16 as f32;
-        let ch2_right_sample = self.channel2.generate_sample() * self.nr51.contains(SoundPanningRegister::CH2_RIGHT) as i16 as f32;
+        ch1_sample /= 15.0;
+        ch2_sample /= 15.0;
+        ch3_sample /= 15.0;
+        ch4_sample /= 15.0;
 
-        let ch3_left_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_LEFT) as i16 as f32;
-        let ch3_right_sample = self.channel3.generate_sample() * self.nr51.contains(SoundPanningRegister::CH3_RIGHT) as i16 as f32;
+        let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        let ch4_left_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_LEFT) as i16 as f32;
-        let ch4_right_sample = self.channel4.generate_sample() * self.nr51.contains(SoundPanningRegister::CH4_RIGHT) as i16 as f32;
-
-
-        let mut left_sample = (ch1_left_sample + ch2_left_sample + ch3_left_sample + ch4_left_sample) / 4.0;
-        let mut right_sample =(ch1_right_sample + ch2_right_sample + ch3_right_sample + ch4_right_sample) / 4.0;
-
-        left_sample /= 15.0;
-        right_sample /= 15.0;
-
-        left_sample *= self.nr50.left_volume as f32 / 7.0;
-        right_sample *= self.nr50.right_volume as f32 / 7.0;
+        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
+        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(0.0, 1.0);
         right_sample = right_sample.clamp(0.0, 1.0);
