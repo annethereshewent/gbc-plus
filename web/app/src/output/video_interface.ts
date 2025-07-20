@@ -31,12 +31,11 @@ export class VideoInterface {
     for (let y = 0; y < SCREEN_HEIGHT; y++) {
       for (let x = 0; x < SCREEN_WIDTH; x++) {
         const index = x * 4 + y * SCREEN_WIDTH * 4
-        const screenIndex = x * 3 + y * SCREEN_WIDTH * 3
 
-        imageData.data[index] = memory[screenIndex]
-        imageData.data[index + 1] = memory[screenIndex + 1]
-        imageData.data[index + 2] = memory[screenIndex + 2]
-        imageData.data[index + 3] = 0xff
+        imageData.data[index] = memory[index]
+        imageData.data[index + 1] = memory[index + 1]
+        imageData.data[index + 2] = memory[index + 2]
+        imageData.data[index + 3] = memory[index + 3]
       }
     }
 
