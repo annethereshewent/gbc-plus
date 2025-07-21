@@ -139,18 +139,16 @@ export class GBC {
       const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
 
       if (this.waveVisualizer.originSampleTime == 0) {
+        this.waveVisualizer.redrawBackground()
         this.waveVisualizer.originSampleTime = time
       }
+      console.log("yeah!")
       this.waveVisualizer.append(x, samples)
     }
 
 
 
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
-      if (this.showWaveform) {
-        this.waveVisualizer.plot()
-      }
-
       this.emulator!.step_frame()
       this.video.updateCanvas()
 
@@ -205,33 +203,9 @@ export class GBC {
   toggleWavePlot() {
     this.showWaveform = !this.showWaveform
 
-    const delta = 0.1
+    const display = this.showWaveform ? "block" : "none"
 
-    let currOpacity = this.showWaveform ? 0.0 : 1.0
-
-    const interval = setInterval(() => {
-      if (!this.showWaveform) {
-        currOpacity -= delta
-        this.plotCanvas.style.opacity = `${currOpacity}`
-
-        if (currOpacity <= 0) {
-          this.plotCanvas.style.opacity = "0.0"
-          clearInterval(interval)
-        }
-      } else {
-        currOpacity += delta
-        this.plotCanvas.style.opacity = `${currOpacity}`
-
-        if (currOpacity >= 1) {
-          this.plotCanvas.style.opacity = "1.0"
-          clearInterval(interval)
-        }
-      }
-
-      if (currOpacity >= 1 || currOpacity <= 0) {
-        clearInterval(interval)
-      }
-    }, 100)
+    this.plotCanvas.style.display = display
   }
 
   addEventListeners() {
