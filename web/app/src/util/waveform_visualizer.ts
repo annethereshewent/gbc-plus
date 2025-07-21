@@ -3,13 +3,15 @@ const CANVAS_HEIGHT = 256
 
 const NUM_SNAPSHOTS = 10240
 
-export class WaveformAnalyzer {
+export class WaveformVisualizer {
     canvas: HTMLCanvasElement
     context: CanvasRenderingContext2D|null
 
     coordinates: number[][] = new Array(NUM_SNAPSHOTS)
 
     originSampleTime = 0
+
+    lastIndex = 0
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas
@@ -24,9 +26,11 @@ export class WaveformAnalyzer {
             this.coordinates.fill([], 0, NUM_SNAPSHOTS)
         }
 
-        this.coordinates[realX - 1] = []
+        // this.coordinates[this.lastIndex] = []
 
         this.coordinates[realX] = y
+
+        this.lastIndex = realX
     }
 
     drawOriginLines() {

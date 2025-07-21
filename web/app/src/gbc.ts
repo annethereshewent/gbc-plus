@@ -4,7 +4,7 @@ import wasmData from '../../pkg/gb_plus_web_bg.wasm'
 import { VideoInterface } from './output/video_interface'
 import { AudioInterface } from './output/audio_interface'
 import { Joypad } from './input/joypad'
-import { WaveformAnalyzer } from './util/waveform_analyzer'
+import { WaveformVisualizer } from './util/waveform_visualizer'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -12,13 +12,14 @@ export class GBC {
   private emulator: WebEmulator|null = null
   private wasm: InitOutput|null = null
   private canvas: HTMLCanvasElement = document.getElementById('game-canvas')! as HTMLCanvasElement
-  private plotCanvas: HTMLCanvasElement = document.getElementById('waveform-analyzer')! as HTMLCanvasElement
+  private plotCanvas: HTMLCanvasElement = document.getElementById('waveform-visualizer')! as HTMLCanvasElement
   private context = this.canvas.getContext("2d")
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
   private audio: AudioInterface|null = null
   private previousTime = 0
   private joypad: Joypad = new Joypad()
-  private waveAnalyzer = new WaveformAnalyzer(this.plotCanvas as HTMLCanvasElement)
+  private waveVisualizer = new WaveformVisualizer(this.plotCanvas)
+  private showWaveform = false
 
   private saveName = ""
   private rtcName = ""
@@ -132,18 +133,23 @@ export class GBC {
   runFrame(time: number) {
     const diff = time - this.previousTime
 
-    const x = this.waveAnalyzer.originSampleTime == 0 ? 0 : time - this.waveAnalyzer.originSampleTime
-
-    if (this.waveAnalyzer.originSampleTime == 0) {
-      this.waveAnalyzer.originSampleTime = time
-    }
-
     const samples = this.audio!.pushSamples()
 
-    this.waveAnalyzer.append(x, samples)
+    if (this.showWaveform) {
+      const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
+
+      if (this.waveVisualizer.originSampleTime == 0) {
+        this.waveVisualizer.originSampleTime = time
+      }
+      this.waveVisualizer.append(x, samples)
+    }
+
+
 
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
-      this.waveAnalyzer.plot()
+      if (this.showWaveform) {
+        this.waveVisualizer.plot()
+      }
 
       this.emulator!.step_frame()
       this.video.updateCanvas()
@@ -196,6 +202,38 @@ export class GBC {
     }
   }
 
+  toggleWavePlot() {
+    this.showWaveform = !this.showWaveform
+
+    const delta = 0.1
+
+    let currOpacity = this.showWaveform ? 0.0 : 1.0
+
+    const interval = setInterval(() => {
+      if (!this.showWaveform) {
+        currOpacity -= delta
+        this.plotCanvas.style.opacity = `${currOpacity}`
+
+        if (currOpacity <= 0) {
+          this.plotCanvas.style.opacity = "0.0"
+          clearInterval(interval)
+        }
+      } else {
+        currOpacity += delta
+        this.plotCanvas.style.opacity = `${currOpacity}`
+
+        if (currOpacity >= 1) {
+          this.plotCanvas.style.opacity = "1.0"
+          clearInterval(interval)
+        }
+      }
+
+      if (currOpacity >= 1 || currOpacity <= 0) {
+        clearInterval(interval)
+      }
+    }, 100)
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
@@ -218,6 +256,12 @@ export class GBC {
       }
     }
 
+    const waveformButton = document.getElementById("waveform-visualizer")!
+
+    waveformButton.addEventListener('click', () => {
+      this.toggleWavePlot()
+    })
+
     document.onkeydown = (ev) => {
       switch (ev.key) {
         case 'Escape':
@@ -234,6 +278,9 @@ export class GBC {
             helpModal.className = 'modal hide'
             helpModal.style.display = 'none'
           }
+          break
+        case 'F2':
+          this.toggleWavePlot()
           break
       }
     }

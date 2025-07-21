@@ -6,7 +6,6 @@
     <div class="navbar-brand">
       <a class="navbar-item" href="https://www.github.com/annethereshewent"><i class="fa-brands logo fa-github"></i>GBC+</a>
     </div>
-
     <div id="navbar-main" class="navbar-menu">
       <div class="navbar-start">
         <div class="navbar-item">
@@ -33,9 +32,16 @@
       <div class="navbar-end">
         <div class="navbar-item has-dropdown is-hoverable">
           <a class="navbar-link">
+            Misc
+          </a>
+          <div class="navbar-dropdown">
+            <a id="waveform-visualizer-button" class="navbar-item">Waveform visualizer [F2]</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">
             Saves
           </a>
-
           <div class="navbar-dropdown">
             <a id="save-states" class="navbar-item">
               Save States
@@ -68,7 +74,7 @@
     <input type="file" id="save-input" class="file-input" accept=".sav">
     <p id="fps-counter"></p>
     <div>
-      <canvas width="683" height="256" id="waveform-analyzer"></canvas>
+      <canvas width="683" height="256" id="waveform-visualizer"></canvas>
     </div>
     <div class="canvas-wrapper">
       <canvas width="160" height="144" id="game-canvas" />
