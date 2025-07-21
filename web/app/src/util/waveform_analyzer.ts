@@ -48,12 +48,30 @@ export class WaveformAnalyzer {
         this.context!.stroke()
     }
 
+    drawAxisLines() {
+        const originX = CANVAS_WIDTH / 2
+        const originY = CANVAS_HEIGHT / 2
+
+        this.context!.strokeStyle = '#ff00ff'
+        this.context!.lineWidth = 1
+
+        this.context!.beginPath()
+        this.context!.moveTo(originX, 0)
+        this.context!.lineTo(originX, CANVAS_HEIGHT)
+        this.context!.stroke()
+
+        this.context!.beginPath()
+        this.context!.moveTo(0, originY)
+        this.context!.lineTo(CANVAS_WIDTH, originY)
+        this.context!.stroke()
+        }
+
     plot() {
         this.context!.fillStyle = "rgb(200 200 200)"
         this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         // Begin the path
         this.context!.lineWidth = 2
-        this.context!.strokeStyle = "#00ff00"
+        this.context!.strokeStyle = "#088F8F"
         this.context!.beginPath()
         for (let x = 0; x < this.coordinates.length; x++) {
             const realX = Math.floor(x / 10)
