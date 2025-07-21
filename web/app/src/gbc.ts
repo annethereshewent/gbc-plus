@@ -140,11 +140,6 @@ export class GBC {
 
     const samples = this.audio!.pushSamples()
 
-    const filteredSamples = samples.filter((sample) => sample < -1.0)
-    if (filteredSamples.length > 0) {
-      console.log(filteredSamples)
-    }
-
     this.waveAnalyzer.append(x, samples)
 
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
