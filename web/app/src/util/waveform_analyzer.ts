@@ -1,7 +1,7 @@
-const CANVAS_WIDTH = 1024
-const CANVAS_HEIGHT = 768
+const CANVAS_WIDTH = 683
+const CANVAS_HEIGHT = 256
 
-const NUM_SNAPSHOTS = 10000
+const NUM_SNAPSHOTS = 10240
 
 export class WaveformAnalyzer {
     canvas: HTMLCanvasElement
@@ -21,9 +21,10 @@ export class WaveformAnalyzer {
 
         if (x >= NUM_SNAPSHOTS) {
             this.originSampleTime = 0
-            console.log("clearing coordinate buffer")
             this.coordinates.fill([], 0, NUM_SNAPSHOTS)
         }
+
+        this.coordinates[realX - 1] = []
 
         this.coordinates[realX] = y
     }
@@ -49,32 +50,27 @@ export class WaveformAnalyzer {
     }
 
     drawAxisLines() {
-        const originX = CANVAS_WIDTH / 2
         const originY = CANVAS_HEIGHT / 2
 
-        this.context!.strokeStyle = '#ff00ff'
-        this.context!.lineWidth = 1
-
-        this.context!.beginPath()
-        this.context!.moveTo(originX, 0)
-        this.context!.lineTo(originX, CANVAS_HEIGHT)
-        this.context!.stroke()
+        this.context!.strokeStyle = '#000000'
+        this.context!.lineWidth = 3
 
         this.context!.beginPath()
         this.context!.moveTo(0, originY)
         this.context!.lineTo(CANVAS_WIDTH, originY)
         this.context!.stroke()
-        }
+    }
 
     plot() {
         this.context!.fillStyle = "rgb(200 200 200)"
         this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        this.drawAxisLines()
         // Begin the path
         this.context!.lineWidth = 2
         this.context!.strokeStyle = "#088F8F"
         this.context!.beginPath()
         for (let x = 0; x < this.coordinates.length; x++) {
-            const realX = Math.floor(x / 10)
+            const realX = Math.floor(x / 15)
             if (this.coordinates[x] == null) {
                 continue
             }

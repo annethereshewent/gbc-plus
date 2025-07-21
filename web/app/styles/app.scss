@@ -18,14 +18,17 @@
     height: 576px;
     margin: 150px auto;
   }
-  #waveform-analyzer {
-    width: 1024px;
-    height: 768px;
-    margin: 640px auto;
-    border: 1px solid red;
-    display: block;
-  }
 }
+
+#waveform-analyzer {
+  width: 683px;
+  height: 256px;
+  float: right;
+  margin-top: 150px;
+  margin-right: 80px;
+}
+
+
 
 .fa-github {
   font-size: 28px;
