@@ -4,6 +4,7 @@ import wasmData from '../../pkg/gb_plus_web_bg.wasm'
 import { VideoInterface } from './output/video_interface'
 import { AudioInterface } from './output/audio_interface'
 import { Joypad } from './input/joypad'
+import { WaveformAnalyzer } from './util/waveform_analyzer'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -11,11 +12,13 @@ export class GBC {
   private emulator: WebEmulator|null = null
   private wasm: InitOutput|null = null
   private canvas: HTMLCanvasElement = document.getElementById('game-canvas')! as HTMLCanvasElement
+  private plotCanvas: HTMLCanvasElement = document.getElementById('waveform-analyzer')! as HTMLCanvasElement
   private context = this.canvas.getContext("2d")
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
   private audio: AudioInterface|null = null
   private previousTime = 0
   private joypad: Joypad = new Joypad()
+  private waveAnalyzer = new WaveformAnalyzer(this.plotCanvas as HTMLCanvasElement)
 
   private saveName = ""
   private rtcName = ""
@@ -129,9 +132,19 @@ export class GBC {
   runFrame(time: number) {
     const diff = time - this.previousTime
 
-    this.audio!.pushSamples()
+    const x = this.waveAnalyzer.originSampleTime == 0 ? 0 : time - this.waveAnalyzer.originSampleTime
+
+    if (this.waveAnalyzer.originSampleTime == 0) {
+      this.waveAnalyzer.originSampleTime = time
+    }
+
+    const samples = this.audio!.pushSamples()
+
+    this.waveAnalyzer.append(x, samples)
 
     if (diff >= FPS_INTERVAL || this.previousTime == 0) {
+      this.waveAnalyzer.plot()
+
       this.emulator!.step_frame()
       this.video.updateCanvas()
 

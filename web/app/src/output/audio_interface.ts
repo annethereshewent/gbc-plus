@@ -40,5 +40,7 @@ export class AudioInterface {
     const samples = Array.from(f32arr)
 
     this.workletNode?.port.postMessage({ type: "samples", samples: samples })
+
+    return samples
   }
 }
