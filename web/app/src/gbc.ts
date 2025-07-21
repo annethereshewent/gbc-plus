@@ -133,22 +133,18 @@ export class GBC {
   runFrame(time: number) {
     const diff = time - this.previousTime
 
-    const samples = this.audio!.pushSamples()
-
-    if (this.showWaveform) {
+    if (diff >= FPS_INTERVAL || this.previousTime == 0) {
+      const samples = this.audio!.pushSamples()
+      if (this.showWaveform) {
       const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
 
       if (this.waveVisualizer.originSampleTime == 0) {
         this.waveVisualizer.redrawBackground()
         this.waveVisualizer.originSampleTime = time
       }
-      console.log("yeah!")
+
       this.waveVisualizer.append(x, samples)
     }
-
-
-
-    if (diff >= FPS_INTERVAL || this.previousTime == 0) {
       this.emulator!.step_frame()
       this.video.updateCanvas()
 
@@ -203,9 +199,38 @@ export class GBC {
   toggleWavePlot() {
     this.showWaveform = !this.showWaveform
 
-    const display = this.showWaveform ? "block" : "none"
+    let currentOpacity = 0
+    let initialOpacity: number
+    let delta: number
 
-    this.plotCanvas.style.display = display
+    if (this.showWaveform) {
+      currentOpacity = 0.0
+      initialOpacity = currentOpacity
+      delta = 0.25
+
+      this.plotCanvas.style.display = "block"
+    } else {
+      currentOpacity = 1.0
+      initialOpacity = currentOpacity
+      delta = -0.25
+    }
+
+    this.plotCanvas.style.opacity = `${initialOpacity}`
+
+    const interval = setInterval(() => {
+      currentOpacity += delta
+
+      this.plotCanvas.style.opacity = `${currentOpacity}`
+
+      if ((currentOpacity <= 0.0 && initialOpacity != 0.0) || (currentOpacity >= 1.0 && initialOpacity != 1.0)) {
+        if (!this.showWaveform) {
+          this.plotCanvas.style.display = "none"
+        }
+        clearInterval(interval)
+      }
+    }, 150)
+
+
   }
 
   addEventListeners() {

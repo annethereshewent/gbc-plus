@@ -66,10 +66,13 @@ export class WaveformVisualizer {
     }
 
     plot(x: number) {
+        // this.context!.fillStyle = "rgba(200, 200, 200, 0.05)"
+        // this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
         this.drawAxisLines()
         // Begin the path
-        this.context!.lineWidth = 5
-        this.context!.strokeStyle = "#088F8F"
+        this.context!.lineWidth = 5  // 0x088f8f
+        this.context!.strokeStyle = "rgba(8, 143, 143, 0.5)"
         this.context!.beginPath()
 
         const realX = Math.floor(x / 15)
