@@ -53,7 +53,7 @@ export class WaveformAnalyzer {
         this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         // Begin the path
         this.context!.lineWidth = 2
-        this.context!.strokeStyle = "#ffffff"
+        this.context!.strokeStyle = "#00ff00"
         this.context!.beginPath()
         for (let x = 0; x < this.coordinates.length; x++) {
             const realX = Math.floor(x / 10)
