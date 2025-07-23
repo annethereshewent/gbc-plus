@@ -3,15 +3,17 @@ use std::{collections::HashSet, sync::Arc};
 use bitflags::bitflags;
 use bus::{interrupt_register::InterruptRegister, Bus};
 use ringbuf::{storage::Heap, wrap::caching::Caching, SharedRb};
+use serde::{Deserialize, Serialize};
 
 pub mod bus;
-pub mod cpu_instructions;
+pub mod instructions;
 pub mod disassembler;
 
 pub const CLOCK_SPEED: usize = 4194304;
 const CGB_ADDR: usize = 0x143;
 
 bitflags! {
+    #[derive(Serialize, Deserialize)]
     pub struct FlagRegister: u8 {
         const CARRY = 1 << 4;
         const HALF_CARRY = 1 << 5;
@@ -37,6 +39,7 @@ pub enum Register {
     AF = 16
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct CPU {
     registers: [u8; 7],
     pc: u16,
@@ -60,6 +63,22 @@ impl CPU {
             debug_on: false,
             is_halted: false
         }
+    }
+
+    pub fn create_save_state(&mut self) -> (Vec<u8>, usize) {
+        let mut data: Vec<u8> = Vec::new();
+
+        let length = bincode::serde::encode_into_slice(
+            self,
+            &mut data,
+            bincode::config::standard()
+        ).unwrap();
+
+        (data, length)
+    }
+
+    pub fn load_save_state(&mut self, data: &[u8]) {
+        (*self, _) = bincode::serde::decode_from_slice(data, bincode::config::standard()).unwrap();
     }
 
     pub fn push_to_stack(&mut self, value: u16) {
@@ -111,6 +130,10 @@ impl CPU {
 
         self.check_cgb_header();
         self.bus.check_header();
+    }
+
+    pub fn reload_rom(&mut self, bytes: &[u8]) {
+        self.bus.cartridge.rom = bytes.to_vec();
     }
 
     fn check_cgb_header(&mut self) {

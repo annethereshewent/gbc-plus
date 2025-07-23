@@ -6,6 +6,7 @@ use joypad::Joypad;
 use ppu::PPU;
 use interrupt_register::InterruptRegister;
 use ringbuf::{storage::Heap, wrap::caching::Caching, SharedRb};
+use serde::{Deserialize, Serialize};
 use timer::Timer;
 
 pub mod interrupt_register;
@@ -25,6 +26,7 @@ pub enum HdmaMode {
     Hblank
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Bus {
     pub cartridge: Cartridge,
     wram: [Box<[u8]>; 8],

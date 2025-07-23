@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 bitflags! {
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, Serialize, Deserialize)]
     pub struct JoypadRegister: u8 {
         const A_RIGHT = 1;
         const B_LEFT = 1 << 1;
@@ -12,7 +13,16 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Serialize,
+    Deserialize
+)]
 pub enum JoypadButtons {
     A,
     B,
@@ -25,6 +35,7 @@ pub enum JoypadButtons {
     None
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Joypad {
     pub select_buttons: bool,
     pub select_dpad: bool,

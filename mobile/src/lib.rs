@@ -1,24 +1,34 @@
 use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
-use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, joypad::JoypadButtons}, CPU};
-use ringbuf::{storage::Heap, traits::{Consumer, Observer, Split}, wrap::caching::Caching, HeapRb, SharedRb};
+use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
+use ringbuf::{
+    storage::Heap,
+    traits::{
+        Consumer,
+        Observer,
+        Split
+    },
+    wrap::caching::Caching,
+    HeapRb,
+    SharedRb
+};
 
 const BUTTON_CROSS: usize = 0;
 const BUTTON_CIRCLE: usize = 1;
-const BUTTON_SQUARE: usize = 2;
-const BUTTON_TRIANGLE: usize = 3;
+// const BUTTON_SQUARE: usize = 2;
+// const BUTTON_TRIANGLE: usize = 3;
 const SELECT: usize = 4;
 const START: usize = 6;
-const LEFT_STICK: usize = 7;
-const RIGHT_STICK: usize = 8;
-const BUTTON_L: usize = 9;
-const BUTTON_R: usize = 10;
+// const LEFT_STICK: usize = 7;
+// const RIGHT_STICK: usize = 8;
+// const BUTTON_L: usize = 9;
+// const BUTTON_R: usize = 10;
 const UP: usize = 12;
 const DOWN: usize = 13;
 const LEFT: usize = 14;
 const RIGHT: usize = 15;
-const LEFT_TRIGGER: usize = 16;
-const RIGHT_TRIGGER: usize = 17;
+// const LEFT_TRIGGER: usize = 16;
+// const RIGHT_TRIGGER: usize = 17;
 
 #[swift_bridge::bridge]
 mod ffi {
@@ -78,6 +88,18 @@ mod ffi {
 
         #[swift_bridge(swift_name="popSample")]
         fn pop_sample(&mut self) -> f32;
+
+        #[swift_bridge(swift_name="createSaveState")]
+        fn create_save_state(&mut self) -> *const u8;
+
+        #[swift_bridge(swift_name="saveStateLength")]
+        fn save_state_len(&self) -> usize;
+
+        #[swift_bridge(swift_name="loadSaveState")]
+        fn load_save_state(&mut self, data: &[u8]);
+
+        #[swift_bridge(swift_name="reloadRom")]
+        fn reload_rom(&mut self, bytes: &[u8]);
     }
 }
 
@@ -87,6 +109,7 @@ pub struct GBCMobileEmulator {
     sample_buffer: Vec<f32>,
     paused: bool,
     consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+    state_data: Vec<u8>
 }
 
 impl GBCMobileEmulator {
@@ -112,8 +135,39 @@ impl GBCMobileEmulator {
             joypad_map,
             sample_buffer: Vec::new(),
             paused: false,
-            consumer
+            consumer,
+            state_data: Vec::new()
         }
+    }
+
+    pub fn create_save_state(&mut self) -> *const u8 {
+        let (bytes, _) = self.cpu.create_save_state();
+
+        let compressed = zstd::encode_all(&*bytes, 9).unwrap();
+
+        self.state_data = compressed;
+
+            self.state_data.as_ptr()
+    }
+
+    pub fn reload_rom(&mut self, bytes: &[u8]) {
+        self.cpu.reload_rom(bytes);
+    }
+
+    pub fn load_save_state(&mut self, data: &[u8]) {
+        let decompressed = zstd::decode_all(&*data).unwrap();
+        self.cpu.load_save_state(&decompressed);
+
+        let ringbuffer = HeapRb::<f32>::new(4096 * 2);
+
+        let (producer, consumer) = ringbuffer.split();
+
+        self.consumer = consumer;
+        self.cpu.bus.apu.producer = Some(producer);
+    }
+
+    pub fn save_state_len(&self) -> usize {
+        self.state_data.len()
     }
 
     pub fn has_timer(&self) -> bool {

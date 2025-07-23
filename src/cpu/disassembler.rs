@@ -1,6 +1,6 @@
 use crate::cpu::FlagRegister;
 
-use super::{cpu_instructions::{AluOp, CBOp, IncrementMode, JumpFlags, LoadType, ALU_TABLE, CC_TABLE, RP2_TABLE, RP_TABLE, R_TABLE}, Register, CPU};
+use super::{instructions::{AluOp, CBOp, IncrementMode, JumpFlags, LoadType, ALU_TABLE, CC_TABLE, RP2_TABLE, RP_TABLE, R_TABLE}, Register, CPU};
 
 impl CPU {
 

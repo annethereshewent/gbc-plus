@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct MasterVolumeVinRegister {
     pub right_volume: u8,
     pub left_volume: u8,

@@ -1,9 +1,23 @@
+use serde::{Deserialize, Serialize};
+
 use crate::cpu::CLOCK_SPEED;
 
-use super::{channel_length_duty_register::ChannelLengthDutyRegister, channel_period_high_control_register::ChannelPeriodHighControlRegister, channel_sweep_register::{ChannelSweepRegister, SweepDirection}, channel_volume_register::{ChannelVolumeRegister, EnvelopeDirection}};
+use super::{
+    channel_length_duty_register::ChannelLengthDutyRegister,
+    channel_period_high_control_register::ChannelPeriodHighControlRegister,
+    channel_sweep_register::{
+        ChannelSweepRegister,
+        SweepDirection
+    },
+    channel_volume_register::{
+        ChannelVolumeRegister,
+        EnvelopeDirection
+    }
+};
 
 pub const LENGTH_CYCLES_NEEDED: usize = CLOCK_SPEED / 256;
 
+#[derive(Serialize, Deserialize)]
 pub struct PulseChannel<const IS_CHANNEL1: bool>  {
     pub enabled: bool,
     pub nrx2: ChannelVolumeRegister,

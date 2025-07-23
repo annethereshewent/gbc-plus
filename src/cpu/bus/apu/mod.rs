@@ -8,6 +8,7 @@ use channels::{
 };
 use master_volume_vin_register::MasterVolumeVinRegister;
 use ringbuf::{storage::Heap, traits::Producer, wrap::caching::Caching, SharedRb};
+use serde::{Deserialize, Serialize};
 use sound_panning_register::SoundPanningRegister;
 
 use crate::cpu::CLOCK_SPEED;
@@ -21,6 +22,7 @@ pub const TICKS_PER_SAMPLE: usize = CLOCK_SPEED / 44100;
 pub const NUM_SAMPLES: usize = 8192 * 2;
 pub const HZ_512: usize = CLOCK_SPEED / 512;
 
+#[derive(Serialize, Deserialize)]
 pub struct APU {
     pub nr52: AudioMasterRegister,
     pub nr51: SoundPanningRegister,
@@ -30,7 +32,9 @@ pub struct APU {
     pub channel3: Channel3,
     pub channel4: Channel4,
     cycles: usize,
-    pub producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
     sequencer_step: usize,
     is_ios: bool
@@ -49,7 +53,7 @@ impl APU {
             cycles: 0,
             sequencer_cycles: 0,
             sequencer_step: 0,
-            producer,
+            producer: Some(producer),
             is_ios
         }
     }
@@ -109,8 +113,10 @@ impl APU {
     }
 
     fn push_ringbuffer(&mut self, left_sample: f32, right_sample: f32) {
-        self.producer.try_push(left_sample).unwrap_or(());
-        self.producer.try_push(right_sample).unwrap_or(());
+        if let Some(producer) = &mut self.producer {
+            producer.try_push(left_sample).unwrap_or(());
+            producer.try_push(right_sample).unwrap_or(());
+        }
     }
     // https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
     // Step   Length Ctr  Vol Env     Sweep

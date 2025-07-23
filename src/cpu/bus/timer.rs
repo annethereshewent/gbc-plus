@@ -1,8 +1,10 @@
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 use super::interrupt_register::InterruptRegister;
 
 bitflags! {
+    #[derive(Serialize, Deserialize)]
     pub struct TimerControl: u8 {
         const ENABLE = 1 << 2;
     }
@@ -16,6 +18,7 @@ impl TimerControl {
 
 pub const DIV_CYCLES: usize = 256;
 
+#[derive(Serialize, Deserialize)]
 pub struct Timer {
     pub div: u8,
     pub tima: u8,

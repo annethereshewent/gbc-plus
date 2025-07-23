@@ -1,7 +1,9 @@
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 
 bitflags! {
+    #[derive(Serialize, Deserialize)]
     pub struct SoundPanningRegister: u8 {
         const CH1_LEFT = 1;
         const CH1_RIGHT = 1 << 1;

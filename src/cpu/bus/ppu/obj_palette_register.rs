@@ -1,5 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::bg_palette_register::{BGColor, BGPaletteRegister};
 
+#[derive(Serialize, Deserialize)]
 pub struct ObjPaletteRegister {
     pub indexes: [BGColor; 4]
 }

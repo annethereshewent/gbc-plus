@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 
 
-#[derive(Copy, Clone)]
+
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum BGColor {
     White = 0,
     LightGray = 1,
@@ -8,6 +10,7 @@ pub enum BGColor {
     Black = 3
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct BGPaletteRegister {
     pub indexes: [BGColor; 4]
 }

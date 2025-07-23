@@ -1,12 +1,18 @@
 use mbc::{mbc1::MBC1, mbc3::MBC3, mbc5::MBC5, MBC};
+use serde::{Deserialize, Serialize};
 
 pub mod backup_file;
 pub mod mbc;
 
+#[derive(Serialize, Deserialize)]
 pub struct Cartridge {
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     pub rom: Vec<u8>,
     pub rom_size: usize,
     pub ram_size: usize,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     pub mbc: Option<Box<dyn MBC>>,
     pub rom_path: Option<String>
 }

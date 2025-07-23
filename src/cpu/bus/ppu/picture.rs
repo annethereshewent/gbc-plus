@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -13,6 +15,7 @@ impl Color {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Picture {
     pub data: Vec<u8>
 }

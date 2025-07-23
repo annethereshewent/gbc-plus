@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::{OamAttributes, OamPriority};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct OAMEntry {
     pub y_position: u8,
     pub x_position: u8,
