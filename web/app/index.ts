@@ -7,3 +7,5 @@ const gbc = new GBC()
 
 gbc.addEventListeners()
 gbc.initWasm()
+
+gbc.checkOauth()

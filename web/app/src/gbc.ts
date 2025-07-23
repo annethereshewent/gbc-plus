@@ -5,6 +5,7 @@ import { VideoInterface } from './output/video_interface'
 import { AudioInterface } from './output/audio_interface'
 import { Joypad } from './input/joypad'
 import { WaveformVisualizer } from './util/waveform_visualizer'
+import { CloudService } from './util/cloud_service'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -21,10 +22,17 @@ export class GBC {
   private waveVisualizer = new WaveformVisualizer(this.plotCanvas)
   private showWaveform = false
 
+  private cloudService = new CloudService()
+
   private saveName = ""
   private rtcName = ""
+  private gameName = ""
 
   private timeoutIndex: any|null = null
+
+  checkOauth() {
+    this.cloudService.checkAuthentication()
+  }
 
   async onGameChange(file: File) {
     const fileName = file.name
@@ -33,6 +41,8 @@ export class GBC {
 
     let gameName = tokens.pop()!
 
+    this.gameName = gameName
+
     const gameNameTokens = gameName.split('.')
 
     const extension = gameNameTokens.pop()!
@@ -40,6 +50,7 @@ export class GBC {
     gameName = gameNameTokens.join('.')
 
     let saveName = gameName + ".sav"
+    this.rtcName = gameName + ".rtc"
 
     let data = null
     if (extension.toLowerCase() == 'zip') {
@@ -47,11 +58,16 @@ export class GBC {
 
       const zipFileName = Object.keys(zipFile.files)[0]
 
+      console.log(zipFileName)
+
+      this.gameName = gameName
+
       const zipTokens = zipFileName.split('.')
 
       zipTokens.pop()
 
       saveName = zipTokens.join('.') + ".sav"
+      this.rtcName = zipTokens.join('.') + ".sav"
 
       data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
@@ -61,7 +77,6 @@ export class GBC {
     if (data != null) {
       this.saveName = saveName
 
-      // check if save exists in localStorage
       this.startGame(data)
     }
   }
@@ -71,7 +86,7 @@ export class GBC {
     this.emulator = new WebEmulator()
   }
 
-  startGame(data: ArrayBuffer) {
+  async startGame(data: ArrayBuffer) {
     if (this.emulator != null) {
       const byteArr = new Uint8Array(data)
       this.emulator.load_rom(byteArr)
@@ -82,13 +97,13 @@ export class GBC {
         this.fetchRtc()
       }
 
-      const saveArr = JSON.parse(localStorage.getItem(this.saveName) || '[]')
+      // check if save exists and whether it's on the cloud
+      const saveBuffer = this.cloudService.usingCloud ?
+        (await this.cloudService.getSave(this.saveName)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName) || '[]'))
 
-      if (saveArr.length > 0) {
-        const saveBuffer = new Uint8Array(saveArr)
+      if (saveBuffer != null && saveBuffer.length > 0) {
         this.emulator!.load_save(saveBuffer)
       }
-
 
       this.audio = new AudioInterface()
 
@@ -124,8 +139,16 @@ export class GBC {
         const data = new Uint8Array(this.wasm!.memory.buffer, dataPointer, saveLength)
 
         const saveArr = Array.from(data)
+        // need to do this for uploading to the cloud, otherwise it will try to upload the emulator's
+        // entire memory
+        const uint8Clone = new Uint8Array(saveArr)
 
-        localStorage.setItem(this.saveName, JSON.stringify(saveArr))
+
+        if (!this.cloudService.usingCloud) {
+          localStorage.setItem(this.saveName, JSON.stringify(saveArr))
+        } else {
+          this.cloudService.uploadSave(this.saveName, uint8Clone)
+        }
       }
     }
   }
