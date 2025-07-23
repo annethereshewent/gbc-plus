@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use apu::{sound_panning_register::SoundPanningRegister, APU};
-use cartridge::Cartridge;
+use cartridge::{mbc::MBC, Cartridge};
 use joypad::Joypad;
 use ppu::PPU;
 use interrupt_register::InterruptRegister;
@@ -128,11 +128,9 @@ impl Bus {
 
     pub fn mem_read8(&mut self, address: u16) -> u8 {
         match address {
-            // 0x0000..=0x3fff => self.cartridge.rom[address as usize], // TODO: implement banks
-            0x0000..=0x7fff => if self.cartridge.mbc.is_some() {
-                self.cartridge.mbc_read8(address)
-            } else {
-                self.cartridge.rom[address as usize]
+            0x0000..=0x7fff => match self.cartridge.mbc {
+                MBC::None => self.cartridge.rom[address as usize],
+                _ => self.cartridge.mbc_read8(address)
             }
             0xa000..=0xbfff => self.cartridge.mbc_read8(address),
             0x8000..=0x9fff => if self.ppu.cgb_mode {
@@ -225,16 +223,18 @@ impl Bus {
             0xff70 => self.wram_bank as u8,
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize],
             0xffff => self.ie.bits(),
-            _ => panic!("(mem_read8): invalid address given: 0x{:x}", address)
+            _ => {
+                println!("[WARN](mem_read8): invalid address given: 0x{:x}", address);
+                0xff
+            }
         }
     }
 
     pub fn mem_read16(&mut self, address: u16) -> u16 {
         match address {
-            0x0000..=0x7fff => if self.cartridge.mbc.is_some() {
-                self.cartridge.mbc_read16(address)
-            } else {
-                unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) }
+            0x0000..=0x7fff => match self.cartridge.mbc {
+                MBC::None => unsafe { *(&self.cartridge.rom[address as usize] as *const u8 as *const u16) },
+                _ => self.cartridge.mbc_read16(address)
             }
             0x8000..=0x9fff => if self.ppu.cgb_mode {
                 if self.ppu.vram_enabled { unsafe { *(&self.ppu.vram[self.ppu.vram_bank as usize][(address - 0x8000) as usize] as *const u8 as *const u16) } } else { 0xff }
@@ -249,7 +249,10 @@ impl Bus {
                 unsafe { *(&self.wram[1][(address - 0xd000) as usize] as *const u8 as *const u16) }
             }
             0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
-            _ => panic!("(mem_read16): invalid address given: 0x{:x}", address)
+            _ => {
+                println!("(mem_read16): invalid address given: 0x{:x}", address);
+                0xff
+            }
         }
     }
 
@@ -264,8 +267,6 @@ impl Bus {
                     unsafe { *(&mut self.ppu.vram[0][(address - 0x8000) as usize] as *mut u8 as *mut u16) = value }
                 }
             }
-
-
             0xa000..=0xbfff | 0x0000..=0x7fff => self.cartridge.mbc_write16(address, value),
             0xc000..=0xcfff => unsafe { *(&mut self.wram[0][(address - 0xc000) as usize] as *mut u8 as *mut u16) = value },
             0xd000..=0xdfff => if self.ppu.cgb_mode {
@@ -276,7 +277,7 @@ impl Bus {
             0xff7f => (),
             0xff80..=0xfffe => unsafe { *(&mut self.hram[(address - 0xff80) as usize] as *mut u8 as *mut u16) = value },
             0xffff => self.ie = InterruptRegister::from_bits_retain(value as u8),
-            _ => panic!("(mem_write16): invalid address given: 0x{:x}", address)
+            _ => println!("[WARN] (mem_write16): invalid address given: 0x{:x}", address)
         }
     }
 
@@ -491,7 +492,7 @@ impl Bus {
             0xff7f => (), // ignore this one, tetris tries to write to here for some reason.
             0xff80..=0xfffe => self.hram[(address - 0xff80) as usize] = value,
             0xffff => self.ie = InterruptRegister::from_bits_retain(value),
-            _ => panic!("(mem_write8): invalid address given: 0x{:x}", address)
+            _ => println!("[WARN](mem_write8): invalid address given: 0x{:x}", address)
         }
     }
 }

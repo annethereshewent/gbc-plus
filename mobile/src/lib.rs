@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
-use gbc_plus::cpu::{bus::joypad::JoypadButtons, CPU};
+use gbc_plus::cpu::{bus::{cartridge::mbc::MBC, joypad::JoypadButtons}, CPU};
 use ringbuf::{
     storage::Heap,
     traits::{
@@ -178,24 +178,23 @@ impl GBCMobileEmulator {
     }
 
     pub fn has_timer(&self) -> bool {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.has_timer()
-        } else {
-            false
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.has_timer,
+            _ => false
         }
     }
 
     pub fn fetch_rtc(&self) -> String {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.save_rtc_web_mobile()
-        } else {
-            "".to_string()
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.save_rtc_web_mobile(),
+            _ => "".to_string()
         }
     }
 
     pub fn load_rtc(&mut self, json: String) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_rtc(json);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.load_rtc(json),
+            _ => ()
         }
     }
 
@@ -228,40 +227,42 @@ impl GBCMobileEmulator {
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_save(buf);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC3(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC5(mbc) => mbc.backup_file.load_save(buf),
+            _ => ()
         }
     }
 
     pub fn has_saved(&mut self) -> bool {
-        let return_val = if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            let return_val = mbc.backup_file().is_dirty;
-
-            mbc.clear_is_dirty();
-
-            return_val
-        } else {
-            false
-        };
-
-        return_val
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.has_saved(),
+            MBC::MBC3(mbc) => mbc.has_saved(),
+            MBC::MBC5(mbc) => mbc.has_saved(),
+            _ => false
+        }
     }
 
     pub fn get_save_length(&self) -> usize {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.backup_file().ram.len()
-        } else {
-            0
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.len(),
+            _ => 0
         }
     }
 
     pub fn save_game(&mut self) -> *const u8 {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.save_web_mobile()
-        } else {
-            let vec = Vec::new();
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.as_ptr(),
+            _ => {
+                let vec = Vec::new();
 
-            vec.as_ptr()
+                vec.as_ptr()
+            }
         }
     }
 

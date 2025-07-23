@@ -1,13 +1,16 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
-use super::MBC;
-
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 enum BankingMode {
     Simple = 0,
     Advanced = 1
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MBC1 {
     _ram_size: usize,
     rom_size: usize,
@@ -19,43 +22,34 @@ pub struct MBC1 {
     pub backup_file: BackupFile
 }
 
-impl MBC for MBC1 {
-    fn backup_file(&self) -> &BackupFile {
-        &self.backup_file
+impl MBC1 {
+    pub fn check_save(&mut self) {
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
+        let last_updated = self.backup_file.last_updated;
+
+        if self.backup_file.is_dirty &&
+            current_time > last_updated &&
+            last_updated != 0
+        {
+            let diff = current_time - last_updated;
+            if diff >= 500 {
+                self.backup_file.save_file()
+            }
+        }
     }
 
-    fn has_timer(&self) -> bool {
-        false
-    }
+    pub fn has_saved(&mut self) -> bool {
+        let return_val = self.backup_file.is_dirty;
 
-    fn load_rtc(&mut self, json: String) {
-
-    }
-
-    fn save_rtc_web_mobile(&self) -> String {
-        "".to_string()
-    }
-
-    fn load_save(&mut self, buf: &[u8]) {
-        self.backup_file.load_save(buf);
-    }
-
-    fn save_web_mobile(&self) -> *const u8 {
-        self.backup_file.ram.as_ptr()
-    }
-
-    fn clear_is_dirty(&mut self) {
         self.backup_file.is_dirty = false;
+
+        return_val
     }
 
-    // Do nothing; MBC1 has no RTC
-    fn save_rtc(&mut self) {}
-
-    fn save(&mut self) {
-        self.backup_file.save_file();
-    }
-
-    fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
+    pub fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
                 let actual_address = self.get_rom_address_lower(address);
@@ -76,7 +70,7 @@ impl MBC for MBC1 {
             _ => panic!("invalid address to mbc read given: 0x{:x}", address)
         }
     }
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x1fff => self.update_ram_enable(value),
             0x2000..=0x3fff => self.update_rom_bank(value),
@@ -91,7 +85,7 @@ impl MBC for MBC1 {
         }
     }
 
-    fn write16(&mut self, address: u16, value: u16) {
+    pub fn write16(&mut self, address: u16, value: u16) {
         match address {
             0x0000..=0x1fff => self.update_ram_enable(value as u8),
             0x2000..=0x3fff => self.update_rom_bank(value as u8),
@@ -106,7 +100,7 @@ impl MBC for MBC1 {
         }
     }
 
-    fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
+    pub fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
         match address {
             0x0000..=0x3fff => {
                 let actual_address = self.get_rom_address_lower(address);
@@ -127,9 +121,7 @@ impl MBC for MBC1 {
             _ => panic!("(mbc_read16): unsupported address given: 0x{:x}", address)
         }
     }
-}
 
-impl MBC1 {
     pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
         Self {
             _ram_size: ram_size,

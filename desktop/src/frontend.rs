@@ -22,8 +22,7 @@ use std::{
 use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
-        joypad::JoypadButtons,
-        ppu::{
+        cartridge::mbc::MBC, joypad::JoypadButtons, ppu::{
             SCREEN_HEIGHT,
             SCREEN_WIDTH
         }
@@ -265,42 +264,34 @@ impl Frontend {
 
     pub fn update_rtc(&mut self, cpu: &mut CPU) {
 
-        if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
-            let current_time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("an error occurred")
-                .as_millis();
-            if let Some(last_check) = self.last_check {
-                if current_time - last_check >= 1500 {
-                    mbc.save_rtc();
-                    self.last_check = None;
-                }
-            } else {
-                self.last_check = Some(SystemTime::now()
+        match &mut cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => {
+                let current_time = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
-                    .as_millis());
+                    .as_millis();
+                if let Some(last_check) = self.last_check {
+                    if current_time - last_check >= 1500 {
+                        mbc3.save_rtc();
+                        self.last_check = None;
+                    }
+                } else {
+                    self.last_check = Some(SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("an error occurred")
+                        .as_millis());
+                }
             }
+            _ => ()
         }
     }
 
     pub fn check_saves(&mut self, cpu: &mut CPU) {
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("an error occurred")
-            .as_millis();
-
-        if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
-            let last_updated = mbc.backup_file().last_updated;
-            if mbc.backup_file().is_dirty &&
-                current_time > last_updated &&
-                last_updated != 0
-            {
-                let diff = current_time - last_updated;
-                if diff >= 500 {
-                    mbc.save();
-                }
-            }
+        match &mut cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.check_save(),
+            MBC::MBC3(mbc) => mbc.check_save(),
+            MBC::MBC5(mbc) => mbc.check_save(),
+            _ => ()
         }
     }
 
@@ -319,10 +310,23 @@ impl Frontend {
         for event in self.event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => {
-                    if let Some(mbc) = &mut cpu.bus.cartridge.mbc {
-                        if mbc.backup_file().is_dirty {
-                            mbc.save();
+                    match &mut cpu.bus.cartridge.mbc {
+                        MBC::MBC1(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
                         }
+                        MBC::MBC3(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
+                        }
+                        MBC::MBC5(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
+                        }
+                        _=> ()
                     }
                     exit(0);
                 }

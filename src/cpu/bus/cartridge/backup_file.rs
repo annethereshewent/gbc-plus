@@ -1,6 +1,11 @@
 use std::{fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct BackupFile {
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     file: Option<File>,
     pub is_dirty: bool,
     pub ram: Box<[u8]>,
