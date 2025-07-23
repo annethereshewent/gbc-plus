@@ -14,7 +14,7 @@ import { StateManager } from './saves/state_manager'
 const FPS_INTERVAL = 1000 / 60
 
 export class GBC {
-  private emulator: WebEmulator|null = null
+  emulator: WebEmulator|null = null
   private wasm: InitOutput|null = null
   private canvas: HTMLCanvasElement = document.getElementById('game-canvas')! as HTMLCanvasElement
   private plotCanvas: HTMLCanvasElement = document.getElementById('waveform-visualizer')! as HTMLCanvasElement
@@ -22,7 +22,7 @@ export class GBC {
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
   private audio: AudioInterface|null = null
   private previousTime = 0
-  private joypad: Joypad = new Joypad()
+  private joypad: Joypad = new Joypad(this)
   private waveVisualizer = new WaveformVisualizer(this.plotCanvas)
   private showWaveform = false
 
@@ -30,10 +30,10 @@ export class GBC {
 
   private saveName = ""
   private rtcName = ""
-  private gameName = ""
+  gameName = ""
   private isPaused = false
 
-  private db = new GbcDatabase()
+  db = new GbcDatabase()
   private stateManager: StateManager|null = null
 
   private timeoutIndex: any|null = null
@@ -128,7 +128,7 @@ export class GBC {
       this.audio.setEmulator(this.emulator)
       this.audio.setMemory(this.wasm)
 
-      this.joypad.setEmulator(this.emulator)
+      this.joypad.setStateManager(this.stateManager)
 
       setInterval(() => {
         this.updateRtc()
@@ -467,7 +467,7 @@ export class GBC {
     }
   }
 
-  async createSaveState() {
+  async createSaveState(isQuickSave = false) {
     const now = moment()
 
     const stateName = `${now.unix()}.state`
@@ -475,7 +475,10 @@ export class GBC {
     if (this.gameName != "") {
       const imageUrl = this.getImageUrl()
       if (imageUrl != null) {
-        const entry = await this.stateManager?.createSaveState(imageUrl, stateName)
+        const entry = isQuickSave ?
+          await this.stateManager?.createSaveState(imageUrl) :
+          await this.stateManager?.createSaveState(imageUrl, stateName)
+
         const statesList = document.getElementById("states-list")
 
         if (entry != null && statesList != null) {
