@@ -66,15 +66,14 @@ impl CPU {
     }
 
     pub fn create_save_state(&mut self) -> (Vec<u8>, usize) {
-        let mut data: Vec<u8> = Vec::new();
-
-        let length = bincode::serde::encode_into_slice(
+        let data = bincode::serde::encode_to_vec(
             self,
-            &mut data,
             bincode::config::standard()
         ).unwrap();
 
-        (data, length)
+        let len = data.len();
+
+        (data, len)
     }
 
     pub fn load_save_state(&mut self, data: &[u8]) {
