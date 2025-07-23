@@ -3,11 +3,16 @@
 export class WebEmulator {
   free(): void;
   constructor();
+  set_pause(value: boolean): void;
   has_timer(): boolean;
   fetch_rtc(): string;
   load_rtc(json: string): void;
   load_rom(data: Uint8Array): void;
   step_frame(): void;
+  load_save_state(data: Uint8Array): void;
+  create_save_state(): number;
+  save_state_length(): number;
+  reload_rom(data: Uint8Array): void;
   get_screen(): number;
   get_screen_length(): number;
   read_ringbuffer(): number;
@@ -26,11 +31,16 @@ export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_webemulator_free: (a: number, b: number) => void;
   readonly webemulator_new: () => number;
+  readonly webemulator_set_pause: (a: number, b: number) => void;
   readonly webemulator_has_timer: (a: number) => number;
   readonly webemulator_fetch_rtc: (a: number) => [number, number];
   readonly webemulator_load_rtc: (a: number, b: number, c: number) => void;
   readonly webemulator_load_rom: (a: number, b: number, c: number) => void;
   readonly webemulator_step_frame: (a: number) => void;
+  readonly webemulator_load_save_state: (a: number, b: number, c: number) => void;
+  readonly webemulator_create_save_state: (a: number) => number;
+  readonly webemulator_save_state_length: (a: number) => number;
+  readonly webemulator_reload_rom: (a: number, b: number, c: number) => void;
   readonly webemulator_get_screen: (a: number) => number;
   readonly webemulator_get_screen_length: (a: number) => number;
   readonly webemulator_read_ringbuffer: (a: number) => number;

@@ -1,11 +1,15 @@
 import JSZip from 'jszip'
 import init, { WebEmulator, InitOutput } from "../../pkg/gb_plus_web"
 import wasmData from '../../pkg/gb_plus_web_bg.wasm'
-import { VideoInterface } from './output/video_interface'
+import { SCREEN_HEIGHT, SCREEN_WIDTH, VideoInterface } from './output/video_interface'
 import { AudioInterface } from './output/audio_interface'
 import { Joypad } from './input/joypad'
 import { WaveformVisualizer } from './util/waveform_visualizer'
-import { CloudService } from './util/cloud_service'
+import { CloudService } from './saves/cloud_service'
+import moment from 'moment'
+import { StateEntry } from './interface/game_state_entry'
+import { GbcDatabase } from './saves/gbc_database'
+import { StateManager } from './saves/state_manager'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -27,8 +31,16 @@ export class GBC {
   private saveName = ""
   private rtcName = ""
   private gameName = ""
+  private isPaused = false
+
+  private db = new GbcDatabase()
+  private stateManager: StateManager|null = null
 
   private timeoutIndex: any|null = null
+
+  private frameNumber: number = -1
+
+  private romData = new Uint8Array()
 
   checkOauth() {
     this.cloudService.checkAuthentication()
@@ -58,16 +70,14 @@ export class GBC {
 
       const zipFileName = Object.keys(zipFile.files)[0]
 
-      console.log(zipFileName)
-
-      this.gameName = gameName
+      this.gameName = zipFileName
 
       const zipTokens = zipFileName.split('.')
 
       zipTokens.pop()
 
       saveName = zipTokens.join('.') + ".sav"
-      this.rtcName = zipTokens.join('.') + ".sav"
+      this.rtcName = zipTokens.join('.') + ".rtc"
 
       data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
@@ -89,6 +99,9 @@ export class GBC {
   async startGame(data: ArrayBuffer) {
     if (this.emulator != null) {
       const byteArr = new Uint8Array(data)
+
+      this.romData = byteArr
+
       this.emulator.load_rom(byteArr)
 
       if (this.emulator.has_timer()) {
@@ -107,6 +120,8 @@ export class GBC {
 
       this.audio = new AudioInterface()
 
+      this.stateManager = new StateManager(this.emulator, this.wasm, this.gameName, this.db)
+
       this.video.setEmulator(this.emulator)
       this.video.setMemory(this.wasm)
 
@@ -119,7 +134,7 @@ export class GBC {
         this.updateRtc()
       }, 5 * 60 * 1000)
 
-      requestAnimationFrame((time) => this.runFrame(time))
+      this.frameNumber = requestAnimationFrame((time) => this.runFrame(time))
     }
   }
 
@@ -156,28 +171,30 @@ export class GBC {
   runFrame(time: number) {
     const diff = time - this.previousTime
 
-    if (diff >= FPS_INTERVAL || this.previousTime == 0) {
-      const samples = this.audio!.pushSamples()
-      if (this.showWaveform) {
-      const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
+    if (!this.isPaused) {
+      if (diff >= FPS_INTERVAL || this.previousTime == 0) {
+        const samples = this.audio!.pushSamples()
+        if (this.showWaveform) {
+          const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
 
-      if (this.waveVisualizer.originSampleTime == 0) {
-        this.waveVisualizer.redrawBackground()
-        this.waveVisualizer.originSampleTime = time
+          if (this.waveVisualizer.originSampleTime == 0) {
+            this.waveVisualizer.redrawBackground()
+            this.waveVisualizer.originSampleTime = time
+          }
+
+          this.waveVisualizer.append(x, samples)
+        }
+        this.emulator!.step_frame()
+        this.video.updateCanvas()
+
+        this.joypad.handleInput()
+        this.checkSaveGame()
+
+        this.previousTime = time - (diff % FPS_INTERVAL)
       }
 
-      this.waveVisualizer.append(x, samples)
+      this.frameNumber = requestAnimationFrame((time) => this.runFrame(time))
     }
-      this.emulator!.step_frame()
-      this.video.updateCanvas()
-
-      this.joypad.handleInput()
-      this.checkSaveGame()
-
-      this.previousTime = time - (diff % FPS_INTERVAL)
-    }
-
-    requestAnimationFrame((time) => this.runFrame(time))
   }
 
   readFile(file: File): Promise<ArrayBuffer> {
@@ -252,13 +269,229 @@ export class GBC {
         clearInterval(interval)
       }
     }, 150)
+  }
+
+  closeStatesModal() {
+    this.emulator?.set_pause(false)
+    this.isPaused = false
+    const statesModal = document.getElementById("states-modal")
+
+    if (statesModal != null) {
+      statesModal.className = "modal hide"
+      statesModal.style.display = "none"
+    }
+  }
+
+  async displaySaveStatesModal() {
+    if (this.gameName != "") {
+      const modal = document.getElementById("states-modal")
+      const statesList = document.getElementById("states-list")
+
+      if (modal != null && statesList != null) {
+        this.emulator?.set_pause(true)
+        modal.style.display = "block"
+
+        statesList.innerHTML = ""
+
+        const entry = await this.db.getSaveStates(this.gameName)
+
+        if (entry != null) {
+          for (const key in entry.states) {
+            const stateEntry = entry.states[key]
+
+            this.addStateElement(statesList, stateEntry)
+          }
+        }
+      }
+    }
+  }
+
+  displayMenu(stateName: string) {
+    const menus = document.getElementsByClassName("state-menu") as HTMLCollectionOf<HTMLElement>
+
+    for (const menu of menus) {
+      if (menu.id.indexOf(stateName) == -1) {
+        menu.style.display = "none"
+      }
+    }
+
+    const menu = document.getElementById(`menu-${stateName}`)
+
+    if (menu != null) {
+      if (menu.style.display == "block") {
+        menu.style.display = "none"
+      } else {
+        menu.style.display = "block"
+      }
+    }
+  }
+
+  async updateState(entry: StateEntry) {
+    const imageUrl = this.getImageUrl()
+    if (imageUrl != null && this.stateManager != null) {
+      const oldStateName = entry.stateName
+
+      const updateEntry = await this.stateManager.createSaveState(imageUrl, entry.stateName, true)
+
+      if (updateEntry != null) {
+        this.updateStateElement(updateEntry, oldStateName)
+      }
+    }
+  }
+
+  updateStateElement(entry: StateEntry, oldStateName: string) {
+    const image = document.getElementById(`image-${oldStateName}`) as HTMLImageElement
+    const title = document.getElementById(`title-${oldStateName}`)
+
+    if (image != null && title != null) {
+      image.src = entry.imageUrl
+
+      if (entry.stateName != "quick_save.state") {
+        const timestamp = parseInt(entry.stateName.replace(".state", ""))
+
+        title.innerText = `Save on ${moment.unix(timestamp).format("lll")}`
+      }
+    }
+  }
+
+  getImageUrl() {
+    if (this.emulator != null && this.wasm != null) {
+      let screen = new Uint8Array(SCREEN_WIDTH * SCREEN_HEIGHT * 4)
+      screen = new Uint8Array(this.wasm.memory.buffer, this.emulator.get_screen(), SCREEN_WIDTH * SCREEN_HEIGHT * 4)
+      const canvas = document.getElementById("save-state-canvas") as HTMLCanvasElement
+
+      const context = canvas.getContext("2d")
+
+      if (context != null) {
+        const imageData = context.getImageData(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+
+        let screenIndex = 0
+        for (let i = 0; i < screen.length; i += 4) {
+          imageData.data[i] = screen[screenIndex]
+          imageData.data[i + 1] = screen[screenIndex + 1]
+          imageData.data[i + 2] = screen[screenIndex + 2]
+          imageData.data[i + 3] = screen[screenIndex + 3]
+
+          screenIndex += 4
+        }
+
+        context.putImageData(imageData, 0, 0)
+
+        return canvas.toDataURL()
+      }
+    }
+
+    return null
+  }
+
+  addStateElement(statesList: HTMLElement, entry: StateEntry) {
+    const divEl = document.createElement("div")
+
+    divEl.className = "state-element"
+    divEl.id = entry.stateName
+
+    divEl.addEventListener("click", () => this.displayMenu(entry.stateName))
+
+    const imgEl = document.createElement("img")
+
+    imgEl.className = "state-image"
+    imgEl.id = `image-${entry.stateName}`
+
+    const pEl = document.createElement("p")
+    pEl.id = `title-${entry.stateName}`
+
+    if (entry.stateName != "quick_save.state") {
+
+      const timestamp = parseInt(entry.stateName.replace(".state", ""))
+
+      pEl.innerText = `Save on ${moment.unix(timestamp).format("lll")}`
+    } else {
+      pEl.innerText = "Quick save"
+    }
+
+    const menu = document.createElement("aside")
+
+    menu.className = "state-menu hide"
+    menu.id = `menu-${entry.stateName}`
+    menu.style.display = "none"
+
+    menu.innerHTML = `
+      <ul class="state-menu-list">
+        <li><a id="update-${entry.stateName}">Update State</a></li>
+        <li><a id="load-${entry.stateName}">Load state</a></li>
+        <li><a id="delete-${entry.stateName}">Delete state</a></li>
+      </ul>
+    `
+    imgEl.src = entry.imageUrl
 
 
+    divEl.append(imgEl)
+    divEl.append(pEl)
+    divEl.append(menu)
+
+    statesList.append(divEl)
+
+    // finally add event listeners for loading and deleting states
+    document.getElementById(`update-${entry.stateName}`)?.addEventListener("click", () => this.updateState(entry))
+    document.getElementById(`load-${entry.stateName}`)?.addEventListener("click", () => this.loadSaveState(entry.state))
+    document.getElementById(`delete-${entry.stateName}`)?.addEventListener("click", () => this.deleteState(entry.stateName))
+  }
+
+  async loadSaveState(compressed: Uint8Array) {
+    if (this.romData != null) {
+      cancelAnimationFrame(this.frameNumber)
+
+      if (this.stateManager != null) {
+        const data = await this.stateManager.decompress(compressed)
+
+        if (data != null) {
+          this.emulator!.load_save_state(data)
+
+          this.emulator!.reload_rom(this.romData)
+
+          this.frameNumber = requestAnimationFrame((time) => this.runFrame(time))
+        }
+
+        this.closeStatesModal()
+      }
+    }
+  }
+
+  async deleteState(stateName: string) {
+    if (confirm("Are you sure you want to delete this save state?")) {
+      await this.db.deleteState(this.gameName, stateName)
+
+      const el = document.getElementById(stateName)
+
+      el?.remove()
+    }
+  }
+
+  async createSaveState() {
+    const now = moment()
+
+    const stateName = `${now.unix()}.state`
+
+    if (this.gameName != "") {
+      const imageUrl = this.getImageUrl()
+      if (imageUrl != null) {
+        const entry = await this.stateManager?.createSaveState(imageUrl, stateName)
+        const statesList = document.getElementById("states-list")
+
+        if (entry != null && statesList != null) {
+          this.addStateElement(statesList, entry)
+        }
+      }
+    }
   }
 
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
+
+    document.getElementById("states-modal-close")?.addEventListener("click", () => this.closeStatesModal())
+    document.getElementById("save-states")?.addEventListener("click", () => this.displaySaveStatesModal())
+    document.getElementById("create-save-state")?.addEventListener("click", () => this.createSaveState())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {
