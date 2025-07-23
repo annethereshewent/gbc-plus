@@ -100,6 +100,9 @@ mod ffi {
 
         #[swift_bridge(swift_name="reloadRom")]
         fn reload_rom(&mut self, bytes: &[u8]);
+
+        #[swift_bridge(swift_name="setPausedAudio")]
+        fn set_paused_audio(&mut self, value: bool);
     }
 }
 
@@ -138,6 +141,10 @@ impl GBCMobileEmulator {
             consumer,
             state_data: Vec::new()
         }
+    }
+
+    pub fn set_paused_audio(&mut self, value: bool) {
+        self.cpu.bus.apu.is_paused = value;
     }
 
     pub fn create_save_state(&mut self) -> *const u8 {

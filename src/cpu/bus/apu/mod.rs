@@ -37,7 +37,8 @@ pub struct APU {
     pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
     sequencer_step: usize,
-    is_ios: bool
+    is_ios: bool,
+    pub is_paused: bool
 }
 
 impl APU {
@@ -54,12 +55,16 @@ impl APU {
             sequencer_cycles: 0,
             sequencer_step: 0,
             producer: Some(producer),
-            is_ios
+            is_ios,
+            is_paused: false
         }
     }
 
     fn generate_samples(&mut self) {
-       let mut ch1_sample = self.channel1.generate_sample();
+        if self.is_paused {
+            return;
+        }
+        let mut ch1_sample = self.channel1.generate_sample();
         let mut ch2_sample = self.channel2.generate_sample();
         let mut ch3_sample = self.channel3.generate_sample();
         let mut ch4_sample = self.channel4.generate_sample();
