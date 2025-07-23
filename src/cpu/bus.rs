@@ -207,6 +207,7 @@ impl Bus {
             0xff42 => self.ppu.scy,
             0xff43 => self.ppu.scx,
             0xff44 => self.ppu.line_y,
+            0xff45 => self.ppu.lyc,
             0xff47 => self.ppu.bgp.read(),
             0xff48 => self.ppu.obp0.read(),
             0xff49 => self.ppu.obp1.read(),
