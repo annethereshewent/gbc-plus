@@ -51,7 +51,12 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, rom_path: Option<String>, is_ios: bool) -> Self {
+    pub fn new(
+        producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        rom_path: Option<String>,
+        is_ios: bool
+    ) -> Self {
         Self {
             cartridge: Cartridge::new(rom_path),
             wram: [
@@ -69,7 +74,7 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new(producer, is_ios),
+            apu: APU::new(producer, waveform_producer, is_ios),
             joypad: Joypad::new(),
             timer: Timer::new(),
             wram_bank: 1,

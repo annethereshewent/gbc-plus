@@ -29,6 +29,10 @@ fn main() {
 
     let (producer, consumer) = ringbuffer.split();
 
+    let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+    let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
     let mut rom_bytes = fs::read(rom_path.clone()).unwrap();
 
     if Path::new(&rom_path).extension().unwrap().to_os_string() == "zip" {
@@ -63,9 +67,9 @@ fn main() {
         }
     }
 
-    let mut cpu = CPU::new(producer, Some(rom_path.clone()), false);
+    let mut cpu = CPU::new(producer, waveform_producer, Some(rom_path.clone()), false);
 
-    let mut frontend = Frontend::new(&mut cpu, consumer);
+    let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer);
 
     cpu.load_rom(&rom_bytes);
 
@@ -86,7 +90,7 @@ fn main() {
         frontend.handle_events(&mut cpu);
 
         if frontend.show_waveform {
-            frontend.update_waveform_graph();
+            frontend.plot_waveform();
         }
 
     }

@@ -123,13 +123,11 @@ pub struct Frontend {
     waveform_canvas: Canvas<Window>,
     pub show_waveform: bool,
     wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
-    origin_sample_time: u128,
     samples: Vec<f32>
 }
 
 pub struct GbcAudioCallback {
-    pub consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
-    producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>
+    pub consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>
 }
 
 impl AudioCallback for GbcAudioCallback {
@@ -148,7 +146,6 @@ impl AudioCallback for GbcAudioCallback {
 
         for b in buf.iter_mut() {
             *b = if let Some(sample) = self.consumer.try_pop() {
-                self.producer.try_push(sample).unwrap_or(());
                 sample
             } else {
                 if is_left_sample {
@@ -185,26 +182,26 @@ impl Frontend {
         }
     }
 
-    pub fn update_waveform_graph(&mut self) {
+    pub fn plot_waveform(&mut self) {
         let mut new_samples: Vec<f32> = self.wave_consumer.pop_iter().collect();
         self.samples.append(&mut new_samples);
 
-        while self.samples.len() > WAVEFORM_LENGTH {
+        while self.samples.len() >= WAVEFORM_LENGTH * 2 {
             self.samples.remove(0);
         }
 
-        self.waveform_canvas.set_draw_color(Color::RGB(0, 0, 0));
+        self.waveform_canvas.set_draw_color(Color::RGB(25, 25, 112));
         self.waveform_canvas.clear();
 
-        self.waveform_canvas.set_draw_color(Color::RGB(0, 255, 0));
+        self.waveform_canvas.set_draw_color(Color::RGB(8, 143, 143));
 
-        for x in (0..self.samples.len()).step_by(2) {
+        for x in (0..self.samples.len()).step_by(4) {
             // let real_y = WAVEFORM_HEIGHT / 2 - ( as usize * WAVEFORM_HEIGHT) / 2;
             // let next_y =
 
             let y1 = self.samples[x];
-            let y2 = if x + 1 < self.samples.len() {
-                self.samples[x + 1]
+            let y2 = if x + 2 < self.samples.len() {
+                self.samples[x + 2]
             } else {
                 break;
             };
@@ -212,13 +209,36 @@ impl Frontend {
             let real_y1 = WAVEFORM_HEIGHT as f32 / 2.0 - (y1 * WAVEFORM_HEIGHT as f32) / 2.0;
             let real_y2 = WAVEFORM_HEIGHT as f32 / 2.0 - (y2 * WAVEFORM_HEIGHT as f32) / 2.0;
 
-            let _ = self.waveform_canvas.draw_line((x as i32, real_y1 as i32), ((x as i32 + 1), real_y2 as i32)).unwrap();
+            let _ = self.waveform_canvas.draw_line((x as i32 / 2, real_y1 as i32), ((x as i32 + 1) / 2, real_y2 as i32)).unwrap();
+        }
+
+        self.waveform_canvas.set_draw_color(Color::RGB(0xff, 0, 0));
+
+        for x in (1..self.samples.len()).step_by(4) {
+            // let real_y = WAVEFORM_HEIGHT / 2 - ( as usize * WAVEFORM_HEIGHT) / 2;
+            // let next_y =
+
+            let y1 = self.samples[x];
+            let y2 = if x + 2 < self.samples.len() {
+                self.samples[x + 2]
+            } else {
+                break;
+            };
+
+            let real_y1 = WAVEFORM_HEIGHT as f32 / 2.0 - (y1 * WAVEFORM_HEIGHT as f32) / 2.0;
+            let real_y2 = WAVEFORM_HEIGHT as f32 / 2.0 - (y2 * WAVEFORM_HEIGHT as f32) / 2.0;
+
+            let _ = self.waveform_canvas.draw_line((x as i32 / 2, real_y1 as i32), ((x as i32 + 1) / 2, real_y2 as i32)).unwrap();
         }
 
         self.waveform_canvas.present();
     }
 
-    pub fn new(cpu: &mut CPU, consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>) -> Self {
+    pub fn new(
+        cpu: &mut CPU,
+        consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+        wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>
+    ) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
@@ -245,10 +265,6 @@ impl Frontend {
             }
         });
 
-        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-        let (wave_producer, wave_consumer) = ringbuffer.split();
-
         let audio_subsystem = sdl_context.audio().unwrap();
 
         let spec = AudioSpecDesired {
@@ -260,7 +276,7 @@ impl Frontend {
         let _device = audio_subsystem.open_playback(
             None,
             &spec,
-            |_| GbcAudioCallback { consumer, producer: wave_producer }
+            |_| GbcAudioCallback { consumer }
         ).unwrap();
 
         _device.resume();
@@ -418,7 +434,6 @@ impl Frontend {
             waveform_canvas: canvas,
             show_waveform: false,
             wave_consumer,
-            origin_sample_time: 0,
             samples: Vec::with_capacity(NUM_SAMPLES)
         }
     }

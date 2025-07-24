@@ -191,14 +191,7 @@ export class GBC {
       if (diff >= FPS_INTERVAL || this.previousTime == 0) {
         const samples = this.audio!.pushSamples()
         if (this.showWaveform) {
-          const x = this.waveVisualizer.originSampleTime == 0 ? 0 : time - this.waveVisualizer.originSampleTime
-
-          if (this.waveVisualizer.originSampleTime == 0) {
-            this.waveVisualizer.redrawBackground()
-            this.waveVisualizer.originSampleTime = time
-          }
-
-          this.waveVisualizer.append(x, samples)
+          this.waveVisualizer.plot(samples)
         }
         this.emulator!.step_frame()
         this.video.updateCanvas()
