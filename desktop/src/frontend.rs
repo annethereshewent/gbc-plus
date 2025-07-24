@@ -190,37 +190,15 @@ impl Frontend {
             self.samples.remove(0);
         }
 
-        self.waveform_canvas.set_draw_color(Color::RGB(25, 25, 112));
+        self.waveform_canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.waveform_canvas.clear();
 
-        self.waveform_canvas.set_draw_color(Color::RGB(8, 143, 143));
+        self.waveform_canvas.set_draw_color(Color::RGB(0, 0xff, 0));
 
-        for x in (0..self.samples.len()).step_by(4) {
-            // let real_y = WAVEFORM_HEIGHT / 2 - ( as usize * WAVEFORM_HEIGHT) / 2;
-            // let next_y =
-
+        for x in (0..self.samples.len()).step_by(2) {
             let y1 = self.samples[x];
-            let y2 = if x + 2 < self.samples.len() {
-                self.samples[x + 2]
-            } else {
-                break;
-            };
-
-            let real_y1 = WAVEFORM_HEIGHT as f32 / 2.0 - (y1 * WAVEFORM_HEIGHT as f32) / 2.0;
-            let real_y2 = WAVEFORM_HEIGHT as f32 / 2.0 - (y2 * WAVEFORM_HEIGHT as f32) / 2.0;
-
-            let _ = self.waveform_canvas.draw_line((x as i32 / 2, real_y1 as i32), ((x as i32 + 1) / 2, real_y2 as i32)).unwrap();
-        }
-
-        self.waveform_canvas.set_draw_color(Color::RGB(0xff, 0, 0));
-
-        for x in (1..self.samples.len()).step_by(4) {
-            // let real_y = WAVEFORM_HEIGHT / 2 - ( as usize * WAVEFORM_HEIGHT) / 2;
-            // let next_y =
-
-            let y1 = self.samples[x];
-            let y2 = if x + 2 < self.samples.len() {
-                self.samples[x + 2]
+            let y2 = if x + 1 < self.samples.len() {
+                self.samples[x + 1]
             } else {
                 break;
             };
