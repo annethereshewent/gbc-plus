@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fs::{
         self,
         File,
@@ -39,7 +39,7 @@ use imgui_glow_renderer::{
 use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
-        cartridge::mbc::MBC, joypad::JoypadButtons, ppu::{
+        apu::NUM_SAMPLES, cartridge::mbc::MBC, joypad::JoypadButtons, ppu::{
             SCREEN_HEIGHT,
             SCREEN_WIDTH
         }
@@ -48,13 +48,9 @@ use gbc_plus::cpu::{
 };
 use imgui_sdl2_support::SdlPlatform;
 use ringbuf::{
-    storage::Heap,
-    traits::{
-        Consumer,
-        Observer
-    },
-    wrap::caching::Caching,
-    SharedRb
+    storage::Heap, traits::{
+        Consumer, Observer, Producer, Split
+    }, wrap::caching::Caching, HeapRb, SharedRb
 };
 use sdl2::{
     audio::{
@@ -63,9 +59,9 @@ use sdl2::{
         AudioSpecDesired
     },
     controller::GameController,
-    event::Event,
+    event::{Event, WindowEvent},
     keyboard::Keycode,
-    pixels::PixelFormatEnum,
+    pixels::{Color, PixelFormatEnum},
     render::Canvas,
     video::{GLContext, GLProfile, Window},
     EventPump,
@@ -82,6 +78,14 @@ const BUTTON_UP: u8 = 11;
 const BUTTON_DOWN: u8 = 12;
 const BUTTON_LEFT: u8 = 13;
 const BUTTON_RIGHT: u8 = 14;
+
+const WAVEFORM_LENGTH: usize = 683;
+const WAVEFORM_HEIGHT: usize = 256;
+
+pub enum UIAction {
+    None,
+    Waveform
+}
 
 #[derive(Serialize, Deserialize)]
 struct EmuConfig {
@@ -115,11 +119,17 @@ pub struct Frontend {
     renderer: Renderer,
     imgui: imgui::Context,
     textures: Textures<NativeTexture>,
-    _gl_context: GLContext
+    _gl_context: GLContext,
+    waveform_canvas: Canvas<Window>,
+    pub show_waveform: bool,
+    wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+    origin_sample_time: u128,
+    samples: Vec<f32>
 }
 
 pub struct GbcAudioCallback {
     pub consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+    producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>
 }
 
 impl AudioCallback for GbcAudioCallback {
@@ -138,6 +148,7 @@ impl AudioCallback for GbcAudioCallback {
 
         for b in buf.iter_mut() {
             *b = if let Some(sample) = self.consumer.try_pop() {
+                self.producer.try_push(sample).unwrap_or(());
                 sample
             } else {
                 if is_left_sample {
@@ -174,6 +185,39 @@ impl Frontend {
         }
     }
 
+    pub fn update_waveform_graph(&mut self) {
+        let mut new_samples: Vec<f32> = self.wave_consumer.pop_iter().collect();
+        self.samples.append(&mut new_samples);
+
+        while self.samples.len() > WAVEFORM_LENGTH {
+            self.samples.remove(0);
+        }
+
+        self.waveform_canvas.set_draw_color(Color::RGB(0, 0, 0));
+        self.waveform_canvas.clear();
+
+        self.waveform_canvas.set_draw_color(Color::RGB(0, 255, 0));
+
+        for x in (0..self.samples.len()).step_by(2) {
+            // let real_y = WAVEFORM_HEIGHT / 2 - ( as usize * WAVEFORM_HEIGHT) / 2;
+            // let next_y =
+
+            let y1 = self.samples[x];
+            let y2 = if x + 1 < self.samples.len() {
+                self.samples[x + 1]
+            } else {
+                break;
+            };
+
+            let real_y1 = WAVEFORM_HEIGHT as f32 / 2.0 - (y1 * WAVEFORM_HEIGHT as f32) / 2.0;
+            let real_y2 = WAVEFORM_HEIGHT as f32 / 2.0 - (y2 * WAVEFORM_HEIGHT as f32) / 2.0;
+
+            let _ = self.waveform_canvas.draw_line((x as i32, real_y1 as i32), ((x as i32 + 1), real_y2 as i32)).unwrap();
+        }
+
+        self.waveform_canvas.present();
+    }
+
     pub fn new(cpu: &mut CPU, consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
@@ -201,6 +245,10 @@ impl Frontend {
             }
         });
 
+        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+        let (wave_producer, wave_consumer) = ringbuffer.split();
+
         let audio_subsystem = sdl_context.audio().unwrap();
 
         let spec = AudioSpecDesired {
@@ -212,7 +260,7 @@ impl Frontend {
         let _device = audio_subsystem.open_playback(
             None,
             &spec,
-            |_| GbcAudioCallback { consumer }
+            |_| GbcAudioCallback { consumer, producer: wave_producer }
         ).unwrap();
 
         _device.resume();
@@ -223,6 +271,17 @@ impl Frontend {
             .position_centered()
             .build()
             .unwrap();
+
+        let mut waveform_window = video_subsystem
+            .window("Waveform Viewer", 683, 256)
+            .build()
+            .unwrap();
+
+        waveform_window.hide();
+
+        let mut canvas = waveform_window.into_canvas().software().present_vsync().build().unwrap();
+        canvas.set_scale(1.0, 1.0).unwrap();
+
 
         let gl_context = window.gl_create_context().unwrap();
 
@@ -272,7 +331,7 @@ impl Frontend {
             .fonts()
             .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
 
-        let renderer = Renderer::initialize(
+        let renderer = Renderer::new(
             &gl,
             &mut imgui,
             &mut textures,
@@ -355,7 +414,12 @@ impl Frontend {
             renderer,
             imgui,
             textures,
-            _gl_context: gl_context
+            _gl_context: gl_context,
+            waveform_canvas: canvas,
+            show_waveform: false,
+            wave_consumer,
+            origin_sample_time: 0,
+            samples: Vec::with_capacity(NUM_SAMPLES)
         }
     }
 
@@ -451,40 +515,64 @@ impl Frontend {
         }
     }
 
-    pub fn render_ui(&mut self) {
+    pub fn render_ui(&mut self) -> UIAction {
         self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
 
+        let mut action = UIAction::None;
+
         let ui = self.imgui.new_frame();
+
+        ui.main_menu_bar(|| {
+            if let Some(menu) = ui.begin_menu("Misc") {
+                if ui.menu_item("Waveform visualizer") {
+                    self.show_waveform = !self.show_waveform;
+                    if self.show_waveform {
+                        self.waveform_canvas.window_mut().show();
+                    } else {
+                        self.waveform_canvas.window_mut().hide();
+                    }
+                }
+            }
+        });
 
         let draw_data = self.imgui.render();
 
         self.renderer.render(&self.gl, &mut self.textures, draw_data).unwrap();
+
+        action
     }
 
     pub fn handle_events(&mut self, cpu: &mut CPU) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
             match event {
-                Event::Quit { .. } => {
-                    match &mut cpu.bus.cartridge.mbc {
-                        MBC::MBC1(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
+                Event::Window { win_event, window_id, .. } => {
+                    if win_event == WindowEvent::Close {
+                        if window_id == 1 {
+                            match &mut cpu.bus.cartridge.mbc {
+                                MBC::MBC1(mbc) => {
+                                    if mbc.backup_file.is_dirty {
+                                        mbc.backup_file.save_file();
+                                    }
+                                }
+                                MBC::MBC3(mbc) => {
+                                    if mbc.backup_file.is_dirty {
+                                        mbc.backup_file.save_file();
+                                    }
+                                }
+                                MBC::MBC5(mbc) => {
+                                    if mbc.backup_file.is_dirty {
+                                        mbc.backup_file.save_file();
+                                    }
+                                }
+                                _=> ()
                             }
+                            exit(0);
+                        } else if window_id == 2 {
+                            self.show_waveform = false;
+                            self.waveform_canvas.window_mut().hide();
                         }
-                        MBC::MBC3(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
-                            }
-                        }
-                        MBC::MBC5(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
-                            }
-                        }
-                        _=> ()
                     }
-                    exit(0);
                 }
                 Event::KeyDown { keycode, .. } => {
                     if let Some(keycode) = keycode {

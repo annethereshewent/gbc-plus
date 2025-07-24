@@ -23,9 +23,13 @@ export class WaveformVisualizer {
       this.originSampleTime = 0
     }
 
-    this.yCoords = y
+    this.yCoords = this.yCoords.concat(y)
 
-    this.plot(realX)
+    while (this.yCoords.length >= CANVAS_WIDTH) {
+      this.yCoords.shift()
+    }
+
+    this.plot()
   }
 
   drawOriginLines() {
@@ -61,27 +65,31 @@ export class WaveformVisualizer {
   }
 
   redrawBackground() {
-    this.context!.fillStyle = "rgb(200 200 200)"
+    // 191970
+    this.context!.fillStyle = "rgb(25, 25, 112)"
     this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
-  plot(x: number) {
+  plot() {
+    this.redrawBackground()
     // this.context!.fillStyle = "rgba(200, 200, 200, 0.05)"
     // this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 
-    this.drawAxisLines()
+    // this.drawAxisLines()
     // Begin the path
     this.context!.lineWidth = 5  // 0x088f8f
-    this.context!.strokeStyle = "rgba(8, 143, 143, 0.5)"
+    this.context!.strokeStyle = "rgb(8, 143, 143)"
     this.context!.beginPath()
 
-    const realX = Math.floor(x / 15)
-    for (const y of this.yCoords) {
+    for (let x = 0; x < this.yCoords.length; x++) {
+      const y = this.yCoords[x]
+
       const realY = CANVAS_HEIGHT / 2 - Math.floor((y * CANVAS_HEIGHT) / 2)
-      if (realX == 0) {
-        this.context!.moveTo(realX, realY)
+
+      if (x == 0) {
+        this.context!.moveTo(x, realY)
       } else {
-        this.context!.lineTo(realX, realY)
+        this.context!.lineTo(x, realY)
       }
     }
 

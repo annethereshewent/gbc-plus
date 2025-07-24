@@ -81,7 +81,13 @@ fn main() {
         frontend.render_screen(&mut cpu);
         frontend.render_ui();
         frontend.check_controller_status();
-        frontend.handle_events(&mut cpu);
         frontend.end_frame();
+
+        frontend.handle_events(&mut cpu);
+
+        if frontend.show_waveform {
+            frontend.update_waveform_graph();
+        }
+
     }
 }
