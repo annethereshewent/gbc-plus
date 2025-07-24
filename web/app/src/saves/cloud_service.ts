@@ -164,22 +164,25 @@ export class CloudService {
   }
 
   private refreshTokensIfNeeded() {
-    const gbcExpires = parseInt(localStorage.getItem("gb_access_expires") || "") / 1000
+    return new Promise((resolve, reject) => {
+      const gbcExpires = parseInt(localStorage.getItem("gb_access_expires") || "") / 1000
+      if (gbcExpires != null && Date.now() >= gbcExpires) {
+        // refresh tokens as they're expired
+        window.addEventListener("message", async (e) => {
+          if (e.data == "authFinished") {
+            this.getTokenFromStorage()
 
-    if (gbcExpires != null && Date.now() >= gbcExpires) {
-      // refresh tokens as they're expired
-      window.addEventListener("message", async (e) => {
-        if (e.data == "authFinished") {
-          this.getTokenFromStorage()
-        }
-      })
-      this.silentSignIn()
-    }
+            resolve(null)
+          }
+        })
+        this.silentSignIn()
+      }
+    })
   }
 
   async cloudRequest(request: () => Promise<Response>, returnBuffer: boolean = false): Promise<any> {
     return new Promise(async (resolve, reject) => {
-      this.refreshTokensIfNeeded()
+      await this.refreshTokensIfNeeded()
 
       const response = await request()
 
