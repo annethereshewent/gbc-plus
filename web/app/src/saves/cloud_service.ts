@@ -164,8 +164,15 @@ export class CloudService {
   }
 
   private refreshTokensIfNeeded() {
+
+    const userEmail = localStorage.getItem("gbc_user_email")
+
+    if (userEmail == null) {
+      return
+    }
+
     return new Promise((resolve, reject) => {
-      const gbcExpires = parseInt(localStorage.getItem("gb_access_expires") || "") / 1000
+      const gbcExpires = parseInt(localStorage.getItem("gbc_access_expires") || "-1")
       if (gbcExpires != null && Date.now() >= gbcExpires) {
         // refresh tokens as they're expired
         window.addEventListener("message", async (e) => {
@@ -176,6 +183,8 @@ export class CloudService {
           }
         })
         this.silentSignIn()
+      } else {
+        resolve(null)
       }
     })
   }
@@ -417,7 +426,7 @@ export class CloudService {
         if (expires != null) {
           expires = expires.split("=")[1]
 
-          const timestamp = parseInt(expires) + Date.now()
+          const timestamp = parseInt(expires) * 1000 + Date.now()
 
           localStorage.setItem("gbc_access_expires", timestamp.toString())
         }
