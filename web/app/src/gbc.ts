@@ -693,6 +693,7 @@ export class GBC {
     document.onkeydown = (ev) => {
       switch (ev.key) {
         case 'Escape':
+          this.emulator?.set_pause(false)
           const savesModal = document.getElementById('saves-modal')
 
           if (savesModal != null) {

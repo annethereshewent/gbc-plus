@@ -15,7 +15,8 @@ export class WaveformVisualizer {
   }
 
   redrawBackground() {
-    this.context!.fillStyle = "rgb(25, 25, 112)"
+    // this.context!.fillStyle = "rgb(25, 25, 112)"
+    this.context!.fillStyle = "rgb(0, 0, 0)"
     this.context!.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
@@ -23,7 +24,7 @@ export class WaveformVisualizer {
     this.redrawBackground()
 
     this.context!.lineWidth = 1  // 0x088f8f
-    this.context!.strokeStyle = "rgb(8, 143, 143)"
+    this.context!.strokeStyle = "rgb(0, 255, 0)"
     this.context!.beginPath()
 
     for (let x = 0; x < yCoords.length; x+= 2) {
