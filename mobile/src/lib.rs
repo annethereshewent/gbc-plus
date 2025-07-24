@@ -154,7 +154,7 @@ impl GBCMobileEmulator {
 
         self.state_data = compressed;
 
-            self.state_data.as_ptr()
+        self.state_data.as_ptr()
     }
 
     pub fn reload_rom(&mut self, bytes: &[u8]) {
