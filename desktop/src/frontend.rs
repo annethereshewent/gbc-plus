@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     fs::{
         self,
         File,
@@ -49,8 +49,10 @@ use gbc_plus::cpu::{
 use imgui_sdl2_support::SdlPlatform;
 use ringbuf::{
     storage::Heap, traits::{
-        Consumer, Observer, Producer, Split
-    }, wrap::caching::Caching, HeapRb, SharedRb
+        Consumer,
+        Observer,
+    }, wrap::caching::Caching,
+    SharedRb
 };
 use sdl2::{
     audio::{
@@ -59,9 +61,12 @@ use sdl2::{
         AudioSpecDesired
     },
     controller::GameController,
-    event::{Event, WindowEvent},
+    event::{
+        Event,
+        WindowEvent
+    },
     keyboard::Keycode,
-    pixels::{Color, PixelFormatEnum},
+    pixels::Color,
     render::Canvas,
     video::{GLContext, GLProfile, Window},
     EventPump,
@@ -459,7 +464,6 @@ impl Frontend {
     }
 
     pub fn update_rtc(&mut self, cpu: &mut CPU) {
-
         match &mut cpu.bus.cartridge.mbc {
             MBC::MBC3(mbc3) => {
                 let current_time = SystemTime::now()

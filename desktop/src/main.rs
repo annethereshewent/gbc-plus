@@ -13,6 +13,7 @@ use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
 pub mod frontend;
+pub mod cloud_service;
 
 fn main() {
 
