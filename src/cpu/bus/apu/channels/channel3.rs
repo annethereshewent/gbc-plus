@@ -1,5 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use super::channel_period_high_control_register::ChannelPeriodHighControlRegister;
 
+
+#[derive(Serialize, Deserialize)]
 pub struct Channel3 {
     pub enabled: bool,
     pub nr34: ChannelPeriodHighControlRegister,

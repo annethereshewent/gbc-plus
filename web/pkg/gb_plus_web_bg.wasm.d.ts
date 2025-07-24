@@ -3,11 +3,16 @@
 export const memory: WebAssembly.Memory;
 export const __wbg_webemulator_free: (a: number, b: number) => void;
 export const webemulator_new: () => number;
+export const webemulator_set_pause: (a: number, b: number) => void;
 export const webemulator_has_timer: (a: number) => number;
 export const webemulator_fetch_rtc: (a: number) => [number, number];
 export const webemulator_load_rtc: (a: number, b: number, c: number) => void;
 export const webemulator_load_rom: (a: number, b: number, c: number) => void;
 export const webemulator_step_frame: (a: number) => void;
+export const webemulator_load_save_state: (a: number, b: number, c: number) => void;
+export const webemulator_create_save_state: (a: number) => number;
+export const webemulator_save_state_length: (a: number) => number;
+export const webemulator_reload_rom: (a: number, b: number, c: number) => void;
 export const webemulator_get_screen: (a: number) => number;
 export const webemulator_get_screen_length: (a: number) => number;
 export const webemulator_read_ringbuffer: (a: number) => number;

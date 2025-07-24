@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Channel4ControlRegister {
     pub length_enable: bool,
     pub trigger: bool

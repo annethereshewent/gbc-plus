@@ -1,24 +1,34 @@
 use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
-use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, joypad::JoypadButtons}, CPU};
-use ringbuf::{storage::Heap, traits::{Consumer, Observer, Split}, wrap::caching::Caching, HeapRb, SharedRb};
+use gbc_plus::cpu::{bus::{cartridge::mbc::MBC, joypad::JoypadButtons}, CPU};
+use ringbuf::{
+    storage::Heap,
+    traits::{
+        Consumer,
+        Observer,
+        Split
+    },
+    wrap::caching::Caching,
+    HeapRb,
+    SharedRb
+};
 
 const BUTTON_CROSS: usize = 0;
 const BUTTON_CIRCLE: usize = 1;
-const BUTTON_SQUARE: usize = 2;
-const BUTTON_TRIANGLE: usize = 3;
+// const BUTTON_SQUARE: usize = 2;
+// const BUTTON_TRIANGLE: usize = 3;
 const SELECT: usize = 4;
 const START: usize = 6;
-const LEFT_STICK: usize = 7;
-const RIGHT_STICK: usize = 8;
-const BUTTON_L: usize = 9;
-const BUTTON_R: usize = 10;
+// const LEFT_STICK: usize = 7;
+// const RIGHT_STICK: usize = 8;
+// const BUTTON_L: usize = 9;
+// const BUTTON_R: usize = 10;
 const UP: usize = 12;
 const DOWN: usize = 13;
 const LEFT: usize = 14;
 const RIGHT: usize = 15;
-const LEFT_TRIGGER: usize = 16;
-const RIGHT_TRIGGER: usize = 17;
+// const LEFT_TRIGGER: usize = 16;
+// const RIGHT_TRIGGER: usize = 17;
 
 #[swift_bridge::bridge]
 mod ffi {
@@ -78,6 +88,21 @@ mod ffi {
 
         #[swift_bridge(swift_name="popSample")]
         fn pop_sample(&mut self) -> f32;
+
+        #[swift_bridge(swift_name="createSaveState")]
+        fn create_save_state(&mut self) -> *const u8;
+
+        #[swift_bridge(swift_name="saveStateLength")]
+        fn save_state_len(&self) -> usize;
+
+        #[swift_bridge(swift_name="loadSaveState")]
+        fn load_save_state(&mut self, data: &[u8]);
+
+        #[swift_bridge(swift_name="reloadRom")]
+        fn reload_rom(&mut self, bytes: &[u8]);
+
+        #[swift_bridge(swift_name="setPausedAudio")]
+        fn set_paused_audio(&mut self, value: bool);
     }
 }
 
@@ -87,6 +112,7 @@ pub struct GBCMobileEmulator {
     sample_buffer: Vec<f32>,
     paused: bool,
     consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+    state_data: Vec<u8>
 }
 
 impl GBCMobileEmulator {
@@ -112,29 +138,63 @@ impl GBCMobileEmulator {
             joypad_map,
             sample_buffer: Vec::new(),
             paused: false,
-            consumer
+            consumer,
+            state_data: Vec::new()
         }
     }
 
+    pub fn set_paused_audio(&mut self, value: bool) {
+        self.cpu.bus.apu.is_paused = value;
+    }
+
+    pub fn create_save_state(&mut self) -> *const u8 {
+        let (bytes, _) = self.cpu.create_save_state();
+
+        let compressed = zstd::encode_all(&*bytes, 9).unwrap();
+
+        self.state_data = compressed;
+
+            self.state_data.as_ptr()
+    }
+
+    pub fn reload_rom(&mut self, bytes: &[u8]) {
+        self.cpu.reload_rom(bytes);
+    }
+
+    pub fn load_save_state(&mut self, data: &[u8]) {
+        let decompressed = zstd::decode_all(&*data).unwrap();
+        self.cpu.load_save_state(&decompressed);
+
+        let ringbuffer = HeapRb::<f32>::new(4096 * 2);
+
+        let (producer, consumer) = ringbuffer.split();
+
+        self.consumer = consumer;
+        self.cpu.bus.apu.producer = Some(producer);
+    }
+
+    pub fn save_state_len(&self) -> usize {
+        self.state_data.len()
+    }
+
     pub fn has_timer(&self) -> bool {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.has_timer()
-        } else {
-            false
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.has_timer,
+            _ => false
         }
     }
 
     pub fn fetch_rtc(&self) -> String {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.save_rtc_web_mobile()
-        } else {
-            "".to_string()
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.save_rtc_web_mobile(),
+            _ => "".to_string()
         }
     }
 
     pub fn load_rtc(&mut self, json: String) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_rtc(json);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.load_rtc(json),
+            _ => ()
         }
     }
 
@@ -167,40 +227,42 @@ impl GBCMobileEmulator {
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_save(buf);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC3(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC5(mbc) => mbc.backup_file.load_save(buf),
+            _ => ()
         }
     }
 
     pub fn has_saved(&mut self) -> bool {
-        let return_val = if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            let return_val = mbc.backup_file().is_dirty;
-
-            mbc.clear_is_dirty();
-
-            return_val
-        } else {
-            false
-        };
-
-        return_val
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.has_saved(),
+            MBC::MBC3(mbc) => mbc.has_saved(),
+            MBC::MBC5(mbc) => mbc.has_saved(),
+            _ => false
+        }
     }
 
     pub fn get_save_length(&self) -> usize {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.backup_file().ram.len()
-        } else {
-            0
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.len(),
+            _ => 0
         }
     }
 
     pub fn save_game(&mut self) -> *const u8 {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.save_web_mobile()
-        } else {
-            let vec = Vec::new();
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.as_ptr(),
+            _ => {
+                let vec = Vec::new();
 
-            vec.as_ptr()
+                vec.as_ptr()
+            }
         }
     }
 

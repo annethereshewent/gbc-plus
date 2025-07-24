@@ -1,9 +1,12 @@
-#[derive(Copy, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SweepDirection {
     Addition = 0,
     Subtraction = 1
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ChannelSweepRegister {
     pub step: u8,
     pub direction: SweepDirection,

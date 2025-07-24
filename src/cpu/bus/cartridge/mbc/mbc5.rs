@@ -1,7 +1,10 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
-use super::MBC;
-
+#[derive(Serialize, Deserialize)]
 pub struct MBC5 {
     rom_bank: u16,
     ram_bank: u8,
@@ -9,39 +12,37 @@ pub struct MBC5 {
     _has_rumble: bool,
     ram_size: usize,
     has_ram: bool,
-    backup_file: BackupFile
+    pub backup_file: BackupFile
 }
 
-impl MBC for MBC5 {
-    fn backup_file(&self) -> &BackupFile {
-        &self.backup_file
+impl MBC5 {
+    pub fn check_save(&mut self) {
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
+        let last_updated = self.backup_file.last_updated;
+
+        if self.backup_file.is_dirty &&
+            current_time > last_updated &&
+            last_updated != 0
+        {
+            let diff = current_time - last_updated;
+            if diff >= 500 {
+                self.backup_file.save_file()
+            }
+        }
     }
 
-    fn save_rtc_web_mobile(&self) -> String {
-        "".to_string()
-    }
+     pub fn has_saved(&mut self) -> bool {
+        let return_val = self.backup_file.is_dirty;
 
-    fn has_timer(&self) -> bool {
-        false
-    }
-
-    fn load_rtc(&mut self, json: String) {
-
-    }
-
-    fn load_save(&mut self, buf: &[u8]) {
-        self.backup_file.load_save(buf);
-    }
-
-    fn save_web_mobile(&self) -> *const u8 {
-        self.backup_file.ram.as_ptr()
-    }
-
-    fn clear_is_dirty(&mut self) {
         self.backup_file.is_dirty = false;
+
+        return_val
     }
 
-    fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
+    pub fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
        match address {
             0x0000..=0x3fff => {
                 rom[address as usize]
@@ -65,7 +66,7 @@ impl MBC for MBC5 {
         }
     }
 
-    fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
+    pub fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
 
         match address {
             0x0000..=0x3fff => {
@@ -87,15 +88,7 @@ impl MBC for MBC5 {
         }
     }
 
-    fn save(&mut self) {
-        self.backup_file.save_file();
-    }
-
-    fn save_rtc(&mut self) {
-        // do nothing
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x1fff => if value == 0xa {
                 self.ram_enable = true;
@@ -113,7 +106,7 @@ impl MBC for MBC5 {
         }
     }
 
-    fn write16(&mut self, address: u16, value: u16) {
+    pub fn write16(&mut self, address: u16, value: u16) {
         match address {
             0x0000..=0x1fff => if value == 0xa {
                 self.ram_enable = true;
@@ -130,9 +123,7 @@ impl MBC for MBC5 {
             _ => ()
         }
     }
-}
 
-impl MBC5 {
     pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: Option<String>) -> Self {
         Self {
             rom_bank: 0,

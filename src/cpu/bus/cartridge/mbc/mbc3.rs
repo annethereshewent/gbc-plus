@@ -1,11 +1,9 @@
-use std::{cmp, fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}};
+use std::{cmp, fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
 
 use chrono::{DateTime, Duration, Local, TimeDelta, TimeZone};
 use serde::{Deserialize, Serialize};
 
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
-
-use super::MBC;
 
 #[derive(Serialize, Deserialize)]
 struct RtcFile {
@@ -29,7 +27,7 @@ impl RtcFile {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ClockRegister {
     rtc_s: u8,
     rtc_m: u8,
@@ -50,35 +48,73 @@ impl ClockRegister {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MBC3 {
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     start: DateTime<Local>,
     rom_bank: u8,
     ram_bank: u8,
     timer_ram_enable: bool,
     latch_clock: ClockRegister,
-    backup_file: BackupFile,
+    pub backup_file: BackupFile,
     _rom_size: usize,
     has_ram: bool,
-    has_timer: bool,
+    pub has_timer: bool,
     latch_value: u8,
     clock_latched: bool,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     rtc_file: Option<File>,
     carry_bit: bool,
     previous_wrapped_days: u16,
     halted: bool,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     halted_elapsed: TimeDelta
 }
 
-impl MBC for MBC3 {
-    fn backup_file(&self) -> &BackupFile {
-        &self.backup_file
+impl MBC3 {
+    pub fn check_save(&mut self) {
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("an error occurred")
+            .as_millis();
+        let last_updated = self.backup_file.last_updated;
+
+        if self.backup_file.is_dirty &&
+            current_time > last_updated &&
+            last_updated != 0
+        {
+            let diff = current_time - last_updated;
+            if diff >= 500 {
+                self.backup_file.save_file()
+            }
+        }
     }
 
-    fn has_timer(&self) -> bool {
-        self.has_timer
+    pub fn has_saved(&mut self) -> bool {
+        let return_val = self.backup_file.is_dirty;
+
+        self.backup_file.is_dirty = false;
+
+        return_val
     }
 
-    fn load_rtc(&mut self, json: String) {
+    pub fn save_rtc_web_mobile(&self) -> String {
+        if self.has_timer {
+            let rtc_json = RtcFile::new(
+                self.start.timestamp() as usize,
+                self.halted,
+                self.carry_bit
+            );
+            serde_json::to_string::<RtcFile>(&rtc_json).unwrap_or("".to_string())
+        } else {
+            "".to_string()
+        }
+    }
+
+    pub fn load_rtc(&mut self, json: String) {
         if self.has_timer {
             match serde_json::from_str::<RtcFile>(&json) {
                 Ok(result) => {
@@ -95,32 +131,8 @@ impl MBC for MBC3 {
         }
     }
 
-    fn save_rtc_web_mobile(&self) -> String {
-        if self.has_timer {
-            let rtc_json = RtcFile::new(
-                self.start.timestamp() as usize,
-                self.halted,
-                self.carry_bit
-            );
-            serde_json::to_string::<RtcFile>(&rtc_json).unwrap_or("".to_string())
-        } else {
-            "".to_string()
-        }
-    }
 
-    fn load_save(&mut self, buf: &[u8]) {
-        self.backup_file.load_save(buf);
-    }
-
-    fn save_web_mobile(&self) -> *const u8 {
-        self.backup_file.ram.as_ptr()
-    }
-
-    fn clear_is_dirty(&mut self) {
-        self.backup_file.is_dirty = false;
-    }
-
-    fn save_rtc(&mut self) {
+    pub fn save_rtc(&mut self) {
         let rtc_json = RtcFile::new(
             self.start.timestamp() as usize,
             self.halted,
@@ -139,7 +151,7 @@ impl MBC for MBC3 {
         }
     }
 
-    fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
+    pub fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
         match address {
             0x0000..=0x3fff => {
                 rom[address as usize]
@@ -165,7 +177,7 @@ impl MBC for MBC3 {
         }
     }
 
-    fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
+    pub fn read16(&mut self, address: u16, rom: &[u8]) -> u16 {
         match address {
             0x0000..=0x3fff => {
                 unsafe { *(&rom[address as usize] as *const u8 as *const u16) }
@@ -192,11 +204,7 @@ impl MBC for MBC3 {
         }
     }
 
-    fn save(&mut self) {
-        self.backup_file.save_file();
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x1fff => if value == 0xa {
                 self.timer_ram_enable = true;
@@ -218,7 +226,7 @@ impl MBC for MBC3 {
         }
     }
 
-    fn write16(&mut self, address: u16, value: u16) {
+    pub fn write16(&mut self, address: u16, value: u16) {
         match address {
             0x0000..=0x1fff => if value == 0xa {
                 self.timer_ram_enable = true;
@@ -239,9 +247,6 @@ impl MBC for MBC3 {
             _ => panic!("unsupported address received: 0x{:x}", address)
         }
     }
-}
-
-impl MBC3 {
 
     fn write_rtc_latch(&mut self, value: u8) {
         match self.ram_bank {

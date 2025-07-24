@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::{
     channel4_control_register::Channel4ControlRegister,
     channel_freq_random_register::{
@@ -10,6 +12,7 @@ use super::{
     }
 };
 
+#[derive(Serialize, Deserialize)]
 pub struct Channel4 {
     pub enabled: bool,
     pub nr42: ChannelVolumeRegister,

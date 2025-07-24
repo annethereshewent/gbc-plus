@@ -5,7 +5,31 @@
 #cloud-logged-in {
   display: none;
 }
-
+@media all and (display-mode: fullscreen) {
+  #emulator {
+    width: 100%;
+    margin-top: 0px;
+    margin-left: 3%;
+  }
+  #fps-counter {
+    display: none;
+  }
+  canvas {
+    height: 100vh !important;
+    width: auto !important;
+  }
+  .navbar:hover {
+    opacity: 1.0 !important;
+  }
+  .navbar:not(:hover) {
+    opacity: 0.0 !important;
+  }
+  body {
+    background: #000000;
+    height: 100vh !important;
+    overflow: none !important;
+  }
+}
 .show {
   display: block;
 }
@@ -28,13 +52,25 @@
   margin-right: 80px;
   display: none;
 }
-
-
-
 .fa-github {
   font-size: 28px;
 }
 
 #game-input, #save-input {
   display: none;
+}
+.save-icon.download {
+  color: white;
+}
+.save-icon.update {
+  color: green;
+}
+.save-icon.delete-save {
+  color: red;
+}
+.save-icon {
+  float: right;
+  font-size: 18px;
+  cursor: pointer;
+  margin-right: 10px;
 }

@@ -1,6 +1,8 @@
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 bitflags! {
+    #[derive(Serialize, Deserialize)]
     pub struct LCDControlRegister: u8 {
         const BG_WINDOW_ENABLE_PRIORITY = 1;
         const OBJ_ENABLE = 1 << 1;

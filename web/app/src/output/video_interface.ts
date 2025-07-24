@@ -1,7 +1,7 @@
 import { InitOutput, WebEmulator } from "../../../pkg/gb_plus_web";
 
-const SCREEN_WIDTH = 160
-const SCREEN_HEIGHT = 144
+export const SCREEN_WIDTH = 160
+export const SCREEN_HEIGHT = 144
 
 export class VideoInterface {
   private wasm: InitOutput|null = null

@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct ChannelLengthDutyRegister {
     pub initial_timer: u8,
     pub wave_duty: u8

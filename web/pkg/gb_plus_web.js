@@ -114,6 +114,12 @@ export class WebEmulator {
         return this;
     }
     /**
+     * @param {boolean} value
+     */
+    set_pause(value) {
+        wasm.webemulator_set_pause(this.__wbg_ptr, value);
+    }
+    /**
      * @returns {boolean}
      */
     has_timer() {
@@ -153,6 +159,36 @@ export class WebEmulator {
     }
     step_frame() {
         wasm.webemulator_step_frame(this.__wbg_ptr);
+    }
+    /**
+     * @param {Uint8Array} data
+     */
+    load_save_state(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.webemulator_load_save_state(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * @returns {number}
+     */
+    create_save_state() {
+        const ret = wasm.webemulator_create_save_state(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    save_state_length() {
+        const ret = wasm.webemulator_save_state_length(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {Uint8Array} data
+     */
+    reload_rom(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.webemulator_reload_rom(this.__wbg_ptr, ptr0, len0);
     }
     /**
      * @returns {number}

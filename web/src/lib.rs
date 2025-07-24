@@ -1,7 +1,7 @@
 
-use std::{collections::{HashMap, VecDeque}, panic, sync::{Arc, Mutex}};
+use std::{collections::HashMap, panic, sync::Arc};
 
-use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, joypad::JoypadButtons}, CPU};
+use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, cartridge::mbc::MBC, joypad::JoypadButtons}, CPU};
 use ringbuf::{storage::Heap, traits::{Consumer, Split}, wrap::caching::Caching, HeapRb, SharedRb};
 use wasm_bindgen::prelude::*;
 
@@ -23,7 +23,9 @@ pub struct WebEmulator {
     cpu: CPU,
     joypad_map: HashMap<usize, JoypadButtons>,
     sample_buffer: Vec<f32>,
-    consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>
+    consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+    is_paused: bool,
+    save_state: Vec<u8>
 }
 
 const BUTTON_CROSS: usize = 0;
@@ -60,29 +62,34 @@ impl WebEmulator {
             cpu: CPU::new(producer, None, false),
             joypad_map,
             sample_buffer: Vec::new(),
-            consumer
+            consumer,
+            is_paused: false,
+            save_state: Vec::new()
         }
     }
 
+    pub fn set_pause(&mut self, value: bool) {
+        self.is_paused = value;
+    }
+
     pub fn has_timer(&self) -> bool {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.has_timer()
-        } else {
-            false
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.has_timer,
+            _ => false
         }
     }
 
     pub fn fetch_rtc(&self) -> String {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.save_rtc_web_mobile()
-        } else {
-            "".to_string()
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.save_rtc_web_mobile(),
+            _ => "".to_string()
         }
     }
 
     pub fn load_rtc(&mut self, json: String) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_rtc(json);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.load_rtc(json),
+            _ => ()
         }
     }
 
@@ -91,9 +98,35 @@ impl WebEmulator {
     }
 
     pub fn step_frame(&mut self) {
-        self.cpu.step_frame();
+        if !self.is_paused {
+            self.cpu.step_frame();
 
-        self.cpu.bus.ppu.frame_finished = false;
+            self.cpu.bus.ppu.frame_finished = false;
+        }
+    }
+
+    pub fn load_save_state(&mut self, data: &[u8]) {
+        self.cpu.load_save_state(&data);
+
+        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+        let (producer, consumer) = ringbuffer.split();
+
+        self.consumer = consumer;
+        self.cpu.bus.apu.producer = Some(producer);
+    }
+
+    pub fn create_save_state(&mut self) -> *const u8 {
+        (self.save_state, _) = self.cpu.create_save_state();
+
+        self.save_state.as_ptr()
+    }
+
+    pub fn save_state_length(&self) -> usize {
+        self.save_state.len()
+    }
+
+    pub fn reload_rom(&mut self, data: &[u8]) {
+        self.cpu.reload_rom(data);
     }
 
     pub fn get_screen(&self) -> *const u8 {
@@ -119,40 +152,42 @@ impl WebEmulator {
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.load_save(buf);
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC3(mbc) => mbc.backup_file.load_save(buf),
+            MBC::MBC5(mbc) => mbc.backup_file.load_save(buf),
+            _ => ()
         }
     }
 
     pub fn has_saved(&mut self) -> bool {
-        let return_val = if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            let return_val = mbc.backup_file().is_dirty;
-
-            mbc.clear_is_dirty();
-
-            return_val
-        } else {
-            false
-        };
-
-        return_val
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.has_saved(),
+            MBC::MBC3(mbc) => mbc.has_saved(),
+            MBC::MBC5(mbc) => mbc.has_saved(),
+            _ => false
+        }
     }
 
     pub fn get_save_length(&self) -> usize {
-        if let Some(mbc) = &self.cpu.bus.cartridge.mbc {
-            mbc.backup_file().ram.len()
-        } else {
-            0
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.len(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.len(),
+            _ => 0
         }
     }
 
     pub fn save_game(&mut self) -> *const u8 {
-        if let Some(mbc) = &mut self.cpu.bus.cartridge.mbc {
-            mbc.save_web_mobile()
-        } else {
-            let vec = Vec::new();
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC3(mbc) => mbc.backup_file.ram.as_ptr(),
+            MBC::MBC5(mbc) => mbc.backup_file.ram.as_ptr(),
+            _ => {
+                let vec = Vec::new();
 
-            vec.as_ptr()
+                vec.as_ptr()
+            }
         }
     }
 

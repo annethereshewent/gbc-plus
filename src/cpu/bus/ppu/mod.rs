@@ -8,6 +8,7 @@ use oam_entry::OAMEntry;
 use obj_palette_index_register::ObjPaletteIndexRegister;
 use obj_palette_register::ObjPaletteRegister;
 use picture::{Color, Picture};
+use serde::{Deserialize, Serialize};
 
 use super::interrupt_register::InterruptRegister;
 
@@ -30,13 +31,13 @@ pub const SCREEN_HEIGHT: usize = 144;
 
 const FPS_INTERVAL: u128 = 1000 / 60;
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum OamPriority {
     None,
     Background
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct OamAttributes {
     pub priority: OamPriority,
     pub y_flip: bool,
@@ -134,7 +135,7 @@ pub const VOID_DREAM: [Color; 4] = [
 ];
 
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum LCDMode {
     HBlank = 0,
     VBlank = 1,
@@ -142,7 +143,7 @@ pub enum LCDMode {
     HDraw = 3
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct BgAttributes {
     palette_index: usize,
     priority: bool
@@ -157,6 +158,7 @@ impl BgAttributes {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct PPU {
     pub scy: u8,
     pub scx: u8,
@@ -171,21 +173,21 @@ pub struct PPU {
     pub mode: LCDMode,
     pub obp0: ObjPaletteRegister,
     pub obp1: ObjPaletteRegister,
-    pub oam: [OAMEntry; 0xa0],
+    pub oam: Box<[OAMEntry]>,
     pub frame_finished: bool,
     pub picture: Picture,
     previous_time: u128,
-    prev_background_pixels: [BgAttributes; SCREEN_WIDTH],
-    prev_window_pixels: [BgAttributes; SCREEN_WIDTH],
+    prev_background_pixels: Box<[BgAttributes]>,
+    prev_window_pixels: Box<[BgAttributes]>,
     current_window_line: isize,
-    previous_objs: [Option<OAMEntry>; SCREEN_WIDTH],
+    previous_objs: Box<[Option<OAMEntry>]>,
     pub lyc: u8,
     pub palette_colors: [[Color; 4]; 10],
     pub current_palette: usize,
     pub vram_bank: u8,
     pub bgpi: BgPaletteIndexRegister,
-    pub palette_ram: [u8; 64],
-    pub obj_palette_ram: [u8; 64],
+    pub palette_ram: Box<[u8]>,
+    pub obj_palette_ram: Box<[u8]>,
     pub obpi: ObjPaletteIndexRegister,
     pub cgb_mode: bool,
     pub in_hblank: bool,
@@ -212,14 +214,14 @@ impl PPU {
             bgp: BGPaletteRegister::new(),
             obp0: ObjPaletteRegister::new(),
             obp1: ObjPaletteRegister::new(),
-            oam: [OAMEntry::new(); 0xa0],
+            oam: vec![OAMEntry::new(); 0xa0].into_boxed_slice(),
             frame_finished: false,
             picture: Picture::new(),
             previous_time: 0,
-            prev_background_pixels: [BgAttributes::new(); SCREEN_WIDTH],
-            prev_window_pixels: [BgAttributes::new(); SCREEN_WIDTH],
+            prev_background_pixels: vec![BgAttributes::new(); SCREEN_WIDTH].into_boxed_slice(),
+            prev_window_pixels: vec![BgAttributes::new(); SCREEN_WIDTH].into_boxed_slice(),
             current_window_line: -1,
-            previous_objs: [None; SCREEN_WIDTH],
+            previous_objs: vec![None; SCREEN_WIDTH].into_boxed_slice(),
             lyc: 0,
             palette_colors: [
                 CLASSIC_GREEN,
@@ -237,8 +239,8 @@ impl PPU {
             vram_bank: 0,
             bgpi: BgPaletteIndexRegister::new(),
             obpi: ObjPaletteIndexRegister::new(),
-            palette_ram: [0; 64],
-            obj_palette_ram: [0; 64],
+            palette_ram: vec![0; 64].into_boxed_slice(),
+            obj_palette_ram: vec![0; 64].into_boxed_slice(),
             cgb_mode: false,
             in_hblank: false,
             vram_enabled: true,

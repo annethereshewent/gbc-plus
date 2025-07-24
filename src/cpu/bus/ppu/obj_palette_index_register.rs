@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct ObjPaletteIndexRegister {
     pub address: u8,
     pub auto_increment: bool
