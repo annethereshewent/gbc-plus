@@ -18,7 +18,24 @@ use std::{
         UNIX_EPOCH
     }
 };
-
+use glow::RGBA;
+use imgui_glow_renderer::{
+  glow::{
+    HasContext,
+    NativeTexture,
+    PixelUnpackData,
+    COLOR_ATTACHMENT0,
+    COLOR_BUFFER_BIT,
+    NEAREST,
+    READ_FRAMEBUFFER,
+    RGBA8,
+    TEXTURE_2D,
+    TEXTURE_MAG_FILTER,
+    TEXTURE_MIN_FILTER,
+    UNSIGNED_BYTE
+  },
+  Renderer
+};
 use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
@@ -29,15 +46,33 @@ use gbc_plus::cpu::{
     },
     CPU
 };
-use ringbuf::{storage::Heap, traits::{Consumer, Observer}, wrap::caching::Caching, SharedRb};
+use imgui_sdl2_support::SdlPlatform;
+use ringbuf::{
+    storage::Heap,
+    traits::{
+        Consumer,
+        Observer
+    },
+    wrap::caching::Caching,
+    SharedRb
+};
 use sdl2::{
     audio::{
         AudioCallback,
         AudioDevice,
         AudioSpecDesired
-    }, controller::GameController, event::Event, keyboard::Keycode, pixels::PixelFormatEnum, render::Canvas, video::Window, EventPump, GameControllerSubsystem
+    },
+    controller::GameController,
+    event::Event,
+    keyboard::Keycode,
+    pixels::PixelFormatEnum,
+    render::Canvas,
+    video::{GLContext, GLProfile, Window},
+    EventPump,
+    GameControllerSubsystem
 };
 use serde::{Deserialize, Serialize};
+use imgui::{Context, Textures};
 
 const BUTTON_CROSS: u8 = 0;
 const BUTTON_SQUARE: u8 = 2;
@@ -63,7 +98,6 @@ impl EmuConfig {
 
 pub struct Frontend {
     controller: Option<GameController>,
-    canvas: Canvas<Window>,
     _device: AudioDevice<GbcAudioCallback>,
     event_pump: EventPump,
     button_map: HashMap<u8, JoypadButtons>,
@@ -73,7 +107,15 @@ pub struct Frontend {
     retry_attempts: usize,
     config: EmuConfig,
     config_file: File,
-    last_check: Option<u128>
+    last_check: Option<u128>,
+    gl: imgui_glow_renderer::glow::Context,
+    texture: NativeTexture,
+    platform: SdlPlatform,
+    window: Window,
+    renderer: Renderer,
+    imgui: imgui::Context,
+    textures: Textures<NativeTexture>,
+    _gl_context: GLContext
 }
 
 pub struct GbcAudioCallback {
@@ -126,6 +168,11 @@ impl Frontend {
             None
         }
     }
+    fn glow_context(window: &Window) -> imgui_glow_renderer::glow::Context {
+        unsafe {
+            imgui_glow_renderer::glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s) as _)
+        }
+    }
 
     pub fn new(cpu: &mut CPU, consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>) -> Self {
         let sdl_context = sdl2::init().unwrap();
@@ -136,6 +183,11 @@ impl Frontend {
         let available = game_controller_subsystem
             .num_joysticks()
             .map_err(|e| format!("can't enumerate joysticks: {}", e)).unwrap();
+
+        let gl_attr = video_subsystem.gl_attr();
+
+        gl_attr.set_context_version(3, 3);
+        gl_attr.set_context_profile(GLProfile::Core);
 
         let controller = (0..available)
             .find_map(|id| {
@@ -167,12 +219,67 @@ impl Frontend {
 
         let window = video_subsystem
             .window("GBC+", (SCREEN_WIDTH * 3) as u32, (SCREEN_HEIGHT * 3) as u32)
+            .opengl()
             .position_centered()
             .build()
             .unwrap();
 
-        let mut canvas = window.into_canvas().present_vsync().build().unwrap();
-        canvas.set_scale(3.0, 3.0).unwrap();
+        let gl_context = window.gl_create_context().unwrap();
+
+        window.gl_make_current(&gl_context).unwrap();
+
+        window.subsystem().gl_set_swap_interval(1).unwrap();
+
+        let gl = Self::glow_context(&window);
+
+        let texture = unsafe { gl.create_texture().unwrap() };
+        let framebuffer = unsafe { gl.create_framebuffer().unwrap() };
+
+        let mut textures = Textures::<NativeTexture>::new();
+
+        unsafe {
+            gl.bind_texture(TEXTURE_2D, Some(texture));
+
+            gl.tex_parameter_i32(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST as i32);
+            gl.tex_parameter_i32(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST as i32);
+
+            gl.tex_storage_2d(
+                TEXTURE_2D,
+                1,
+                RGBA8,
+                SCREEN_WIDTH as i32 * 2,
+                SCREEN_HEIGHT as i32 * 2
+            );
+
+            gl.bind_framebuffer(READ_FRAMEBUFFER, Some(framebuffer));
+            gl.framebuffer_texture_2d(
+                READ_FRAMEBUFFER,
+                COLOR_ATTACHMENT0,
+                TEXTURE_2D,
+                Some(texture),
+                0
+            );
+
+            gl.clear_color(0.0, 0.0, 0.0, 0.0);
+        }
+
+        let mut imgui = Context::create();
+
+        imgui.set_ini_filename(None);
+        imgui.set_log_filename(None);
+
+        imgui
+            .fonts()
+            .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+
+        let renderer = Renderer::initialize(
+            &gl,
+            &mut imgui,
+            &mut textures,
+            false
+        ).unwrap();
+
+        let platform = SdlPlatform::new(&mut imgui);
 
         let event_pump = sdl_context.event_pump().unwrap();
 
@@ -231,7 +338,6 @@ impl Frontend {
 
         Self {
             controller,
-            canvas,
             _device,
             event_pump,
             button_map,
@@ -241,7 +347,15 @@ impl Frontend {
             game_controller_subsystem,
             config,
             config_file,
-            last_check: None
+            last_check: None,
+            gl,
+            texture,
+            platform,
+            window,
+            renderer,
+            imgui,
+            textures,
+            _gl_context: gl_context
         }
     }
 
@@ -250,16 +364,41 @@ impl Frontend {
 
         cpu.bus.ppu.frame_finished = false;
 
-        let creator = self.canvas.texture_creator();
-        let mut texture = creator
-            .create_texture_target(PixelFormatEnum::RGB24, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
-            .unwrap();
+        let screen = &cpu.bus.ppu.picture.data;
 
-        texture.update(None, &cpu.bus.ppu.picture.data, SCREEN_WIDTH as usize * 3).unwrap();
+        unsafe {
+            self.gl.clear(glow::COLOR_BUFFER_BIT);
+            self.gl.bind_texture(TEXTURE_2D, Some(self.texture));
 
-        self.canvas.copy(&texture, None, None).unwrap();
+            self.gl.tex_sub_image_2d(
+                    TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    SCREEN_WIDTH as i32,
+                    SCREEN_HEIGHT as i32,
+                    RGBA,
+                    UNSIGNED_BYTE,
+                    PixelUnpackData::Slice(&screen)
+            );
 
-        self.canvas.present();
+            self.gl.blit_framebuffer(
+                    0,
+                    SCREEN_HEIGHT as i32,
+                    SCREEN_WIDTH as i32,
+                    0,
+                    0,
+                    0,
+                    SCREEN_WIDTH as i32 * 3,
+                    SCREEN_HEIGHT as i32 * 3,
+                    COLOR_BUFFER_BIT,
+                    NEAREST
+            );
+        }
+    }
+
+    pub fn end_frame(&mut self) {
+        self.window.gl_swap_window();
     }
 
     pub fn update_rtc(&mut self, cpu: &mut CPU) {
@@ -306,8 +445,25 @@ impl Frontend {
         }
     }
 
+    pub fn clear_framebuffer(&mut self) {
+        unsafe {
+            self.gl.clear(glow::COLOR_BUFFER_BIT);
+        }
+    }
+
+    pub fn render_ui(&mut self) {
+        self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
+
+        let ui = self.imgui.new_frame();
+
+        let draw_data = self.imgui.render();
+
+        self.renderer.render(&self.gl, &mut self.textures, draw_data).unwrap();
+    }
+
     pub fn handle_events(&mut self, cpu: &mut CPU) {
         for event in self.event_pump.poll_iter() {
+            self.platform.handle_event(&mut self.imgui, &event);
             match event {
                 Event::Quit { .. } => {
                     match &mut cpu.bus.cartridge.mbc {

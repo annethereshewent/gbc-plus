@@ -74,10 +74,14 @@ fn main() {
             cpu.step();
         }
 
+        frontend.clear_framebuffer();
+
         frontend.update_rtc(&mut cpu);
         frontend.check_saves(&mut cpu);
         frontend.render_screen(&mut cpu);
+        frontend.render_ui();
         frontend.check_controller_status();
         frontend.handle_events(&mut cpu);
+        frontend.end_frame();
     }
 }
