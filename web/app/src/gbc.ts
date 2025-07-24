@@ -110,7 +110,6 @@ export class GBC {
 
   async startGame(data: ArrayBuffer) {
     if (this.frameNumber != -1) {
-      console.log("yeah!!!!!!!!!")
       this.emulator = new WebEmulator()
       cancelAnimationFrame(this.frameNumber)
     }
