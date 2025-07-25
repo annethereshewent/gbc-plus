@@ -98,7 +98,6 @@ impl BackupFile {
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
-        println!("loading the save!");
         self.ram = buf.to_vec().into_boxed_slice();
     }
 }
