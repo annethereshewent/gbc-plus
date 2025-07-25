@@ -73,7 +73,7 @@ impl WebEmulator {
     }
 
     pub fn change_palette(&mut self, index: usize) {
-        self.cpu.bus.ppu.current_palette = index;
+        self.cpu.bus.ppu.set_dmg_palette(index);
     }
 
     pub fn has_timer(&self) -> bool {

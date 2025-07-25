@@ -834,7 +834,7 @@ export class GBC {
       }
     }
 
-    const waveformButton = document.getElementById("waveform-visualizer")!
+    const waveformButton = document.getElementById("waveform-visualizer-button")!
 
     waveformButton.addEventListener('click', () => {
       this.toggleWavePlot()
@@ -882,6 +882,7 @@ export class GBC {
           this.emulator?.change_palette(this.palette)
 
           localStorage.setItem('dmg-palette', this.palette.toString())
+          break
       }
     }
   }
