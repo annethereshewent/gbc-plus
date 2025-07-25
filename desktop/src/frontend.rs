@@ -1,19 +1,14 @@
 use std::{
-    collections::HashMap,
-    fs::{
+    collections::HashMap, fs::{
         self,
         File,
         OpenOptions
-    },
-    io::{
+    }, io::{
         Read,
         Seek,
         SeekFrom,
         Write
-    },
-    process::exit,
-    sync::Arc,
-    time::{
+    }, path::PathBuf, process::exit, sync::Arc, time::{
         SystemTime,
         UNIX_EPOCH
     }
@@ -47,6 +42,7 @@ use gbc_plus::cpu::{
     CPU
 };
 use imgui_sdl2_support::SdlPlatform;
+use native_dialog::FileDialog;
 use ringbuf::{
     storage::Heap, traits::{
         Consumer,
@@ -75,6 +71,8 @@ use sdl2::{
 use serde::{Deserialize, Serialize};
 use imgui::{Context, Textures};
 
+use crate::cloud_service::CloudService;
+
 const BUTTON_CROSS: u8 = 0;
 const BUTTON_SQUARE: u8 = 2;
 const BUTTON_SELECT: u8 = 4;
@@ -89,7 +87,9 @@ const WAVEFORM_HEIGHT: usize = 256;
 
 pub enum UIAction {
     None,
-    Waveform
+    CloudLogin,
+    OpenGame(PathBuf),
+    Reset
 }
 
 #[derive(Serialize, Deserialize)]
@@ -128,7 +128,8 @@ pub struct Frontend {
     waveform_canvas: Canvas<Window>,
     pub show_waveform: bool,
     wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
-    samples: Vec<f32>
+    samples: Vec<f32>,
+    pub cloud_service: CloudService
 }
 
 pub struct GbcAudioCallback {
@@ -220,7 +221,8 @@ impl Frontend {
     pub fn new(
         cpu: &mut CPU,
         consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
-        wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>
+        wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
+        game_name: String
     ) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
@@ -417,7 +419,8 @@ impl Frontend {
             waveform_canvas: canvas,
             show_waveform: false,
             wave_consumer,
-            samples: Vec::with_capacity(NUM_SAMPLES)
+            samples: Vec::with_capacity(NUM_SAMPLES),
+            cloud_service: CloudService::new(game_name)
         }
     }
 
@@ -488,9 +491,33 @@ impl Frontend {
 
     pub fn check_saves(&mut self, cpu: &mut CPU) {
         match &mut cpu.bus.cartridge.mbc {
-            MBC::MBC1(mbc) => mbc.check_save(),
-            MBC::MBC3(mbc) => mbc.check_save(),
-            MBC::MBC5(mbc) => mbc.check_save(),
+            MBC::MBC1(mbc) => if mbc.check_save() {
+                if self.cloud_service.logged_in {
+                    let data = &mbc.backup_file.ram;
+
+                    self.cloud_service.upload_save(data);
+                } else {
+                    mbc.backup_file.save_file();
+                }
+            }
+            MBC::MBC3(mbc) => if mbc.check_save() {
+                if self.cloud_service.logged_in {
+                    let data = &mbc.backup_file.ram;
+
+                    self.cloud_service.upload_save(data);
+                } else {
+                    mbc.backup_file.save_file();
+                }
+            }
+            MBC::MBC5(mbc) => if mbc.check_save() {
+                if self.cloud_service.logged_in {
+                    let data = &mbc.backup_file.ram;
+
+                    self.cloud_service.upload_save(data);
+                } else {
+                    mbc.backup_file.save_file();
+                }
+            }
             _ => ()
         }
     }
@@ -520,6 +547,46 @@ impl Frontend {
         let ui = self.imgui.new_frame();
 
         ui.main_menu_bar(|| {
+            if let Some(menu) = ui.begin_menu("File") {
+                if ui.menu_item("Open") {
+                    match FileDialog::new()
+                    .add_filter("GBC rom file", &["gbc", "gb", "zip"])
+                    .show_open_single_file() {
+                        Ok(path) => {
+                            action = UIAction::OpenGame(path.unwrap());
+                        }
+                        Err(_) => ()
+                    }
+                }
+                if ui.menu_item("Reset") {
+                    action = UIAction::Reset
+                }
+                if let Some(menu) = ui.begin_menu("Cloud saves") {
+                    if !self.cloud_service.logged_in {
+                        if ui.menu_item("Log in") {
+                            self.cloud_service.login();
+                            action = UIAction::CloudLogin;
+                        }
+                    } else {
+                        if ui.menu_item("Log out") {
+                            self.cloud_service.logout();
+                            action = UIAction::CloudLogin
+                        }
+                    }
+
+                    menu.end();
+                }
+                menu.end();
+            }
+            if let Some(menu) = ui.begin_menu("Save states") {
+                if ui.menu_item("Create save state") {
+
+                }
+                if ui.menu_item("Load save state") {
+
+                }
+                menu.end();
+            }
             if let Some(menu) = ui.begin_menu("Misc") {
                 if ui.menu_item("Waveform visualizer") {
                     self.show_waveform = !self.show_waveform;
@@ -529,6 +596,7 @@ impl Frontend {
                         self.waveform_canvas.window_mut().hide();
                     }
                 }
+                menu.end();
             }
         });
 

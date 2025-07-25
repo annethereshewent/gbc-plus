@@ -6,23 +6,16 @@ use serde::{Deserialize, Serialize};
 pub struct BackupFile {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    file: Option<File>,
+    pub file: Option<File>,
     pub is_dirty: bool,
     pub ram: Box<[u8]>,
     pub last_updated: u128
 }
 
 impl BackupFile {
-    pub fn new(rom_path: Option<String>, ram_size: usize, has_backup: bool) -> Self {
+    pub fn new(save_path: Option<String>, ram_size: usize, has_backup: bool) -> Self {
          let mut ram = vec![0; ram_size];
-        let file = if let Some(rom_path) = rom_path {
-            let mut split_vec: Vec<&str> = rom_path.split('.').collect();
-
-            // remove the extension
-            split_vec.pop();
-
-            let filename = format!("{}.sav", split_vec.join("."));
-
+        let file = if let Some(filename) = save_path {
             let file = if has_backup {
                 let mut file = OpenOptions::new()
                     .read(true)
@@ -105,6 +98,7 @@ impl BackupFile {
     }
 
     pub fn load_save(&mut self, buf: &[u8]) {
+        println!("loading the save!");
         self.ram = buf.to_vec().into_boxed_slice();
     }
 }

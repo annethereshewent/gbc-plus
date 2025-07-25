@@ -1,4 +1,4 @@
-use std::{fs, io::Read, path::Path, time::{SystemTime, UNIX_EPOCH}};
+use std::{fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
 
 use dirs_next::data_dir;
 use reqwest::{
@@ -44,7 +44,7 @@ struct FileJson {
   mimeType: String
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct TokenResponse {
   access_token: String,
   refresh_token: Option<String>,
@@ -77,7 +77,7 @@ pub struct CloudService {
 }
 
 impl CloudService {
-  pub fn new() -> Self {
+  pub fn new(game_name: String) -> Self {
     let app_path = Self::get_application_path();
 
     let access_token_path_str = format!("{}access_token.json", app_path);
@@ -105,7 +105,7 @@ impl CloudService {
       logged_in: json.access_token != "",
       client: Client::new(),
       gbc_folder_id: String::new(),
-      game_name: String::new(),
+      game_name,
       expires_in
     }
   }
@@ -204,7 +204,7 @@ impl CloudService {
       let json: Result<TokenResponse, Error> = token_response.json();
 
       if json.is_ok() {
-        let json = json.unwrap();
+        let mut json = json.unwrap();
 
         self.access_token = json.clone().access_token;
 
@@ -215,6 +215,9 @@ impl CloudService {
 
         self.expires_in = current_time as isize + json.expires_in as isize * 1000;
 
+        json.expires_in = self.expires_in;
+        json.refresh_token = Some(self.refresh_token.clone());
+
         let access_token_path_str = format!("{}access_token.json", Self::get_application_path());
 
         fs::write(access_token_path_str, serde_json::to_string(&json).unwrap()).unwrap();
@@ -223,12 +226,12 @@ impl CloudService {
 
         self.logout();
 
-        println!("{:?}", error);
+        println!("error refreshing login: {:?}", error);
       }
     } else {
       self.logout();
 
-      println!("{}", token_response.text().unwrap());
+      println!("error refreshing login: {}", token_response.text().unwrap());
     }
   }
 
@@ -337,7 +340,7 @@ impl CloudService {
       );
 
       if response.status() != StatusCode::OK {
-        println!("Warning: Couldn't upload save to cloud!");
+        println!("Warning: Couldn't upload save to cloud! status code: {}", response.status());
       }
 
       return;
@@ -388,14 +391,16 @@ impl CloudService {
     );
 
     if response.status() != StatusCode::OK {
-      println!("Warning: Couldn't rename save!");
+      println!("Warning: Couldn't rename save! status code = {}", response.status());
     }
   }
 
-  pub fn get_save(&mut self, game_name: &str) -> Vec<u8> {
-    self.refresh_token_if_needed();
+  pub fn get_save(&mut self) -> Vec<u8> {
+    if self.game_name == "" {
+      return Vec::new();
+    }
 
-    self.game_name = game_name.to_string();
+    self.refresh_token_if_needed();
 
     self.check_for_gbc_folder();
 
@@ -505,15 +510,22 @@ impl CloudService {
 
 
     if response.status() == StatusCode::OK {
-      let json: TokenResponse = response.json().unwrap();
+      let mut json: TokenResponse = response.json().unwrap();
+
+      let current_time = SystemTime::now()
+          .duration_since(UNIX_EPOCH)
+          .expect("an error occurred")
+          .as_millis();
 
       self.access_token = json.clone().access_token;
+      self.expires_in = json.clone().expires_in * 1000 + current_time as isize;
       self.refresh_token = json.clone().refresh_token.unwrap();
+
+      json.expires_in = self.expires_in;
 
       self.logged_in = true;
 
       let access_token_data_path_str = format!("{}access_token.json", Self::get_application_path());
-      // let refresh_token_path_str = format!("{}.refresh_token", Self::get_application_path());
 
       // store these in files for use later
       fs::write(access_token_data_path_str, serde_json::to_string(&json.clone()).unwrap()).unwrap();

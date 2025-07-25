@@ -55,7 +55,7 @@ impl CPU {
     pub fn new(
         producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
         waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
-        rom_path: Option<String>,
+        save_path: Option<String>,
         is_ios: bool
     ) -> CPU {
         CPU {
@@ -63,7 +63,7 @@ impl CPU {
             pc: 0x100,
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
-            bus: Bus::new(producer, waveform_producer, rom_path, is_ios),
+            bus: Bus::new(producer, waveform_producer, save_path, is_ios),
             found: HashSet::new(),
             debug_on: false,
             is_halted: false

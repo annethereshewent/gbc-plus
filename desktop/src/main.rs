@@ -7,13 +7,17 @@ use std::{
 
 extern crate gbc_plus;
 
-use frontend::Frontend;
+use frontend::{Frontend, UIAction};
 use gbc_plus::cpu::{bus::apu::NUM_SAMPLES, CPU};
 use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
 pub mod frontend;
 pub mod cloud_service;
+
+fn reset() {
+
+}
 
 fn main() {
 
@@ -68,11 +72,30 @@ fn main() {
         }
     }
 
-    let mut cpu = CPU::new(producer, waveform_producer, Some(rom_path.clone()), false);
+    let mut split_vec: Vec<&str> = rom_path.split('.').collect();
 
-    let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer);
+    // remove the extension
+    split_vec.pop();
+
+    let filename = format!("{}.sav", split_vec.join("."));
+
+    split_vec = filename.split('/').collect();
+
+    let save_name = split_vec.pop().unwrap();
+
+    let mut cpu = CPU::new(producer, waveform_producer, Some(filename.clone()), false);
+
+    let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 
     cpu.load_rom(&rom_bytes);
+
+    if frontend.cloud_service.logged_in {
+        cpu.bus.cartridge.set_save_file(None);
+
+        let data = frontend.cloud_service.get_save();
+
+        cpu.bus.cartridge.load_save(&data);
+    }
 
     loop {
         while !cpu.bus.ppu.frame_finished {
@@ -84,7 +107,19 @@ fn main() {
         frontend.update_rtc(&mut cpu);
         frontend.check_saves(&mut cpu);
         frontend.render_screen(&mut cpu);
-        frontend.render_ui();
+        match frontend.render_ui() {
+            UIAction::None => (),
+            UIAction::CloudLogin => {
+                reset();
+            }
+            UIAction::OpenGame(_path) => {
+
+                reset();
+            }
+            UIAction::Reset => {
+
+            }
+        }
         frontend.check_controller_status();
         frontend.end_frame();
 

@@ -75,7 +75,7 @@ pub struct MBC3 {
 }
 
 impl MBC3 {
-    pub fn check_save(&mut self) {
+    pub fn check_save(&mut self) -> bool {
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
@@ -88,9 +88,11 @@ impl MBC3 {
         {
             let diff = current_time - last_updated;
             if diff >= 500 {
-                self.backup_file.save_file()
+                return true;
             }
         }
+
+        false
     }
 
     pub fn has_saved(&mut self) -> bool {
@@ -314,9 +316,9 @@ impl MBC3 {
         (address as usize) & 0x3fff | (self.rom_bank as usize) << 14
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
-        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(rom_path) = &rom_path {
-            let mut split_str: Vec<&str> = rom_path.split('.').collect();
+    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, save_path: Option<String>) -> Self {
+        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
+            let mut split_str: Vec<&str> = save_path.split('.').collect();
 
             split_str.pop();
 
@@ -357,7 +359,7 @@ impl MBC3 {
             ram_bank: 0,
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
-            backup_file: BackupFile::new(rom_path.clone(), ram_size, has_battery && has_ram),
+            backup_file: BackupFile::new(save_path.clone(), ram_size, has_battery && has_ram),
             _rom_size: rom_size,
             has_ram,
             has_timer,

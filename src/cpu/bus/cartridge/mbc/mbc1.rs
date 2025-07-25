@@ -23,7 +23,7 @@ pub struct MBC1 {
 }
 
 impl MBC1 {
-    pub fn check_save(&mut self) {
+    pub fn check_save(&mut self) -> bool {
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
@@ -36,9 +36,11 @@ impl MBC1 {
         {
             let diff = current_time - last_updated;
             if diff >= 500 {
-                self.backup_file.save_file()
+                return true;
             }
         }
+
+        false
     }
 
     pub fn has_saved(&mut self) -> bool {
@@ -122,7 +124,7 @@ impl MBC1 {
         }
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
+    pub fn new(has_ram: bool, has_battery: bool, rom_size: usize, ram_size: usize, save_path: Option<String>) -> Self {
         Self {
             _ram_size: ram_size,
             rom_size: rom_size,
@@ -131,7 +133,7 @@ impl MBC1 {
             banking_mode: BankingMode::Simple,
             rom_bank: 1,
             ram_bank: 0,
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery && has_ram)
+            backup_file: BackupFile::new(save_path, ram_size, has_battery && has_ram)
         }
     }
 

@@ -16,7 +16,7 @@ pub struct MBC5 {
 }
 
 impl MBC5 {
-    pub fn check_save(&mut self) {
+    pub fn check_save(&mut self) -> bool {
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
@@ -29,9 +29,11 @@ impl MBC5 {
         {
             let diff = current_time - last_updated;
             if diff >= 500 {
-                self.backup_file.save_file()
+                return true
             }
         }
+
+        false
     }
 
      pub fn has_saved(&mut self) -> bool {
@@ -124,7 +126,7 @@ impl MBC5 {
         }
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: Option<String>) -> Self {
+    pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  save_path: Option<String>) -> Self {
         Self {
             rom_bank: 0,
             ram_bank: 0,
@@ -132,7 +134,7 @@ impl MBC5 {
             has_ram,
             ram_size,
             _has_rumble,
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery)
+            backup_file: BackupFile::new(save_path, ram_size, has_battery)
         }
     }
     fn get_ram_address(&self, address: u16) -> usize {
