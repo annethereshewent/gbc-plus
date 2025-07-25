@@ -9,11 +9,12 @@ pub struct BackupFile {
     pub file: Option<File>,
     pub is_dirty: bool,
     pub ram: Box<[u8]>,
-    pub last_updated: u128
+    pub last_updated: u128,
+    pub is_desktop: bool
 }
 
 impl BackupFile {
-    pub fn new(save_path: Option<String>, ram_size: usize, has_backup: bool) -> Self {
+    pub fn new(save_path: Option<String>, ram_size: usize, has_backup: bool, is_desktop: bool) -> Self {
          let mut ram = vec![0; ram_size];
         let file = if let Some(filename) = save_path {
             let file = if has_backup {
@@ -47,7 +48,8 @@ impl BackupFile {
             is_dirty: false,
             file,
             ram: ram.into_boxed_slice(),
-            last_updated: 0
+            last_updated: 0,
+            is_desktop
         }
     }
 
@@ -60,7 +62,7 @@ impl BackupFile {
         self.ram[address] = value;
         self.is_dirty = true;
 
-        if self.file.is_some() {
+        if self.is_desktop {
             self.last_updated = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("an error occurred")
@@ -72,7 +74,7 @@ impl BackupFile {
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
         self.is_dirty = true;
 
-        if self.file.is_some() {
+        if self.is_desktop {
             self.last_updated = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("an error occurred")

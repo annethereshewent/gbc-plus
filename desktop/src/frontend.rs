@@ -500,6 +500,7 @@ impl Frontend {
                 if self.cloud_service.logged_in {
                     let data = &mbc.backup_file.ram;
 
+                    mbc.backup_file.is_dirty = false;
                     self.cloud_service.upload_save(data);
                 } else {
                     mbc.backup_file.save_file();
@@ -509,6 +510,7 @@ impl Frontend {
                 if self.cloud_service.logged_in {
                     let data = &mbc.backup_file.ram;
 
+                     mbc.backup_file.is_dirty = false;
                     self.cloud_service.upload_save(data);
                 } else {
                     mbc.backup_file.save_file();
@@ -518,6 +520,7 @@ impl Frontend {
                 if self.cloud_service.logged_in {
                     let data = &mbc.backup_file.ram;
 
+                     mbc.backup_file.is_dirty = false;
                     self.cloud_service.upload_save(data);
                 } else {
                     mbc.backup_file.save_file();

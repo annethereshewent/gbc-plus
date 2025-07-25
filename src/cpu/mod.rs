@@ -56,14 +56,15 @@ impl CPU {
         producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
         waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
         save_path: Option<String>,
-        is_ios: bool
+        is_ios: bool,
+        is_desktop: bool
     ) -> CPU {
         CPU {
             registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
-            bus: Bus::new(producer, waveform_producer, save_path, is_ios),
+            bus: Bus::new(producer, waveform_producer, save_path, is_ios, is_desktop),
             found: HashSet::new(),
             debug_on: false,
             is_halted: false

@@ -14,17 +14,19 @@ pub struct Cartridge {
     pub rom_size: usize,
     pub ram_size: usize,
     pub mbc: MBC,
-    pub save_path: Option<String>
+    pub save_path: Option<String>,
+    is_desktop: bool
 }
 
 impl Cartridge {
-    pub fn new(save_path: Option<String>) -> Self {
+    pub fn new(save_path: Option<String>, is_desktop: bool) -> Self {
         Self {
             rom: Vec::new(),
             rom_size: 0,
             ram_size: 0,
             mbc: MBC::None,
-            save_path
+            save_path,
+            is_desktop
         }
     }
 
@@ -35,7 +37,8 @@ impl Cartridge {
                 battery,
                 self.rom_size,
                 self.ram_size,
-                self.save_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }
@@ -48,7 +51,8 @@ impl Cartridge {
                 timer,
                 self.rom_size,
                 self.ram_size,
-                self.save_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }
@@ -61,7 +65,8 @@ impl Cartridge {
                 rumble,
                 self.rom_size,
                 self.ram_size,
-                self.save_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }

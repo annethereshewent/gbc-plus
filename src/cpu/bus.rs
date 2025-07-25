@@ -55,10 +55,11 @@ impl Bus {
         producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
         waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
         save_path: Option<String>,
-        is_ios: bool
+        is_ios: bool,
+        is_desktop: bool
     ) -> Self {
         Self {
-            cartridge: Cartridge::new(save_path),
+            cartridge: Cartridge::new(save_path, is_desktop),
             wram: [
                 vec![0; 0x1000].into_boxed_slice(),
                 vec![0; 0x1000].into_boxed_slice(),

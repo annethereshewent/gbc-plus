@@ -59,7 +59,7 @@ impl WebEmulator {
         let (producer, consumer) = ringbuffer.split();
 
         Self {
-            cpu: CPU::new(producer, None, None, false),
+            cpu: CPU::new(producer, None, None, false, false),
             joypad_map,
             sample_buffer: Vec::new(),
             consumer,

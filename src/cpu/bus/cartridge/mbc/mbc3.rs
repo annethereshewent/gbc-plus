@@ -316,7 +316,15 @@ impl MBC3 {
         (address as usize) & 0x3fff | (self.rom_bank as usize) << 14
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, save_path: Option<String>) -> Self {
+    pub fn new(
+        has_ram: bool,
+        has_battery: bool,
+        has_timer: bool,
+        rom_size: usize,
+        ram_size: usize,
+        save_path: Option<String>,
+        is_desktop: bool
+    ) -> Self {
         let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
             let mut split_str: Vec<&str> = save_path.split('.').collect();
 
@@ -359,7 +367,7 @@ impl MBC3 {
             ram_bank: 0,
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
-            backup_file: BackupFile::new(save_path.clone(), ram_size, has_battery && has_ram),
+            backup_file: BackupFile::new(save_path.clone(), ram_size, has_battery && has_ram, is_desktop),
             _rom_size: rom_size,
             has_ram,
             has_timer,

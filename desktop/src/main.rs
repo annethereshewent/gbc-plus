@@ -83,7 +83,7 @@ fn main() {
 
     let save_name = split_vec.pop().unwrap();
 
-    let mut cpu = CPU::new(producer, Some(waveform_producer), Some(filename.clone()), false);
+    let mut cpu = CPU::new(producer, Some(waveform_producer), Some(filename.clone()), false, true);
 
     let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 
@@ -94,7 +94,9 @@ fn main() {
 
         let data = frontend.cloud_service.get_save();
 
-        cpu.bus.cartridge.load_save(&data);
+        if data.len() > 0 {
+            cpu.bus.cartridge.load_save(&data);
+        }
     }
 
     loop {

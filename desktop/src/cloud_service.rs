@@ -312,10 +312,12 @@ impl CloudService {
 
   // TODO: Fix this really long unfortunate method
   pub fn upload_save(&mut self, bytes: &[u8]) {
+    println!("uploading save!");
     if self.game_name == "" {
       return;
     }
 
+    println!("save name is *not* empty!");
     self.refresh_token_if_needed();
 
     if self.gbc_folder_id == "" {

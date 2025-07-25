@@ -126,7 +126,15 @@ impl MBC5 {
         }
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  save_path: Option<String>) -> Self {
+    pub fn new(
+        has_ram: bool,
+        has_battery: bool,
+        _has_rumble: bool,
+        _rom_size: usize,
+        ram_size: usize,
+        save_path: Option<String>,
+        is_desktop: bool
+    ) -> Self {
         Self {
             rom_bank: 0,
             ram_bank: 0,
@@ -134,7 +142,7 @@ impl MBC5 {
             has_ram,
             ram_size,
             _has_rumble,
-            backup_file: BackupFile::new(save_path, ram_size, has_battery)
+            backup_file: BackupFile::new(save_path, ram_size, has_battery, is_desktop)
         }
     }
     fn get_ram_address(&self, address: u16) -> usize {
