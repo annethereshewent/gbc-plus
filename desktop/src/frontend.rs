@@ -129,7 +129,8 @@ pub struct Frontend {
     pub show_waveform: bool,
     wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
     samples: Vec<f32>,
-    pub cloud_service: CloudService
+    pub cloud_service: CloudService,
+    display_ui: bool
 }
 
 pub struct GbcAudioCallback {
@@ -420,7 +421,8 @@ impl Frontend {
             show_waveform: false,
             wave_consumer,
             samples: Vec::with_capacity(NUM_SAMPLES),
-            cloud_service: CloudService::new(game_name)
+            cloud_service: CloudService::new(game_name),
+            display_ui: true
         }
     }
 
@@ -546,59 +548,61 @@ impl Frontend {
 
         let ui = self.imgui.new_frame();
 
-        ui.main_menu_bar(|| {
-            if let Some(menu) = ui.begin_menu("File") {
-                if ui.menu_item("Open") {
-                    match FileDialog::new()
-                    .add_filter("GBC rom file", &["gbc", "gb", "zip"])
-                    .show_open_single_file() {
-                        Ok(path) => {
-                            action = UIAction::OpenGame(path.unwrap());
-                        }
-                        Err(_) => ()
-                    }
-                }
-                if ui.menu_item("Reset") {
-                    action = UIAction::Reset
-                }
-                if let Some(menu) = ui.begin_menu("Cloud saves") {
-                    if !self.cloud_service.logged_in {
-                        if ui.menu_item("Log in") {
-                            self.cloud_service.login();
-                            action = UIAction::CloudLogin;
-                        }
-                    } else {
-                        if ui.menu_item("Log out") {
-                            self.cloud_service.logout();
-                            action = UIAction::CloudLogin
+        if self.display_ui {
+            ui.main_menu_bar(|| {
+                if let Some(menu) = ui.begin_menu("File") {
+                    if ui.menu_item("Open") {
+                        match FileDialog::new()
+                        .add_filter("GBC rom file", &["gbc", "gb", "zip"])
+                        .show_open_single_file() {
+                            Ok(path) => {
+                                action = UIAction::OpenGame(path.unwrap());
+                            }
+                            Err(_) => ()
                         }
                     }
+                    if ui.menu_item("Reset") {
+                        action = UIAction::Reset
+                    }
+                    if let Some(menu) = ui.begin_menu("Cloud saves") {
+                        if !self.cloud_service.logged_in {
+                            if ui.menu_item("Log in") {
+                                self.cloud_service.login();
+                                action = UIAction::CloudLogin;
+                            }
+                        } else {
+                            if ui.menu_item("Log out") {
+                                self.cloud_service.logout();
+                                action = UIAction::CloudLogin
+                            }
+                        }
 
+                        menu.end();
+                    }
                     menu.end();
                 }
-                menu.end();
-            }
-            if let Some(menu) = ui.begin_menu("Save states") {
-                if ui.menu_item("Create save state") {
+                if let Some(menu) = ui.begin_menu("Save states") {
+                    if ui.menu_item("Create save state") {
 
-                }
-                if ui.menu_item("Load save state") {
-
-                }
-                menu.end();
-            }
-            if let Some(menu) = ui.begin_menu("Misc") {
-                if ui.menu_item("Waveform visualizer") {
-                    self.show_waveform = !self.show_waveform;
-                    if self.show_waveform {
-                        self.waveform_canvas.window_mut().show();
-                    } else {
-                        self.waveform_canvas.window_mut().hide();
                     }
+                    if ui.menu_item("Load save state") {
+
+                    }
+                    menu.end();
                 }
-                menu.end();
-            }
-        });
+                if let Some(menu) = ui.begin_menu("Misc") {
+                    if ui.menu_item("Waveform visualizer") {
+                        self.show_waveform = !self.show_waveform;
+                        if self.show_waveform {
+                            self.waveform_canvas.window_mut().show();
+                        } else {
+                            self.waveform_canvas.window_mut().hide();
+                        }
+                    }
+                    menu.end();
+                }
+            });
+        }
 
         let draw_data = self.imgui.render();
 
@@ -642,6 +646,7 @@ impl Frontend {
                 Event::KeyDown { keycode, .. } => {
                     if let Some(keycode) = keycode {
                         if let Some(button) = self.keyboard_map.get(&keycode) {
+                            self.display_ui = false;
                             cpu.bus.joypad.press_button(*button);
                         } else if keycode == Keycode::G {
 
@@ -662,6 +667,16 @@ impl Frontend {
                                 self.config_file.seek(SeekFrom::Start(0)).unwrap();
                                 self.config_file.write_all(json.as_bytes()).unwrap();
                             }
+                        } else if keycode == Keycode::F4 {
+                            self.show_waveform = !self.show_waveform;
+
+                            if self.show_waveform {
+                                self.waveform_canvas.window_mut().show();
+                            } else {
+                                self.waveform_canvas.window_mut().hide();
+                            }
+                        } else if keycode == Keycode::Escape {
+                            self.display_ui = !self.display_ui;
                         }
                     }
                 }
@@ -674,6 +689,7 @@ impl Frontend {
                 }
                 Event::JoyButtonDown { button_idx, .. } => {
                     if let Some(button) = self.button_map.get(&button_idx) {
+                        self.display_ui = false;
                         cpu.bus.joypad.press_button(*button);
                     }
                 }
