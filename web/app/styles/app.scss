@@ -15,7 +15,7 @@
     display: none;
   }
   canvas {
-    height: 100vh !important;
+    height: 80vh !important;
     width: auto !important;
   }
   .navbar:hover {
@@ -28,6 +28,9 @@
     background: #000000;
     height: 100vh !important;
     overflow: none !important;
+  }
+  #waveform-visualizer {
+    display: none !important
   }
 }
 #palette-header-message {
