@@ -13,6 +13,59 @@ import { StateManager } from './saves/state_manager'
 
 const FPS_INTERVAL = 1000 / 60
 
+const PALETTES = [
+  {
+    name: 'Classic green',
+    class: 'classic-green',
+    color: '#489848'
+  },
+  {
+    name: 'Grayscale',
+    class: 'grayscale',
+    color: '#555555'
+  },
+  {
+    name: 'Solarized',
+    class: 'solarized',
+    color: '#586e75'
+  },
+  {
+    name: 'Maverick',
+    class: 'maverick',
+    color: '#306850'
+  },
+  {
+    name: 'Oceanic',
+    class: 'oceanic',
+    color: '#0074d9'
+  },
+  {
+    name: 'Burnt peach',
+    class: 'burnt-peach',
+    color: '#803d26'
+  },
+  {
+    name: 'Grape soda',
+    class: 'grape-soda',
+    color: '#5c258d'
+  },
+  {
+    name: 'Strawberry milk',
+    class: 'strawberry-milk',
+    color: '#e175a4'
+  },
+  {
+    name: 'Witching hour',
+    class: 'witching-hour',
+    color: '#4b0082'
+  },
+  {
+    name: 'Void dream',
+    class: 'void-dream',
+    color: '#4f86f7'
+  }
+]
+
 export class GBC {
   emulator: WebEmulator|null = null
   private wasm: InitOutput|null = null
@@ -43,6 +96,16 @@ export class GBC {
   private frameNumber: number = -1
 
   private romData = new Uint8Array()
+
+  private palette = 1
+
+  constructor() {
+    const palette = localStorage.getItem('dmg-palette')
+
+    if (palette != null) {
+      this.palette = parseInt(palette)
+    }
+  }
 
   checkOauth() {
     this.cloudService.checkAuthentication()
@@ -149,6 +212,8 @@ export class GBC {
       setInterval(() => {
         this.updateRtc()
       }, 5 * 60 * 1000)
+
+      this.emulator!.change_palette(this.palette)
 
       this.frameNumber = requestAnimationFrame((time) => this.runFrame(time))
     }
@@ -635,6 +700,70 @@ export class GBC {
     }
   }
 
+  changePalette(index: number) {
+    this.emulator?.change_palette(index)
+
+    localStorage.setItem('dmg-palette', index.toString())
+
+    this.palette = index
+
+    this.hidePalettesModal()
+
+    this.emulator?.set_pause(false)
+  }
+
+  showColorPalettes() {
+    this.emulator?.set_pause(true)
+
+    const paletteModal = document.getElementById("color-palettes-modal")
+
+    if (paletteModal != null) {
+      const palettesDiv = document.getElementById("color-palettes")
+
+      const ulEl = document.createElement('ul')
+
+      ulEl.className = "palettes-list"
+
+      if (palettesDiv != null) {
+        palettesDiv.innerHTML = ''
+        for (let i = 0; i < PALETTES.length; i++) {
+          const palette = PALETTES[i]
+          const liEl = document.createElement('li')
+
+          const divEl = document.createElement('div')
+
+          divEl.className = 'color-palette'
+
+          divEl.innerText = palette.name
+
+          const spanEl = document.createElement("span")
+
+          spanEl.className = "palette-circle"
+          spanEl.style.background = palette.color
+
+          spanEl.addEventListener("click", () => this.changePalette(i))
+
+          divEl.appendChild(spanEl)
+
+          liEl.appendChild(divEl)
+
+          const divEl2 = document.createElement('div')
+
+          divEl2.style.clear = 'both'
+
+          liEl.append(divEl2)
+
+          ulEl.appendChild(liEl)
+        }
+
+        palettesDiv.appendChild(ulEl)
+      }
+
+      paletteModal.style.display = "block"
+      paletteModal.className = "modal show"
+    }
+  }
+
   async createSaveState(isQuickSave = false) {
     const now = moment()
 
@@ -656,15 +785,36 @@ export class GBC {
     }
   }
 
+  hideSavesModal() {
+    const savesModal = document.getElementById('saves-modal')
+
+    if (savesModal != null) {
+      savesModal.className = 'modal hide'
+      savesModal.style.display = 'none'
+    }
+  }
+
+  hidePalettesModal() {
+    const palettesModal = document.getElementById('color-palettes-modal')
+
+    if (palettesModal != null) {
+      palettesModal.className = 'modal hide'
+      palettesModal.style.display = 'none'
+    }
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
 
     document.getElementById("states-modal-close")?.addEventListener("click", () => this.closeStatesModal())
+    document.getElementById("hide-saves-modal")?.addEventListener("click", () => this.hideSavesModal())
     document.getElementById("save-states")?.addEventListener("click", () => this.displaySaveStatesModal())
     document.getElementById("create-save-state")?.addEventListener("click", () => this.createSaveState())
     document.getElementById("save-management")?.addEventListener("click", () => this.displaySavesModal())
     document.getElementById("fullscreen")?.addEventListener("click", () => this.toggleFullscreen())
+    document.getElementById("dmg-color-palettes-item")?.addEventListener("click", () => this.showColorPalettes())
+    document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {
@@ -701,16 +851,37 @@ export class GBC {
             savesModal.style.display = 'none'
           }
 
-          const helpModal = document.getElementById('help-modal')
+          const helpModal = document.getElementById('help-modal')!
 
           if (helpModal != null) {
             helpModal.className = 'modal hide'
             helpModal.style.display = 'none'
           }
+
+          const statesModal = document.getElementById('states-modal')
+
+          if (statesModal != null) {
+            statesModal.className = 'modal hide'
+            statesModal.style.display = 'none'
+          }
+
+          const palettesModal = document.getElementById('color-palettes-modal')
+
+          if (palettesModal != null) {
+            palettesModal.className = 'modal hide'
+            palettesModal.style.display = 'none'
+          }
+
           break
-        case 'F2':
+        case 'F4':
           this.toggleWavePlot()
           break
+        case 'F2':
+          this.palette = (this.palette + 1) % PALETTES.length
+
+          this.emulator?.change_palette(this.palette)
+
+          localStorage.setItem('dmg-palette', this.palette.toString())
       }
     }
   }

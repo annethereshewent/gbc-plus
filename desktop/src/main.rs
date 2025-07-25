@@ -83,7 +83,7 @@ fn main() {
 
     let save_name = split_vec.pop().unwrap();
 
-    let mut cpu = CPU::new(producer, waveform_producer, Some(filename.clone()), false);
+    let mut cpu = CPU::new(producer, Some(waveform_producer), Some(filename.clone()), false);
 
     let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 

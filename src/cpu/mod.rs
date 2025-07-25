@@ -54,7 +54,7 @@ pub struct CPU {
 impl CPU {
     pub fn new(
         producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
-        waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
         save_path: Option<String>,
         is_ios: bool
     ) -> CPU {

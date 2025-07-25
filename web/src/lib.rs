@@ -59,7 +59,7 @@ impl WebEmulator {
         let (producer, consumer) = ringbuffer.split();
 
         Self {
-            cpu: CPU::new(producer, None, false),
+            cpu: CPU::new(producer, None, None, false),
             joypad_map,
             sample_buffer: Vec::new(),
             consumer,
@@ -70,6 +70,10 @@ impl WebEmulator {
 
     pub fn set_pause(&mut self, value: bool) {
         self.is_paused = value;
+    }
+
+    pub fn change_palette(&mut self, index: usize) {
+        self.cpu.bus.ppu.current_palette = index;
     }
 
     pub fn has_timer(&self) -> bool {

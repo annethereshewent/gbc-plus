@@ -47,7 +47,7 @@ pub struct APU {
 impl APU {
     pub fn new(
         producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
-        waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
         is_ios: bool
     ) -> Self {
         Self {
@@ -62,7 +62,7 @@ impl APU {
             sequencer_cycles: 0,
             sequencer_step: 0,
             producer: Some(producer),
-            waveform_producer: Some(waveform_producer),
+            waveform_producer: waveform_producer,
             is_ios,
             is_paused: false
         }

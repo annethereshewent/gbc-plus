@@ -120,6 +120,12 @@ export class WebEmulator {
         wasm.webemulator_set_pause(this.__wbg_ptr, value);
     }
     /**
+     * @param {number} index
+     */
+    change_palette(index) {
+        wasm.webemulator_change_palette(this.__wbg_ptr, index);
+    }
+    /**
      * @returns {boolean}
      */
     has_timer() {

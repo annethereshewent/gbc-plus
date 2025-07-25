@@ -30,6 +30,28 @@
     overflow: none !important;
   }
 }
+#palette-header-message {
+  margin-bottom: 20px;
+}
+#color-palettes {
+  .palettes-list {
+    list-style-type: none;
+    .color-palette {
+      width: 175px;
+      margin-bottom: 10px;
+      .palette-circle {
+        cursor: pointer;
+        float: right;
+        margin-left: 20px;
+        display: block;
+        width: 30px;
+        height: 30px;
+        border-radius: 30px;
+        box-shadow: 1px 1px gray;
+      }
+    }
+  }
+}
 .show {
   display: block;
 }
