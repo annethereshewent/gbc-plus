@@ -8,7 +8,14 @@ use std::{
         Seek,
         SeekFrom,
         Write
-    }, path::PathBuf, process::exit, sync::Arc, time::{
+    }, path::PathBuf,
+    process::exit,
+    sync::{
+        Arc,
+        Mutex
+    },
+    thread,
+    time::{
         SystemTime,
         UNIX_EPOCH
     }
@@ -34,7 +41,10 @@ use imgui_glow_renderer::{
 use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
-        apu::NUM_SAMPLES, cartridge::mbc::MBC, joypad::JoypadButtons, ppu::{
+        apu::NUM_SAMPLES,
+        cartridge::mbc::MBC,
+        joypad::JoypadButtons,
+        ppu::{
             SCREEN_HEIGHT,
             SCREEN_WIDTH
         }
@@ -129,7 +139,7 @@ pub struct Frontend {
     pub show_waveform: bool,
     wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
     samples: Vec<f32>,
-    pub cloud_service: CloudService,
+    pub cloud_service: Arc<Mutex<CloudService>>,
     display_ui: bool
 }
 
@@ -424,7 +434,7 @@ impl Frontend {
             show_waveform: false,
             wave_consumer,
             samples: Vec::with_capacity(NUM_SAMPLES),
-            cloud_service: CloudService::new(game_name),
+            cloud_service: Arc::new(Mutex::new(CloudService::new(game_name))),
             display_ui: true
         }
     }
@@ -494,34 +504,44 @@ impl Frontend {
         }
     }
 
-    pub fn check_saves(&mut self, cpu: &mut CPU) {
-        match &mut cpu.bus.cartridge.mbc {
+    pub fn check_saves(&mut self, cpu: &mut CPU, logged_in: bool) {
+        let mbc = &mut cpu.bus.cartridge.mbc;
+        match mbc {
             MBC::MBC1(mbc) => if mbc.check_save() {
-                if self.cloud_service.logged_in {
-                    let data = &mbc.backup_file.ram;
+                if logged_in {
+                    let data = mbc.backup_file.ram.clone();
 
                     mbc.backup_file.is_dirty = false;
-                    self.cloud_service.upload_save(data);
+                    let cloud_service = self.cloud_service.clone();
+                    thread::spawn(move || {
+                        cloud_service.lock().unwrap().upload_save(&data);
+                    });
                 } else {
                     mbc.backup_file.save_file();
                 }
             }
             MBC::MBC3(mbc) => if mbc.check_save() {
-                if self.cloud_service.logged_in {
-                    let data = &mbc.backup_file.ram;
+                if logged_in {
+                    let data = mbc.backup_file.ram.clone();
 
-                     mbc.backup_file.is_dirty = false;
-                    self.cloud_service.upload_save(data);
+                    mbc.backup_file.is_dirty = false;
+                    let cloud_service = self.cloud_service.clone();
+                    thread::spawn(move || {
+                        cloud_service.lock().unwrap().upload_save(&data);
+                    });
                 } else {
                     mbc.backup_file.save_file();
                 }
             }
             MBC::MBC5(mbc) => if mbc.check_save() {
-                if self.cloud_service.logged_in {
-                    let data = &mbc.backup_file.ram;
+                if logged_in {
+                    let data = mbc.backup_file.ram.clone();
 
-                     mbc.backup_file.is_dirty = false;
-                    self.cloud_service.upload_save(data);
+                    mbc.backup_file.is_dirty = false;
+                    let cloud_service = self.cloud_service.clone();
+                    thread::spawn(move || {
+                        cloud_service.lock().unwrap().upload_save(&data);
+                    });
                 } else {
                     mbc.backup_file.save_file();
                 }
@@ -547,7 +567,7 @@ impl Frontend {
         }
     }
 
-    pub fn render_ui(&mut self) -> UIAction {
+    pub fn render_ui(&mut self, cpu: &mut CPU, logged_in: bool) -> UIAction {
         self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
 
         let mut action = UIAction::None;
@@ -571,14 +591,14 @@ impl Frontend {
                         action = UIAction::Reset
                     }
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
-                        if !self.cloud_service.logged_in {
+                        if !logged_in {
                             if ui.menu_item("Log in") {
-                                self.cloud_service.login();
+                                self.cloud_service.lock().unwrap().login();
                                 action = UIAction::CloudLogin;
                             }
                         } else {
                             if ui.menu_item("Log out") {
-                                self.cloud_service.logout();
+                                self.cloud_service.lock().unwrap().logout();
                                 action = UIAction::CloudLogin
                             }
                         }

@@ -7,17 +7,13 @@ use std::{
 
 extern crate gbc_plus;
 
-use frontend::{Frontend, UIAction};
+use frontend::Frontend;
 use gbc_plus::cpu::{bus::apu::NUM_SAMPLES, CPU};
 use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
 pub mod frontend;
 pub mod cloud_service;
-
-fn reset() {
-
-}
 
 fn main() {
 
@@ -89,10 +85,16 @@ fn main() {
 
     cpu.load_rom(&rom_bytes);
 
-    if frontend.cloud_service.logged_in {
+    let cloud_service_clone = frontend.cloud_service.clone();
+
+    let logged_in = {
+        cloud_service_clone.lock().unwrap().logged_in
+    };
+
+    if logged_in {
         cpu.bus.cartridge.set_save_file(None);
 
-        let data = frontend.cloud_service.get_save();
+        let data = frontend.cloud_service.lock().unwrap().get_save();
 
         if data.len() > 0 {
             cpu.bus.cartridge.load_save(&data);
@@ -107,21 +109,9 @@ fn main() {
         frontend.clear_framebuffer();
 
         frontend.update_rtc(&mut cpu);
-        frontend.check_saves(&mut cpu);
+        frontend.check_saves(&mut cpu, logged_in);
         frontend.render_screen(&mut cpu);
-        match frontend.render_ui() {
-            UIAction::None => (),
-            UIAction::CloudLogin => {
-                reset();
-            }
-            UIAction::OpenGame(_path) => {
-
-                reset();
-            }
-            UIAction::Reset => {
-
-            }
-        }
+        frontend.render_ui(&mut cpu, logged_in);
         frontend.check_controller_status();
         frontend.end_frame();
 
