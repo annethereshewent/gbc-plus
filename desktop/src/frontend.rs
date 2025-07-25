@@ -641,6 +641,27 @@ impl Frontend {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
             match event {
+                Event::Quit { .. } => {
+                    match &mut cpu.bus.cartridge.mbc {
+                        MBC::MBC1(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
+                        }
+                        MBC::MBC3(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
+                        }
+                        MBC::MBC5(mbc) => {
+                            if mbc.backup_file.is_dirty {
+                                mbc.backup_file.save_file();
+                            }
+                        }
+                        _=> ()
+                    }
+                    exit(0);
+                }
                 Event::Window { win_event, window_id, .. } => {
                     if win_event == WindowEvent::Close {
                         if window_id == 1 {
