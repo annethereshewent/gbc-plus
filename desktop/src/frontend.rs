@@ -274,8 +274,11 @@ impl Frontend {
             .build()
             .unwrap();
 
+        let window_positon = window.position();
+
         let mut waveform_window = video_subsystem
             .window("Waveform Viewer", 683, 256)
+            .position((window_positon.0 as f32 * 1.60) as i32, window_positon.1)
             .build()
             .unwrap();
 
