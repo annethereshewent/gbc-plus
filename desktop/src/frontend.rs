@@ -507,11 +507,38 @@ impl Frontend {
     pub fn check_saves(&mut self, cpu: &mut CPU, logged_in: bool) {
         let mbc = &mut cpu.bus.cartridge.mbc;
         match mbc {
-            MBC::MBC1(mbc) => if mbc.check_save() {
+            MBC::MBC1(mbc) => {
+                if mbc.check_save(logged_in) {
+                    if logged_in {
+                        let data = mbc.backup_file.ram.clone();
+
+                        mbc.backup_file.is_dirty = false;
+
+                        mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
+                        let cloud_service = self.cloud_service.clone();
+                        thread::spawn(move || {
+                            cloud_service.lock().unwrap().upload_save(&data);
+                        });
+                    } else {
+                        mbc.backup_file.save_file();
+                    }
+                }
+            }
+            MBC::MBC3(mbc) => if mbc.check_save(logged_in) {
                 if logged_in {
                     let data = mbc.backup_file.ram.clone();
 
                     mbc.backup_file.is_dirty = false;
+
+                    mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
                         cloud_service.lock().unwrap().upload_save(&data);
@@ -520,24 +547,17 @@ impl Frontend {
                     mbc.backup_file.save_file();
                 }
             }
-            MBC::MBC3(mbc) => if mbc.check_save() {
+            MBC::MBC5(mbc) => if mbc.check_save(logged_in) {
                 if logged_in {
                     let data = mbc.backup_file.ram.clone();
 
                     mbc.backup_file.is_dirty = false;
-                    let cloud_service = self.cloud_service.clone();
-                    thread::spawn(move || {
-                        cloud_service.lock().unwrap().upload_save(&data);
-                    });
-                } else {
-                    mbc.backup_file.save_file();
-                }
-            }
-            MBC::MBC5(mbc) => if mbc.check_save() {
-                if logged_in {
-                    let data = mbc.backup_file.ram.clone();
 
-                    mbc.backup_file.is_dirty = false;
+                    mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
                         cloud_service.lock().unwrap().upload_save(&data);

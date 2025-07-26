@@ -10,7 +10,9 @@ pub struct BackupFile {
     pub is_dirty: bool,
     pub ram: Box<[u8]>,
     pub last_updated: u128,
-    pub is_desktop: bool
+    pub is_desktop: bool,
+    pub previous_hash: Option<String>,
+    pub last_saved: u128
 }
 
 impl BackupFile {
@@ -49,7 +51,9 @@ impl BackupFile {
             file,
             ram: ram.into_boxed_slice(),
             last_updated: 0,
-            is_desktop
+            last_saved: 0,
+            is_desktop,
+            previous_hash: None
         }
     }
 
@@ -60,26 +64,28 @@ impl BackupFile {
 
     pub fn write8(&mut self, address: usize, value: u8) {
         self.ram[address] = value;
-        self.is_dirty = true;
 
-        if self.is_desktop {
+        if self.is_desktop && !self.is_dirty {
             self.last_updated = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("an error occurred")
                 .as_millis();
         }
+
+        self.is_dirty = true;
     }
 
     pub fn write16(&mut self, address: usize, value: u16) {
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
-        self.is_dirty = true;
 
-        if self.is_desktop {
+        if self.is_desktop && !self.is_dirty {
             self.last_updated = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("an error occurred")
                 .as_millis();
         }
+
+        self.is_dirty = true;
     }
 
     pub fn read8(&self, address: usize) -> u8 {
@@ -93,6 +99,13 @@ impl BackupFile {
     pub fn save_file(&mut self) {
         self.is_dirty = false;
         self.last_updated = 0;
+        if self.is_desktop {
+            self.last_saved = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("an error occurred")
+                .as_millis();
+        }
+
         if let Some(file) = &mut self.file {
             file.seek(SeekFrom::Start(0)).unwrap();
             file.write_all(&self.ram).unwrap();
