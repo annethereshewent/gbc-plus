@@ -630,21 +630,26 @@ impl Frontend {
         rom_bytes: &[u8],
         rom_path: String,
         logged_in: bool,
-        cloud_service: Arc<Mutex<CloudService>>
-    ) {
+        cloud_service: Arc<Mutex<CloudService>>,
+        fetch_save: bool
+    ) -> Vec<u8> {
         *cpu = CPU::new(producer, Some(waveform_producer), Some(rom_path), false, true);
 
         cpu.load_rom(rom_bytes);
 
         cpu.bus.ppu.set_dmg_palette(current_palette);
 
-        if logged_in {
+        if logged_in && fetch_save {
             let bytes = cloud_service.lock().unwrap().get_save();
 
             if bytes.len() > 0 {
                 cpu.bus.cartridge.load_save(&bytes);
+
+                return bytes;
             }
         }
+
+        Vec::new()
     }
 
     pub fn render_ui(
@@ -652,11 +657,13 @@ impl Frontend {
         cpu: &mut CPU,
         logged_in: bool,
         rom_bytes: &mut Vec<u8>,
-        save_name: &mut String
+        save_name: &mut String,
+        save_bytes: &mut Option<Vec<u8>>
     ) {
         self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
 
         let mut should_reset = false;
+        let mut reuse_save = false;
 
         let ui = self.imgui.new_frame();
 
@@ -714,6 +721,7 @@ impl Frontend {
                         }
                     }
                     if ui.menu_item("Reset") {
+                        reuse_save = true;
                         should_reset = true;
                     }
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
@@ -765,7 +773,7 @@ impl Frontend {
 
             let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
 
-            Self::reload_cpu(
+            let new_save_bytes = Self::reload_cpu(
                 cpu,
                 self.config.current_palette,
                 producer,
@@ -773,8 +781,18 @@ impl Frontend {
                 rom_bytes,
                 save_name.to_string(),
                 logged_in,
-                self.cloud_service.clone()
+                self.cloud_service.clone(),
+                !reuse_save
             );
+
+            if let Some(bytes) = save_bytes {
+                if reuse_save {
+                    println!("reusing save!");
+                    cpu.bus.cartridge.load_save(bytes);
+                } else if new_save_bytes.len() > 0 {
+                    *bytes = new_save_bytes;
+                }
+            }
 
             self.wave_consumer = waveform_consumer;
             self.device.lock().consumer = consumer;

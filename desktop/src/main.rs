@@ -91,6 +91,8 @@ fn main() {
         cloud_service_clone.lock().unwrap().logged_in
     };
 
+    let mut save_bytes: Option<Vec<u8>> = None;
+
     if logged_in {
         cpu.bus.cartridge.set_save_file(None);
 
@@ -98,6 +100,8 @@ fn main() {
 
         if data.len() > 0 {
             cpu.bus.cartridge.load_save(&data);
+
+            save_bytes = Some(data);
         }
     }
 
@@ -115,7 +119,9 @@ fn main() {
             &mut cpu,
             logged_in,
             &mut rom_bytes,
-            &mut filename
+            &mut filename,
+            &mut save_bytes
+
         );
         frontend.check_controller_status();
         frontend.end_frame();
