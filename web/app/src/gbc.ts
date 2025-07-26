@@ -239,7 +239,6 @@ export class GBC {
         // entire memory
         const uint8Clone = new Uint8Array(saveArr)
 
-
         if (!this.cloudService.usingCloud) {
           localStorage.setItem(this.saveName, JSON.stringify(saveArr))
         } else {
