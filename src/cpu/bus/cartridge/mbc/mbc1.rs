@@ -24,10 +24,8 @@ pub struct MBC1 {
 
 impl MBC1 {
     pub fn check_save(&mut self, is_cloud: bool) -> bool {
-        let hash = blake3::hash(&self.backup_file.ram).to_string();
-
-        let min_diff = if is_cloud { 3000 } else { 1000 };
-        let min_last_saved = if is_cloud { 30000 } else { 15000 };
+        let min_diff = if is_cloud { 1500 } else { 500 };
+        let min_last_saved = if is_cloud { 20000 } else { 10000 };
 
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -36,22 +34,17 @@ impl MBC1 {
 
         let last_saved = self.backup_file.last_saved;
 
-        if Some(hash.clone()) != self.backup_file.previous_hash ||
+        let last_updated = self.backup_file.last_updated;
+
+        if (self.backup_file.is_dirty &&
+            current_time > last_updated &&
+            last_updated != 0) ||
             (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
-            let last_updated = self.backup_file.last_updated;
-
-            self.backup_file.previous_hash = Some(hash);
-
-            if self.backup_file.is_dirty &&
-                current_time > last_updated &&
-                last_updated != 0
-            {
-                let diff = current_time - last_updated;
-                if diff >= min_diff {
-                    self.backup_file.last_updated = 0;
-                    return true;
-                }
+            let diff = current_time - last_updated;
+            if diff >= min_diff {
+                self.backup_file.last_updated = 0;
+                return true;
             }
         }
 

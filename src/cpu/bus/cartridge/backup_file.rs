@@ -11,7 +11,6 @@ pub struct BackupFile {
     pub ram: Box<[u8]>,
     pub last_updated: u128,
     pub is_desktop: bool,
-    pub previous_hash: Option<String>,
     pub last_saved: u128,
     pub dirty_reads: HashSet<u16>,
     pub dirty_writes: HashSet<u16>
@@ -55,7 +54,6 @@ impl BackupFile {
             last_updated: 0,
             last_saved: 0,
             is_desktop,
-            previous_hash: None,
             dirty_reads: HashSet::new(),
             dirty_writes: HashSet::new()
         }
