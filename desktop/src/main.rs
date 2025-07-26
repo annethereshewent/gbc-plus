@@ -73,7 +73,7 @@ fn main() {
     // remove the extension
     split_vec.pop();
 
-    let filename = format!("{}.sav", split_vec.join("."));
+    let mut filename = format!("{}.sav", split_vec.join("."));
 
     split_vec = filename.split('/').collect();
 
@@ -114,8 +114,8 @@ fn main() {
         frontend.render_ui(
             &mut cpu,
             logged_in,
-            &rom_bytes,
-            &filename
+            &mut rom_bytes,
+            &mut filename
         );
         frontend.check_controller_status();
         frontend.end_frame();

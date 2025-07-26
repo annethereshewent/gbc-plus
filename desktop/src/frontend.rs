@@ -95,13 +95,6 @@ const BUTTON_RIGHT: u8 = 14;
 const WAVEFORM_LENGTH: usize = 683;
 const WAVEFORM_HEIGHT: usize = 256;
 
-pub enum UIAction {
-    None,
-    CloudLogin,
-    OpenGame(PathBuf),
-    Reset
-}
-
 #[derive(Serialize, Deserialize)]
 struct EmuConfig {
     current_palette: usize
@@ -658,12 +651,12 @@ impl Frontend {
         &mut self,
         cpu: &mut CPU,
         logged_in: bool,
-        rom_bytes: &[u8],
-        save_name: &str
-    ) -> UIAction {
+        rom_bytes: &mut Vec<u8>,
+        save_name: &mut String
+    ) {
         self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
 
-        let mut action = UIAction::None;
+        let mut should_reset = false;
 
         let ui = self.imgui.new_frame();
 
@@ -678,124 +671,61 @@ impl Frontend {
                                 if let Some(path) = path {
                                     let extension = path.extension().unwrap().to_str().unwrap();
                                     if extension == "zip" {
-                                        let (rom_bytes, rom_path) = Self::unzip_game(path);
+                                        let (new_bytes, rom_path) = Self::unzip_game(path);
 
-                                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+                                        *rom_bytes = new_bytes;
 
-                                        let (producer, consumer) = ringbuffer.split();
+                                        let mut split_str_vec: Vec<&str> = rom_path.split('.').collect();
 
-                                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+                                        split_str_vec.pop();
 
-                                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+                                        *save_name = format!("{}.sav", split_str_vec.join("."));
 
                                         if logged_in {
-                                            let mut split_str_vec: Vec<&str> = rom_path.split('/').collect();
+                                            let mut split_str_vec: Vec<&str> = save_name.split('/').collect();
 
-                                            let mut game_name = split_str_vec.pop().unwrap().to_string();
-
-                                            split_str_vec = game_name.split('.').collect();
-
-                                            split_str_vec.pop();
-
-                                            game_name = format!("{}.sav", split_str_vec.join("."));
+                                            let game_name = split_str_vec.pop().unwrap().to_string();
 
                                             self.cloud_service.lock().unwrap().game_name = game_name;
                                         }
-
-                                        Self::reload_cpu(
-                                            cpu,
-                                            self.config.current_palette,
-                                            producer,
-                                            waveform_producer,
-                                            &rom_bytes,
-                                            rom_path,
-                                            logged_in,
-                                            self.cloud_service.clone()
-                                        );
-
-                                        self.wave_consumer = waveform_consumer;
-                                        self.device.lock().consumer = consumer;
                                     } else {
-                                        let rom_bytes = fs::read(&path).unwrap();
+                                        *rom_bytes = fs::read(&path).unwrap();
+
                                         let rom_path = path.to_str().unwrap();
 
-                                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+                                        let mut split_str_vec: Vec<&str> = rom_path.split('.').collect();
 
-                                        let (producer, consumer) = ringbuffer.split();
+                                        split_str_vec.pop();
 
-                                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-                                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+                                        *save_name = format!("{}.sav", split_str_vec.join("."));
 
                                         if logged_in {
-                                            let mut split_str_vec: Vec<&str> = rom_path.split('/').collect();
+                                            let mut split_str_vec: Vec<&str> = save_name.split('/').collect();
 
-                                            let mut game_name = split_str_vec.pop().unwrap().to_string();
-
-                                            split_str_vec = game_name.split('.').collect();
-
-                                            split_str_vec.pop();
-
-                                            game_name = format!("{}.sav", split_str_vec.join("."));
+                                            let game_name = split_str_vec.pop().unwrap().to_string();
 
                                             self.cloud_service.lock().unwrap().game_name = game_name;
                                         }
-
-                                        Self::reload_cpu(
-                                            cpu,
-                                            self.config.current_palette,
-                                            producer,
-                                            waveform_producer,
-                                            &rom_bytes,
-                                            rom_path.to_string(),
-                                            logged_in,
-                                            self.cloud_service.clone()
-                                        );
-
-                                        self.wave_consumer = waveform_consumer;
-                                        self.device.lock().consumer = consumer;
-
                                     }
+                                    should_reset = true;
                                 }
                             }
                             Err(_) => ()
                         }
                     }
                     if ui.menu_item("Reset") {
-                        // as usual, rust won't let me do anything to make my code actually readable, so here's
-                        // a large block of messy code! thanks rust!
-                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-                        let (producer, consumer) = ringbuffer.split();
-
-                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
-
-                        Self::reload_cpu(
-                            cpu,
-                            self.config.current_palette,
-                            producer,
-                            waveform_producer,
-                            &rom_bytes,
-                            save_name.to_string(),
-                            logged_in,
-                            self.cloud_service.clone()
-                        );
-
-                        self.wave_consumer = waveform_consumer;
-                        self.device.lock().consumer = consumer;
+                        should_reset = true;
                     }
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
                         if !logged_in {
                             if ui.menu_item("Log in") {
                                 self.cloud_service.lock().unwrap().login();
-                                action = UIAction::CloudLogin;
+                                should_reset = true;
                             }
                         } else {
                             if ui.menu_item("Log out") {
                                 self.cloud_service.lock().unwrap().logout();
-                                action = UIAction::CloudLogin
+                                should_reset = true;
                             }
                         }
 
@@ -826,11 +756,33 @@ impl Frontend {
             });
         }
 
+        if should_reset {
+            let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+            let (producer, consumer) = ringbuffer.split();
+
+            let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+            let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+            Self::reload_cpu(
+                cpu,
+                self.config.current_palette,
+                producer,
+                waveform_producer,
+                rom_bytes,
+                save_name.to_string(),
+                logged_in,
+                self.cloud_service.clone()
+            );
+
+            self.wave_consumer = waveform_consumer;
+            self.device.lock().consumer = consumer;
+        }
+
         let draw_data = self.imgui.render();
 
         self.renderer.render(&self.gl, &mut self.textures, draw_data).unwrap();
-
-        action
     }
 
     // used when the user closes the emulator and the game saves one more time
