@@ -29,8 +29,6 @@ impl MBC5 {
 
         let last_saved = self.backup_file.last_saved;
 
-        println!("current_time - last_saved = {}, last_saved = {}", current_time - last_saved, last_saved);
-
         if Some(hash.clone()) != self.backup_file.previous_hash &&
             (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
