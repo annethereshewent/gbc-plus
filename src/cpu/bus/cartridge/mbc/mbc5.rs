@@ -20,7 +20,7 @@ impl MBC5 {
         let hash = blake3::hash(&self.backup_file.ram).to_string();
 
         let min_diff = if is_cloud { 3000 } else { 1000 };
-        let min_last_saved = if is_cloud { 6000 } else { 3000 };
+        let min_last_saved = if is_cloud { 30000 } else { 15000 };
 
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -29,7 +29,7 @@ impl MBC5 {
 
         let last_saved = self.backup_file.last_saved;
 
-        if Some(hash.clone()) != self.backup_file.previous_hash &&
+        if Some(hash.clone()) != self.backup_file.previous_hash ||
             (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
             let last_updated = self.backup_file.last_updated;

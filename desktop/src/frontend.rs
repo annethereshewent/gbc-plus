@@ -504,6 +504,7 @@ impl Frontend {
         }
     }
 
+    // used throughout the emulator's lifetime and saves when certain conditions are met.
     pub fn check_saves(&mut self, cpu: &mut CPU, logged_in: bool) {
         let mbc = &mut cpu.bus.cartridge.mbc;
         match mbc {
@@ -513,6 +514,7 @@ impl Frontend {
                         let data = mbc.backup_file.ram.clone();
 
                         mbc.backup_file.is_dirty = false;
+                        mbc.backup_file.last_updated = 0;
 
                         mbc.backup_file.last_saved = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
@@ -530,14 +532,15 @@ impl Frontend {
             }
             MBC::MBC3(mbc) => if mbc.check_save(logged_in) {
                 if logged_in {
-                    let data = mbc.backup_file.ram.clone();
+                   let data = mbc.backup_file.ram.clone();
 
                     mbc.backup_file.is_dirty = false;
+                    mbc.backup_file.last_updated = 0;
 
                     mbc.backup_file.last_saved = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("an error occurred")
-                            .as_millis();
+                        .duration_since(UNIX_EPOCH)
+                        .expect("an error occurred")
+                        .as_millis();
 
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
@@ -552,11 +555,12 @@ impl Frontend {
                     let data = mbc.backup_file.ram.clone();
 
                     mbc.backup_file.is_dirty = false;
+                    mbc.backup_file.last_updated = 0;
 
                     mbc.backup_file.last_saved = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("an error occurred")
-                            .as_millis();
+                        .duration_since(UNIX_EPOCH)
+                        .expect("an error occurred")
+                        .as_millis();
 
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
@@ -657,52 +661,91 @@ impl Frontend {
         action
     }
 
-    pub fn handle_events(&mut self, cpu: &mut CPU) {
+    // used when the user closes the emulator and the game saves one more time
+    fn save_game(&mut self, mbc: &mut MBC, logged_in: bool) {
+        match mbc {
+            MBC::MBC1(mbc) => {
+                if mbc.backup_file.is_dirty {
+                    if logged_in {
+                        let data = mbc.backup_file.ram.clone();
+
+                        mbc.backup_file.is_dirty = false;
+                        mbc.backup_file.last_updated = 0;
+
+                        mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
+                        let cloud_service = self.cloud_service.clone();
+                        thread::spawn(move || {
+                            cloud_service.lock().unwrap().upload_save(&data);
+                        });
+                    } else {
+                        mbc.backup_file.save_file();
+                    }
+                }
+            }
+            MBC::MBC3(mbc) => {
+                if mbc.backup_file.is_dirty {
+                    if logged_in {
+                        let data = mbc.backup_file.ram.clone();
+
+                        mbc.backup_file.is_dirty = false;
+                        mbc.backup_file.last_updated = 0;
+
+                        mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
+                        let cloud_service = self.cloud_service.clone();
+                        thread::spawn(move || {
+                            cloud_service.lock().unwrap().upload_save(&data);
+                        });
+                    } else {
+                        mbc.backup_file.save_file();
+                    }
+                }
+            }
+            MBC::MBC5(mbc) => {
+                if mbc.backup_file.is_dirty {
+                    if logged_in {
+                        let data = mbc.backup_file.ram.clone();
+
+                        mbc.backup_file.is_dirty = false;
+                        mbc.backup_file.last_updated = 0;
+
+                        mbc.backup_file.last_saved = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("an error occurred")
+                            .as_millis();
+
+                        let cloud_service = self.cloud_service.clone();
+                        thread::spawn(move || {
+                            cloud_service.lock().unwrap().upload_save(&data);
+                        });
+                    } else {
+                        mbc.backup_file.save_file();
+                    }
+                }
+            }
+            _=> ()
+        }
+    }
+
+    pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
             match event {
                 Event::Quit { .. } => {
-                    match &mut cpu.bus.cartridge.mbc {
-                        MBC::MBC1(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
-                            }
-                        }
-                        MBC::MBC3(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
-                            }
-                        }
-                        MBC::MBC5(mbc) => {
-                            if mbc.backup_file.is_dirty {
-                                mbc.backup_file.save_file();
-                            }
-                        }
-                        _=> ()
-                    }
+                    self.save_game(&mut cpu.bus.cartridge.mbc, logged_in);
                     exit(0);
                 }
                 Event::Window { win_event, window_id, .. } => {
                     if win_event == WindowEvent::Close {
                         if window_id == 1 {
-                            match &mut cpu.bus.cartridge.mbc {
-                                MBC::MBC1(mbc) => {
-                                    if mbc.backup_file.is_dirty {
-                                        mbc.backup_file.save_file();
-                                    }
-                                }
-                                MBC::MBC3(mbc) => {
-                                    if mbc.backup_file.is_dirty {
-                                        mbc.backup_file.save_file();
-                                    }
-                                }
-                                MBC::MBC5(mbc) => {
-                                    if mbc.backup_file.is_dirty {
-                                        mbc.backup_file.save_file();
-                                    }
-                                }
-                                _=> ()
-                            }
+                            self.save_game(&mut cpu.bus.cartridge.mbc, logged_in);
                             exit(0);
                         } else if window_id == 2 {
                             self.show_waveform = false;

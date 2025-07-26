@@ -1,4 +1,4 @@
-use std::{fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashSet, fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,9 @@ pub struct BackupFile {
     pub last_updated: u128,
     pub is_desktop: bool,
     pub previous_hash: Option<String>,
-    pub last_saved: u128
+    pub last_saved: u128,
+    pub dirty_reads: HashSet<u16>,
+    pub dirty_writes: HashSet<u16>
 }
 
 impl BackupFile {
@@ -53,7 +55,9 @@ impl BackupFile {
             last_updated: 0,
             last_saved: 0,
             is_desktop,
-            previous_hash: None
+            previous_hash: None,
+            dirty_reads: HashSet::new(),
+            dirty_writes: HashSet::new()
         }
     }
 
@@ -63,36 +67,50 @@ impl BackupFile {
 
 
     pub fn write8(&mut self, address: usize, value: u8) {
+        self.dirty_writes.insert(address as u16);
         self.ram[address] = value;
 
-        if self.is_desktop && !self.is_dirty {
-            self.last_updated = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("an error occurred")
-                .as_millis();
-        }
 
-        self.is_dirty = true;
+        if self.dirty_reads.contains(&(address as u16)) {
+            if self.is_desktop && !self.is_dirty {
+                self.last_updated = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("an error occurred")
+                    .as_millis();
+            }
+
+            self.is_dirty = true;
+        }
     }
 
     pub fn write16(&mut self, address: usize, value: u16) {
+        self.dirty_writes.insert(address as u16);
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
 
-        if self.is_desktop && !self.is_dirty {
-            self.last_updated = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("an error occurred")
-                .as_millis();
-        }
+        if self.dirty_reads.contains(&(address as u16)) {
+            if self.is_desktop && !self.is_dirty {
+                self.last_updated = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("an error occurred")
+                    .as_millis();
+            }
 
-        self.is_dirty = true;
+            self.is_dirty = true;
+        }
     }
 
-    pub fn read8(&self, address: usize) -> u8 {
+    pub fn read8(&mut self, address: usize) -> u8 {
+        if !self.dirty_writes.contains(&(address as u16)) {
+            self.dirty_reads.insert(address as u16);
+        }
+
         self.ram[address]
     }
 
-    pub fn read16(&self, address: usize) -> u16 {
+    pub fn read16(&mut self, address: usize) -> u16 {
+         if !self.dirty_writes.contains(&(address as u16)) {
+            self.dirty_reads.insert(address as u16);
+        }
         unsafe { *(&self.ram[address] as *const u8 as *const u16) }
     }
 

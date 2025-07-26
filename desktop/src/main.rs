@@ -115,7 +115,7 @@ fn main() {
         frontend.check_controller_status();
         frontend.end_frame();
 
-        frontend.handle_events(&mut cpu);
+        frontend.handle_events(&mut cpu, logged_in);
 
         if frontend.show_waveform {
             frontend.plot_waveform();
