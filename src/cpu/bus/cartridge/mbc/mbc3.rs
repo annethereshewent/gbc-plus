@@ -77,21 +77,21 @@ pub struct MBC3 {
 impl MBC3 {
     pub fn check_save(&mut self, is_cloud: bool) -> bool {
         let min_diff = if is_cloud { 1500 } else { 500 };
-        let min_last_saved = if is_cloud { 20000 } else { 10000 };
+        // let min_last_saved = if is_cloud { 20000 } else { 10000 };
 
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
             .as_millis();
 
-        let last_saved = self.backup_file.last_saved;
+        // let last_saved = self.backup_file.last_saved;
 
         let last_updated = self.backup_file.last_updated;
 
-        if (self.backup_file.is_dirty &&
+        if self.backup_file.is_dirty &&
             current_time > last_updated &&
-            last_updated != 0) ||
-            (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
+            last_updated != 0 // ||
+            // (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
             let diff = current_time - last_updated;
             if diff >= min_diff {

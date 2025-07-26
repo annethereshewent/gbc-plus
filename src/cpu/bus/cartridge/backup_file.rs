@@ -70,7 +70,7 @@ impl BackupFile {
 
 
         if self.dirty_reads.contains(&(address as u16)) {
-            if self.is_desktop && !self.is_dirty {
+            if self.is_desktop {
                 self.last_updated = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
@@ -86,7 +86,7 @@ impl BackupFile {
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
 
         if self.dirty_reads.contains(&(address as u16)) {
-            if self.is_desktop && !self.is_dirty {
+            if self.is_desktop {
                 self.last_updated = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
