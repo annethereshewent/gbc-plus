@@ -56,9 +56,8 @@ use native_dialog::FileDialog;
 use ringbuf::{
     storage::Heap, traits::{
         Consumer,
-        Observer,
-    }, wrap::caching::Caching,
-    SharedRb
+        Observer, Split,
+    }, wrap::caching::Caching, HeapRb, SharedRb
 };
 use sdl2::{
     audio::{
@@ -80,6 +79,7 @@ use sdl2::{
 };
 use serde::{Deserialize, Serialize};
 use imgui::{Context, Textures};
+use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;
 
@@ -117,7 +117,7 @@ impl EmuConfig {
 
 pub struct Frontend {
     controller: Option<GameController>,
-    _device: AudioDevice<GbcAudioCallback>,
+    device: AudioDevice<GbcAudioCallback>,
     event_pump: EventPump,
     button_map: HashMap<u8, JoypadButtons>,
     keyboard_map: HashMap<Keycode, JoypadButtons>,
@@ -269,13 +269,13 @@ impl Frontend {
             samples: Some(4096)
         };
 
-        let _device = audio_subsystem.open_playback(
+        let device = audio_subsystem.open_playback(
             None,
             &spec,
             |_| GbcAudioCallback { consumer }
         ).unwrap();
 
-        _device.resume();
+        device.resume();
 
         let window = video_subsystem
             .window("GBC+", (SCREEN_WIDTH * 3) as u32, (SCREEN_HEIGHT * 3) as u32)
@@ -412,7 +412,7 @@ impl Frontend {
 
         Self {
             controller,
-            _device,
+            device,
             event_pump,
             button_map,
             keyboard_map,
@@ -591,7 +591,76 @@ impl Frontend {
         }
     }
 
-    pub fn render_ui(&mut self, cpu: &mut CPU, logged_in: bool) -> UIAction {
+    pub fn unzip_game(rom_path: PathBuf) -> (Vec<u8>, String) {
+        let file = fs::File::open(rom_path.to_str().unwrap()).unwrap();
+        let mut archive = ZipArchive::new(file).unwrap();
+
+        let mut file_found = false;
+
+        let mut rom_bytes = Vec::new();
+        let mut rom_path_str = "".to_string();
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+
+            if file.is_file() {
+                file_found = true;
+                rom_bytes = vec![0; file.size() as usize];
+                file.read_exact(&mut rom_bytes).unwrap();
+
+                let real_file_name = file.name().to_string();
+
+                let mut split_str: Vec<&str> = rom_path.to_str().unwrap().split("/").collect();
+
+                split_str.pop();
+
+                split_str.push(&real_file_name);
+
+                rom_path_str = split_str.join("/");
+
+                break;
+            }
+        }
+
+        if !file_found {
+            panic!("couldn't extract ROM from zip file!");
+        }
+
+        (rom_bytes, rom_path_str)
+    }
+
+    fn reload_cpu(
+        cpu: &mut CPU,
+        current_palette: usize,
+        producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        rom_bytes: &[u8],
+        rom_path: String,
+        logged_in: bool,
+        cloud_service: Arc<Mutex<CloudService>>
+    ) {
+        *cpu = CPU::new(producer, Some(waveform_producer), Some(rom_path), false, true);
+
+        cpu.load_rom(rom_bytes);
+
+        cpu.bus.ppu.set_dmg_palette(current_palette);
+
+        if logged_in {
+            let bytes = cloud_service.lock().unwrap().get_save();
+
+            if bytes.len() > 0 {
+                cpu.bus.cartridge.load_save(&bytes);
+            }
+        }
+    }
+
+    pub fn render_ui(
+        &mut self,
+        cpu: &mut CPU,
+        logged_in: bool,
+        rom_bytes: &[u8],
+        save_name: &str
+    ) -> UIAction {
         self.platform.prepare_frame(&mut self.imgui, &mut self.window, &self.event_pump);
 
         let mut action = UIAction::None;
@@ -606,13 +675,116 @@ impl Frontend {
                         .add_filter("GBC rom file", &["gbc", "gb", "zip"])
                         .show_open_single_file() {
                             Ok(path) => {
-                                action = UIAction::OpenGame(path.unwrap());
+                                if let Some(path) = path {
+                                    let extension = path.extension().unwrap().to_str().unwrap();
+                                    if extension == "zip" {
+                                        let (rom_bytes, rom_path) = Self::unzip_game(path);
+
+                                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                        let (producer, consumer) = ringbuffer.split();
+
+                                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                                        if logged_in {
+                                            let mut split_str_vec: Vec<&str> = rom_path.split('/').collect();
+
+                                            let mut game_name = split_str_vec.pop().unwrap().to_string();
+
+                                            split_str_vec = game_name.split('.').collect();
+
+                                            split_str_vec.pop();
+
+                                            game_name = format!("{}.sav", split_str_vec.join("."));
+
+                                            self.cloud_service.lock().unwrap().game_name = game_name;
+                                        }
+
+                                        Self::reload_cpu(
+                                            cpu,
+                                            self.config.current_palette,
+                                            producer,
+                                            waveform_producer,
+                                            &rom_bytes,
+                                            rom_path,
+                                            logged_in,
+                                            self.cloud_service.clone()
+                                        );
+
+                                        self.wave_consumer = waveform_consumer;
+                                        self.device.lock().consumer = consumer;
+                                    } else {
+                                        let rom_bytes = fs::read(&path).unwrap();
+                                        let rom_path = path.to_str().unwrap();
+
+                                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                        let (producer, consumer) = ringbuffer.split();
+
+                                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                                        if logged_in {
+                                            let mut split_str_vec: Vec<&str> = rom_path.split('/').collect();
+
+                                            let mut game_name = split_str_vec.pop().unwrap().to_string();
+
+                                            split_str_vec = game_name.split('.').collect();
+
+                                            split_str_vec.pop();
+
+                                            game_name = format!("{}.sav", split_str_vec.join("."));
+
+                                            self.cloud_service.lock().unwrap().game_name = game_name;
+                                        }
+
+                                        Self::reload_cpu(
+                                            cpu,
+                                            self.config.current_palette,
+                                            producer,
+                                            waveform_producer,
+                                            &rom_bytes,
+                                            rom_path.to_string(),
+                                            logged_in,
+                                            self.cloud_service.clone()
+                                        );
+
+                                        self.wave_consumer = waveform_consumer;
+                                        self.device.lock().consumer = consumer;
+
+                                    }
+                                }
                             }
                             Err(_) => ()
                         }
                     }
                     if ui.menu_item("Reset") {
-                        action = UIAction::Reset
+                        // as usual, rust won't let me do anything to make my code actually readable, so here's
+                        // a large block of messy code! thanks rust!
+                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                        let (producer, consumer) = ringbuffer.split();
+
+                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                        Self::reload_cpu(
+                            cpu,
+                            self.config.current_palette,
+                            producer,
+                            waveform_producer,
+                            &rom_bytes,
+                            save_name.to_string(),
+                            logged_in,
+                            self.cloud_service.clone()
+                        );
+
+                        self.wave_consumer = waveform_consumer;
+                        self.device.lock().consumer = consumer;
                     }
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
                         if !logged_in {

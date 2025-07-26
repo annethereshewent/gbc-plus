@@ -72,7 +72,7 @@ pub struct CloudService {
   pub logged_in: bool,
   client: Client,
   gbc_folder_id: String,
-  game_name: String,
+  pub game_name: String,
   expires_in: isize
 }
 

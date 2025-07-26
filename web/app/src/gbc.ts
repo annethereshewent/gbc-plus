@@ -814,6 +814,7 @@ export class GBC {
     document.getElementById("fullscreen")?.addEventListener("click", () => this.toggleFullscreen())
     document.getElementById("dmg-color-palettes-item")?.addEventListener("click", () => this.showColorPalettes())
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
+    document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {

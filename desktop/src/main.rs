@@ -111,7 +111,12 @@ fn main() {
         frontend.update_rtc(&mut cpu);
         frontend.check_saves(&mut cpu, logged_in);
         frontend.render_screen(&mut cpu);
-        frontend.render_ui(&mut cpu, logged_in);
+        frontend.render_ui(
+            &mut cpu,
+            logged_in,
+            &rom_bytes,
+            &filename
+        );
         frontend.check_controller_status();
         frontend.end_frame();
 
