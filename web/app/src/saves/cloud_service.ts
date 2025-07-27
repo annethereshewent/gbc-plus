@@ -1,3 +1,5 @@
+import { reactive } from "../util/reactive"
+
 export interface SaveEntry {
   gameName: string,
   data?: Uint8Array
@@ -9,6 +11,8 @@ const CLIENT_ID = "353451169812-e707dk5s0qkjq400mrcpjndn6e1smpiv.apps.googleuser
 export class CloudService {
   private accessToken: string = ""
   private gbcFolderId: string|null = null
+
+  private loggedIn = reactive(false)
 
   usingCloud = false
 
@@ -31,6 +35,14 @@ export class CloudService {
       }
     })
 
+    this.loggedIn.subscribe(() => {
+      if (this.loggedIn.value) {
+        document.getElementById("upload-save")!.style.display = "block"
+      } else {
+        document.getElementById("upload-save")!.style.display = "none"
+      }
+    })
+
     const signIn = document.getElementById("cloud-button")
     const accessToken = localStorage.getItem("gbc_access_token")
     const expiresIn = parseInt(localStorage.getItem("gbc_access_expires") || "null")
@@ -42,10 +54,15 @@ export class CloudService {
 
     if (signIn != null) {
       if (accessToken == null) {
+
+        this.usingCloud = false
+        this.loggedIn.value = false
+
         signIn.addEventListener("click", () => this.oauthSignIn())
       } else if (expiresIn != null && (Date.now() < expiresIn)) {
         this.accessToken = accessToken
         this.usingCloud = true
+        this.loggedIn.value = true
 
         signIn.style.display = "none"
         const signOut = document.getElementById("cloud-logged-in")
@@ -110,6 +127,7 @@ export class CloudService {
     if (accessToken != null) {
       this.accessToken = accessToken
       this.usingCloud = true
+      this.loggedIn.value = true
     }
   }
 
@@ -135,6 +153,7 @@ export class CloudService {
     localStorage.removeItem("gbc_folder_id")
 
     this.usingCloud = false
+    this.loggedIn.value = false
     this.accessToken = ""
 
     const signIn = document.getElementById("cloud-button")
@@ -445,6 +464,7 @@ export class CloudService {
 
         this.accessToken = accessToken
         this.usingCloud = true
+        this.loggedIn.value = true
 
         // finally get logged in user email
         await this.getLoggedInEmail()
