@@ -98,6 +98,19 @@ const BUTTON_RIGHT: u8 = 14;
 const WAVEFORM_LENGTH: usize = 683;
 const WAVEFORM_HEIGHT: usize = 256;
 
+const THEME_NAMES: [&str; 10] = [
+    "Classic green",
+    "Grayscale",
+    "Solarized",
+    "Maverick",
+    "Oceanic",
+    "Burnt peach",
+    "Grape soda",
+    "Strawberry milk",
+    "Witching hour",
+    "Void dream"
+];
+
 #[derive(Serialize, Deserialize)]
 struct EmuConfig {
     current_palette: usize
@@ -138,7 +151,8 @@ pub struct Frontend {
     pub cloud_service: Arc<Mutex<CloudService>>,
     display_ui: bool,
     file_to_delete: Option<PathBuf>,
-    confirm_delete_dialog: bool
+    confirm_delete_dialog: bool,
+    show_palette_picker_popup: bool
 }
 
 pub struct GbcAudioCallback {
@@ -495,7 +509,8 @@ impl Frontend {
             cloud_service: Arc::new(Mutex::new(CloudService::new(game_name))),
             display_ui: true,
             file_to_delete: None,
-            confirm_delete_dialog: false
+            confirm_delete_dialog: false,
+            show_palette_picker_popup: false
         }
     }
 
@@ -783,6 +798,44 @@ impl Frontend {
             if self.confirm_delete_dialog {
                 ui.open_popup("confirm_delete");
             }
+            if self.show_palette_picker_popup {
+                ui.open_popup("palette_picker")
+            }
+            if let Some(token) = ui.begin_popup("palette_picker") {
+                ui.text("Choose a palette:");
+
+                for i in 0..cpu.bus.ppu.palette_colors.len() {
+                    let color = cpu.bus.ppu.palette_colors[i][1];
+                    let theme_name = THEME_NAMES[i];
+
+                    let color_normalized = [color.r as f32 / 255.0, color.g as f32 / 255.0, color.b as f32 / 255.0, 1.0];
+
+                    ui.text(theme_name);
+
+                    ui.same_line();
+
+                    if ui.color_button(theme_name, color_normalized) {
+                        cpu.bus.ppu.set_dmg_palette(i);
+
+                        self.config.current_palette = i;
+
+                        let json = match serde_json::to_string(&self.config) {
+                            Ok(result) => result,
+                            Err(_) => "".to_string()
+                        };
+
+                        if json != "" {
+                            self.config_file.seek(SeekFrom::Start(0)).unwrap();
+                            self.config_file.write_all(json.as_bytes()).unwrap();
+                        }
+
+                        self.show_palette_picker_popup = false;
+                        ui.close_current_popup();
+                    }
+                }
+
+                token.end();
+            }
             if let Some(token) = ui.begin_popup("confirm_delete") {
                 ui.text("Are you sure you want to delete this save state?");
 
@@ -918,7 +971,10 @@ impl Frontend {
                     menu.end();
                 }
                 if let Some(menu) = ui.begin_menu("Misc") {
-                    if ui.menu_item("Waveform visualizer") {
+                    if ui.menu_item("DMG Palette picker [F2]") {
+                        self.show_palette_picker_popup = true;
+                    }
+                    if ui.menu_item("Waveform visualizer [F4]") {
                         self.show_waveform = !self.show_waveform;
                         if self.show_waveform {
                             self.waveform_canvas.window_mut().show();
