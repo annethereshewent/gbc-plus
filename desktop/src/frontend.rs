@@ -79,7 +79,7 @@ use sdl2::{
     GameControllerSubsystem
 };
 use serde::{Deserialize, Serialize};
-use imgui::{Context, Textures, Ui};
+use imgui::{Context, Textures};
 use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;

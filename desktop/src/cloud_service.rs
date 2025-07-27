@@ -1,4 +1,11 @@
-use std::{fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+  fs,
+  path::PathBuf,
+  time::{
+    SystemTime,
+    UNIX_EPOCH
+  }
+};
 
 use dirs_next::data_dir;
 use reqwest::{
@@ -78,11 +85,7 @@ pub struct CloudService {
 
 impl CloudService {
   pub fn new(game_name: String) -> Self {
-    let app_path = Self::get_application_path();
-
-    let access_token_path_str = format!("{}access_token.json", app_path);
-
-    let access_token_path = Path::new(&access_token_path_str);
+    let app_path = Self::get_access_token_path();
 
     let mut json = TokenResponse {
       access_token: "".to_string(),
@@ -92,8 +95,8 @@ impl CloudService {
       scope: "".to_string()
     };
 
-    if access_token_path.is_file() {
-      json = serde_json::from_str(&fs::read_to_string(access_token_path).unwrap()).unwrap();
+    if app_path.is_file() {
+      json = serde_json::from_str(&fs::read_to_string(app_path).unwrap()).unwrap();
     }
 
     let expires_in = -1;
@@ -172,15 +175,14 @@ impl CloudService {
     builder.send().unwrap()
   }
 
-  fn get_application_path() -> String {
-    let app_support_dir = data_dir().unwrap();
-    let delimiter = if std::env::consts::OS == "windows" {
-      "\\"
-    } else {
-      "/"
-    };
+  fn get_access_token_path() -> PathBuf {
+    let mut app_support_dir = data_dir().unwrap();
 
-    format!("{}{delimiter}GBC+{delimiter}", app_support_dir.to_str().unwrap())
+    app_support_dir.push("GBC+");
+
+    app_support_dir.push("access_token.json");
+
+    app_support_dir
 }
 
   fn refresh_login(&mut self) {
@@ -218,9 +220,9 @@ impl CloudService {
         json.expires_in = self.expires_in;
         json.refresh_token = Some(self.refresh_token.clone());
 
-        let access_token_path_str = format!("{}access_token.json", Self::get_application_path());
+        let access_token_path = Self::get_access_token_path();
 
-        fs::write(access_token_path_str, serde_json::to_string(&json).unwrap()).unwrap();
+        fs::write(access_token_path, serde_json::to_string(&json).unwrap()).unwrap();
       } else {
         let error = json.err().unwrap();
 
@@ -526,17 +528,17 @@ impl CloudService {
 
       self.logged_in = true;
 
-      let access_token_data_path_str = format!("{}access_token.json", Self::get_application_path());
+      let access_token_path = Self::get_access_token_path();
 
       // store these in files for use later
-      fs::write(access_token_data_path_str, serde_json::to_string(&json.clone()).unwrap()).unwrap();
+      fs::write(access_token_path, serde_json::to_string(&json.clone()).unwrap()).unwrap();
     }
   }
 
   pub fn logout(&mut self) {
-    let access_token_path_str = format!("{}access_token.json", Self::get_application_path());
+    let access_token_path = Self::get_access_token_path();
 
-    fs::remove_file(access_token_path_str).unwrap();
+    fs::remove_file(access_token_path).unwrap();
 
     self.access_token = String::new();
     self.refresh_token = String::new();
