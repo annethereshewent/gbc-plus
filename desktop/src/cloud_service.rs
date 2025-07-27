@@ -317,7 +317,6 @@ impl CloudService {
       return;
     }
 
-    println!("save name is *not* empty!");
     self.refresh_token_if_needed();
 
     if self.gbc_folder_id == "" {

@@ -917,7 +917,6 @@ impl Frontend {
 
             if let Some(bytes) = save_bytes {
                 if reuse_save {
-                    println!("reusing save!");
                     cpu.bus.cartridge.load_save(bytes);
                 } else if new_save_bytes.len() > 0 {
                     *bytes = new_save_bytes;
