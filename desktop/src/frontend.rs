@@ -20,6 +20,7 @@ use std::{
         UNIX_EPOCH
     }
 };
+use chrono::{Local, NaiveDateTime};
 use glow::RGBA;
 use imgui_glow_renderer::{
   glow::{
@@ -78,7 +79,7 @@ use sdl2::{
     GameControllerSubsystem
 };
 use serde::{Deserialize, Serialize};
-use imgui::{Context, Textures};
+use imgui::{Context, Textures, Ui};
 use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;
@@ -189,6 +190,53 @@ impl Frontend {
     fn glow_context(window: &Window) -> imgui_glow_renderer::glow::Context {
         unsafe {
             imgui_glow_renderer::glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s) as _)
+        }
+    }
+
+    pub fn process_save_states<F>(mut callback: F)
+        where F: FnMut(String, PathBuf)
+    {
+        let mut dir = data_dir().unwrap();
+
+        dir.push("GBC+");
+
+        let paths = fs::read_dir(dir).unwrap();
+
+        let mut files: Vec<String> = Vec::new();
+
+        for path in paths {
+            let result_path = path.unwrap();
+
+            if let Some(extension) = result_path.path().extension() {
+                if let Some(extension_str) = extension.to_str() {
+                    if extension_str == "state" {
+                        files.push(result_path.file_name().to_str().unwrap().to_string());
+                    }
+                }
+            }
+        }
+
+        for file in files {
+            let mut dir = data_dir().unwrap();
+
+            dir.push("GBC+");
+            dir.push(&file);
+
+            let mut split: Vec<&str> = file.split('.').collect();
+
+            split.pop();
+
+            let filename = split.pop().unwrap().to_string();
+
+            split = filename.split('_').collect();
+
+            let date_str = split.pop().unwrap();
+
+            let date = NaiveDateTime::parse_from_str(date_str, "%Y%m%d%H%M%S").unwrap();
+
+            let filename = format!("Save on {}", date.format("%m-%d-%Y %H:%M:%S"));
+
+            callback(filename, dir);
         }
     }
 
@@ -743,10 +791,43 @@ impl Frontend {
                 }
                 if let Some(menu) = ui.begin_menu("Save states") {
                     if ui.menu_item("Create save state") {
+                        let (data, _) = cpu.create_save_state();
 
+                        let compressed = zstd::encode_all(&*data, 9).unwrap();
+
+                        let now = Local::now();
+
+                        let name = format!("save_state_{}.state", now.format("%Y%m%d%H%M%S"));
+
+                        let mut dir = data_dir().unwrap();
+
+                        dir.push("GBC+");
+
+                        dir.push(name);
+
+                        fs::write(dir, compressed).unwrap();
                     }
-                    if ui.menu_item("Load save state") {
+                    if let Some(menu) = ui.begin_menu("Load save state") {
+                        // load save states from dir
+                        Self::process_save_states(|file, dir| {
+                            if ui.menu_item(file) {
+                                let compressed = fs::read(dir).unwrap();
 
+                                let bytes = zstd::decode_all(&*compressed).unwrap();
+
+                                cpu.load_save_state(&bytes);
+
+                                cpu.load_rom(rom_bytes);
+                            }
+                        });
+                        menu.end();
+                    }
+                    if let Some(menu) = ui.begin_menu("Delete save state") {
+                        Self::process_save_states(|file, dir| {
+                            if ui.menu_item(file) {
+                                fs::remove_file(dir).unwrap();
+                            }
+                        })
                     }
                     menu.end();
                 }
