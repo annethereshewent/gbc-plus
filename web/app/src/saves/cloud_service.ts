@@ -13,7 +13,6 @@ export class CloudService {
   usingCloud = false
 
   constructor() {
-
     window.addEventListener("message", (e) => {
       if (e.data == "authFinished") {
         this.getTokenFromStorage()
@@ -34,7 +33,7 @@ export class CloudService {
 
     const signIn = document.getElementById("cloud-button")
     const accessToken = localStorage.getItem("gbc_access_token")
-    const expiresIn = parseInt(localStorage.getItem("gbc_access_expires") || "-1")
+    const expiresIn = parseInt(localStorage.getItem("gbc_access_expires") || "null")
     const gbcFolderId = localStorage.getItem("gbc_folder_id")
 
     if (gbcFolderId != null) {
@@ -44,7 +43,7 @@ export class CloudService {
     if (signIn != null) {
       if (accessToken == null) {
         signIn.addEventListener("click", () => this.oauthSignIn())
-      } else if (expiresIn == -1 || Date.now() < expiresIn) {
+      } else if (expiresIn != null && (Date.now() < expiresIn)) {
         this.accessToken = accessToken
         this.usingCloud = true
 
@@ -173,7 +172,7 @@ export class CloudService {
 
     return new Promise((resolve, reject) => {
       const gbcExpires = parseInt(localStorage.getItem("gbc_access_expires") || "-1")
-      if (gbcExpires != null && Date.now() >= gbcExpires) {
+      if (gbcExpires != null && (Date.now() >= gbcExpires || gbcExpires == -1)) {
         // refresh tokens as they're expired
         window.addEventListener("message", async (e) => {
           if (e.data == "authFinished") {
@@ -182,6 +181,7 @@ export class CloudService {
             resolve(null)
           }
         })
+
         this.silentSignIn()
       } else {
         resolve(null)
@@ -199,14 +199,24 @@ export class CloudService {
         const data = returnBuffer ? await response.arrayBuffer() : await response.json()
 
         resolve(data)
-      } else {
-        localStorage.removeItem("gbc_access_token")
-        localStorage.removeItem("gbc_access_expires")
-        localStorage.removeItem("gbc_user_email")
-        localStorage.removeItem("gbc_folder_id")
+      } else if (response.status == 401) {
 
-        this.usingCloud = false
-        this.accessToken = ""
+        this.logout()
+
+        const notification = document.getElementById("request-failure-notification")!
+
+        notification.style.display = "block"
+
+        let opacity = 1.0
+
+        let interval = setInterval(() => {
+          opacity -= 0.05
+          notification.style.opacity = `${opacity}`
+
+          if (opacity <= 0) {
+            clearInterval(interval)
+          }
+        }, 100)
 
         resolve(null)
       }

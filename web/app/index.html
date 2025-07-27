@@ -69,6 +69,12 @@
   <div id="state-notification" class="notification is-success">
     Save state created successfully!
   </div>
+  <div id="save-notification" class="notification is-success">
+    Updated save successfully
+  </div>
+  <div id="request-failure-notification" class="notification is-danger">
+    An error occurred while contacting cloud server.
+  </div>
   <div style="clear: right"></div>
   <div id="emulator">
     <input type="file" id="game-input" class="file-input" accept=".gbc,.gb,.zip">
@@ -190,9 +196,6 @@
         </div>
       </div>
     </div>
-  </div>
-  <div id="save-notification" class="notification is-success">
-    Updated save successfully
   </div>
   <iframe id="silent-sign-in" style="width: 1px; height: 1px"></iframe>
   <script src="./dist/bundle.js"></script>

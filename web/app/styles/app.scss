@@ -1,5 +1,7 @@
-#state-notification, #save-notification {
+#state-notification, #save-notification, #request-failure-notification {
   display: none;
+  width: 70%;
+  margin: 40px auto;
 }
 
 #cloud-logged-in {

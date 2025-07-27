@@ -24,7 +24,10 @@ export class StateManager {
 
   async createSaveState(imageUrl: string, stateName = "quick_save.state", isUpdate: boolean = false): Promise<StateEntry|null> {
     if (this.wasm != null) {
-      const data = new Uint8Array(this.wasm.memory.buffer, this.emulator.create_save_state(), this.emulator.save_state_length())
+      const pointer = this.emulator.create_save_state()
+      const saveLength = this.emulator.save_state_length()
+
+      const data = new Uint8Array(this.wasm.memory.buffer, pointer, saveLength)
 
       return new Promise((resolve, reject) => {
         zlib(data, { level: 2 }, async (err, compressed) => {

@@ -637,12 +637,13 @@ export class GBC {
       const notification = document.getElementById("save-notification")
 
       if (notification != null) {
+        console.log("hello world!")
         notification.style.display = "block"
 
         let opacity = 1.0
 
         let interval = setInterval(() => {
-          opacity -= 0.1
+          opacity -= 0.05
           notification.style.opacity = `${opacity}`
 
           if (opacity <= 0) {
@@ -779,6 +780,23 @@ export class GBC {
 
         if (entry != null && statesList != null) {
           this.addStateElement(statesList, entry)
+        }
+
+        const notification = document.getElementById("state-notification")
+
+        if (notification != null) {
+          notification.style.display = "block"
+
+          let opacity = 1.0
+
+          let interval = setInterval(() => {
+            opacity -= 0.05
+            notification.style.opacity = `${opacity}`
+
+            if (opacity <= 0) {
+              clearInterval(interval)
+            }
+          }, 100)
         }
       }
     }
