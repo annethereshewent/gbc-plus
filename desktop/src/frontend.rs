@@ -919,12 +919,20 @@ impl Frontend {
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
                         if !logged_in {
                             if ui.menu_item("Log in") {
-                                self.cloud_service.lock().unwrap().login();
+                                let mut cloud_service = self.cloud_service.lock().unwrap();
+
+                                cloud_service.login();
+                                cloud_service.logged_in = true;
+
                                 should_reset = true;
                             }
                         } else {
                             if ui.menu_item("Log out") {
-                                self.cloud_service.lock().unwrap().logout();
+                                let mut cloud_service = self.cloud_service.lock().unwrap();
+
+                                cloud_service.logout();
+                                cloud_service.logged_in = false;
+
                                 should_reset = true;
                             }
                         }
