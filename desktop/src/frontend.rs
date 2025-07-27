@@ -782,7 +782,7 @@ impl Frontend {
     pub fn render_ui(
         &mut self,
         cpu: &mut CPU,
-        logged_in: bool,
+        logged_in: &mut bool,
         rom_bytes: &mut Vec<u8>,
         save_name: &mut String,
         save_bytes: &mut Option<Vec<u8>>
@@ -793,6 +793,8 @@ impl Frontend {
         let mut reuse_save = false;
 
         let ui = self.imgui.new_frame();
+
+        let mut previous_logged_in = *logged_in;
 
         if self.display_ui {
             if self.confirm_delete_dialog {
@@ -860,6 +862,7 @@ impl Frontend {
 
                 token.end();
             }
+
             ui.main_menu_bar(|| {
                 if let Some(menu) = ui.begin_menu("File") {
                     if ui.menu_item("Open") {
@@ -880,7 +883,7 @@ impl Frontend {
 
                                         *save_name = format!("{}.sav", split_str_vec.join("."));
 
-                                        if logged_in {
+                                        if *logged_in {
                                             let mut split_str_vec: Vec<&str> = save_name.split('/').collect();
 
                                             let game_name = split_str_vec.pop().unwrap().to_string();
@@ -898,7 +901,7 @@ impl Frontend {
 
                                         *save_name = format!("{}.sav", split_str_vec.join("."));
 
-                                        if logged_in {
+                                        if *logged_in {
                                             let mut split_str_vec: Vec<&str> = save_name.split('/').collect();
 
                                             let game_name = split_str_vec.pop().unwrap().to_string();
@@ -917,12 +920,12 @@ impl Frontend {
                         should_reset = true;
                     }
                     if let Some(menu) = ui.begin_menu("Cloud saves") {
-                        if !logged_in {
+                        if !*logged_in {
                             if ui.menu_item("Log in") {
                                 let mut cloud_service = self.cloud_service.lock().unwrap();
 
                                 cloud_service.login();
-                                cloud_service.logged_in = true;
+                                *logged_in = true;
 
                                 should_reset = true;
                             }
@@ -931,7 +934,7 @@ impl Frontend {
                                 let mut cloud_service = self.cloud_service.lock().unwrap();
 
                                 cloud_service.logout();
-                                cloud_service.logged_in = false;
+                                *logged_in = false;
 
                                 should_reset = true;
                             }
@@ -1004,6 +1007,16 @@ impl Frontend {
 
             let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
 
+            if !previous_logged_in && *logged_in {
+                if let Some(save_bytes) = save_bytes {
+                    let new_bytes = self.cloud_service.lock().unwrap().get_save();
+
+                    *save_bytes = new_bytes;
+
+                    cpu.bus.cartridge.load_save(save_bytes);
+                }
+            }
+
             let new_save_bytes = Self::reload_cpu(
                 cpu,
                 self.config.current_palette,
@@ -1011,7 +1024,7 @@ impl Frontend {
                 waveform_producer,
                 rom_bytes,
                 save_name.to_string(),
-                logged_in,
+                *logged_in,
                 self.cloud_service.clone(),
                 !reuse_save
             );

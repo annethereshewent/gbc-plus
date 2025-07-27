@@ -10,6 +10,7 @@ import moment from 'moment'
 import { StateEntry } from './interface/game_state_entry'
 import { GbcDatabase } from './saves/gbc_database'
 import { StateManager } from './saves/state_manager'
+import { reactive } from './util/reactive'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -83,7 +84,8 @@ export class GBC {
 
   private cloudService = new CloudService()
 
-  private saveName = ""
+  private saveName = reactive("")
+
   private rtcName = ""
   gameName = ""
   private isPaused = false
@@ -105,6 +107,14 @@ export class GBC {
     if (palette != null) {
       this.palette = parseInt(palette)
     }
+
+    this.saveName.subscribe(() => {
+      if (this.saveName.value != "") {
+        (document.getElementById("upload-save") as HTMLInputElement).disabled = false
+      } else {
+        (document.getElementById("upload-save") as HTMLInputElement).disabled = true
+      }
+    })
   }
 
   checkOauth() {
@@ -150,7 +160,7 @@ export class GBC {
     }
 
     if (data != null) {
-      this.saveName = saveName
+      this.saveName.value = saveName
 
       this.startGame(data)
     }
@@ -184,14 +194,14 @@ export class GBC {
       this.emulator.load_rom(byteArr)
 
       if (this.emulator.has_timer()) {
-        this.rtcName = this.saveName.replace(/\.sav$/, '.rtc')
+        this.rtcName = this.saveName.value.replace(/\.sav$/, '.rtc')
 
         this.fetchRtc()
       }
 
       // check if save exists and whether it's on the cloud
       const saveBuffer = this.cloudService.loggedIn.value ?
-        (await this.cloudService.getSave(this.saveName)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName) || '[]'))
+        (await this.cloudService.getSave(this.saveName.value)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || '[]'))
 
       if (saveBuffer != null && saveBuffer.length > 0) {
         this.emulator!.load_save(saveBuffer)
@@ -227,7 +237,7 @@ export class GBC {
   }
 
   saveGame() {
-    if (this.saveName != "") {
+    if (this.saveName.value != "") {
       const dataPointer = this.emulator!.save_game()
       const saveLength = this.emulator!.get_save_length()
 
@@ -240,9 +250,9 @@ export class GBC {
         const uint8Clone = new Uint8Array(saveArr)
 
         if (!this.cloudService.loggedIn.value) {
-          localStorage.setItem(this.saveName, JSON.stringify(saveArr))
+          localStorage.setItem(this.saveName.value, JSON.stringify(saveArr))
         } else {
-          this.cloudService.uploadSave(this.saveName, uint8Clone)
+          this.cloudService.uploadSave(this.saveName.value, uint8Clone)
         }
       }
     }
@@ -824,16 +834,16 @@ export class GBC {
   }
 
   async uploadSave() {
-    if (this.saveName != "" && this.cloudService.loggedIn.value) {
+    if (this.saveName.value != "" && this.cloudService.loggedIn.value) {
       if (confirm(
         "Are you sure you want to upload your local save? This will overwrite your existing data."
       )) {
-        const saveArr = JSON.parse(localStorage.getItem(this.saveName) ?? "[]")
+        const saveArr = JSON.parse(localStorage.getItem(this.saveName.value) ?? "[]")
 
         if (saveArr.length > 0) {
           const saveData = new Uint8Array(saveArr)
 
-          await this.cloudService.uploadSave(this.saveName, saveData)
+          await this.cloudService.uploadSave(this.saveName.value, saveData)
 
           this.showSaveNotification()
         }
@@ -845,7 +855,25 @@ export class GBC {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
 
-    document.getElementById("states-modal-close")?.addEventListener("click", () => this.closeStatesModal())
+    const closeButtons = document.getElementsByClassName("modal-close")
+
+    if (closeButtons != null) {
+      for (const closeButton of closeButtons) {
+        closeButton.addEventListener("click", () => {
+          const modals = document.getElementsByClassName("modal")
+
+          if (modals != null) {
+            for (const modal of modals) {
+              // need that semi-colon here because javascript thinks the next line is a function call otherwise.
+              // good old javascript!
+              (modal as HTMLElement).style.display = "none";
+              (modal as HTMLElement).className = "modal hide"
+            }
+          }
+        })
+      }
+    }
+
     document.getElementById("hide-saves-modal")?.addEventListener("click", () => this.hideSavesModal())
     document.getElementById("save-states")?.addEventListener("click", () => this.displaySaveStatesModal())
     document.getElementById("create-save-state")?.addEventListener("click", () => this.createSaveState())
