@@ -135,7 +135,8 @@ pub struct Frontend {
     samples: Vec<f32>,
     pub cloud_service: Arc<Mutex<CloudService>>,
     display_ui: bool,
-    file_to_delete: Option<PathBuf>
+    file_to_delete: Option<PathBuf>,
+    confirm_delete_dialog: bool
 }
 
 pub struct GbcAudioCallback {
@@ -478,7 +479,8 @@ impl Frontend {
             samples: Vec::with_capacity(NUM_SAMPLES),
             cloud_service: Arc::new(Mutex::new(CloudService::new(game_name))),
             display_ui: true,
-            file_to_delete: None
+            file_to_delete: None,
+            confirm_delete_dialog: false
         }
     }
 
@@ -718,6 +720,9 @@ impl Frontend {
         let ui = self.imgui.new_frame();
 
         if self.display_ui {
+            if self.confirm_delete_dialog {
+                ui.open_popup("confirm_delete");
+            }
             if let Some(token) = ui.begin_popup("confirm_delete") {
                 ui.text("Are you sure you want to delete this save state?");
 
@@ -726,7 +731,7 @@ impl Frontend {
                         fs::remove_file(filepath).unwrap();
 
                         self.file_to_delete = None;
-
+                        self.confirm_delete_dialog = false;
                         ui.close_current_popup();
                     }
                 }
@@ -735,6 +740,7 @@ impl Frontend {
 
                 if ui.button("No") {
                     self.file_to_delete = None;
+                    self.confirm_delete_dialog = false;
 
                     ui.close_current_popup();
                 }
@@ -864,11 +870,8 @@ impl Frontend {
                     }
                     if let Some(menu) = ui.begin_menu("Delete save state") {
                         Self::process_save_states(|file, dir| {
-                            // if ui.menu_item(file) {
-                            //     fs::remove_file(dir).unwrap();
-                            // }
                             if ui.menu_item(file) {
-                                ui.open_popup("confirm_delete");
+                                self.confirm_delete_dialog = true;
                                 self.file_to_delete = Some(dir.clone());
                             }
                         });
