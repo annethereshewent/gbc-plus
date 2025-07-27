@@ -4,6 +4,7 @@ export class WebEmulator {
   free(): void;
   constructor();
   set_pause(value: boolean): void;
+  change_palette(index: number): void;
   has_timer(): boolean;
   fetch_rtc(): string;
   load_rtc(json: string): void;
@@ -32,6 +33,7 @@ export interface InitOutput {
   readonly __wbg_webemulator_free: (a: number, b: number) => void;
   readonly webemulator_new: () => number;
   readonly webemulator_set_pause: (a: number, b: number) => void;
+  readonly webemulator_change_palette: (a: number, b: number) => void;
   readonly webemulator_has_timer: (a: number) => number;
   readonly webemulator_fetch_rtc: (a: number) => [number, number];
   readonly webemulator_load_rtc: (a: number, b: number, c: number) => void;

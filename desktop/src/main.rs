@@ -13,6 +13,7 @@ use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
 pub mod frontend;
+pub mod cloud_service;
 
 fn main() {
 
@@ -28,6 +29,10 @@ fn main() {
     let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
 
     let (producer, consumer) = ringbuffer.split();
+
+    let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+    let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
 
     let mut rom_bytes = fs::read(rom_path.clone()).unwrap();
 
@@ -63,21 +68,69 @@ fn main() {
         }
     }
 
-    let mut cpu = CPU::new(producer, Some(rom_path.clone()), false);
+    let mut split_vec: Vec<&str> = rom_path.split('.').collect();
 
-    let mut frontend = Frontend::new(&mut cpu, consumer);
+    // remove the extension
+    split_vec.pop();
+
+    let mut filename = format!("{}.sav", split_vec.join("."));
+
+    split_vec = filename.split('/').collect();
+
+    let save_name = split_vec.pop().unwrap();
+
+    let mut cpu = CPU::new(producer, Some(waveform_producer), Some(filename.clone()), false, true);
+
+    let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 
     cpu.load_rom(&rom_bytes);
+
+    let cloud_service_clone = frontend.cloud_service.clone();
+
+    let logged_in = {
+        cloud_service_clone.lock().unwrap().logged_in
+    };
+
+    let mut save_bytes: Option<Vec<u8>> = None;
+
+    if logged_in {
+        cpu.bus.cartridge.set_save_file(None);
+
+        let data = frontend.cloud_service.lock().unwrap().get_save();
+
+        if data.len() > 0 {
+            cpu.bus.cartridge.load_save(&data);
+
+            save_bytes = Some(data);
+        }
+    }
 
     loop {
         while !cpu.bus.ppu.frame_finished {
             cpu.step();
         }
 
+        frontend.clear_framebuffer();
+
         frontend.update_rtc(&mut cpu);
-        frontend.check_saves(&mut cpu);
+        frontend.check_saves(&mut cpu, logged_in);
         frontend.render_screen(&mut cpu);
+        frontend.render_ui(
+            &mut cpu,
+            logged_in,
+            &mut rom_bytes,
+            &mut filename,
+            &mut save_bytes
+
+        );
         frontend.check_controller_status();
-        frontend.handle_events(&mut cpu);
+        frontend.end_frame();
+
+        frontend.handle_events(&mut cpu, logged_in, &filename, &rom_bytes);
+
+        if frontend.show_waveform {
+            frontend.plot_waveform();
+        }
+
     }
 }

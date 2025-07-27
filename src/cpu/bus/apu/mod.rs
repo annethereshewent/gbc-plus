@@ -35,6 +35,9 @@ pub struct APU {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    pub waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
     sequencer_step: usize,
     is_ios: bool,
@@ -42,7 +45,11 @@ pub struct APU {
 }
 
 impl APU {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, is_ios: bool) -> Self {
+    pub fn new(
+        producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
+        is_ios: bool
+    ) -> Self {
         Self {
             nr52: AudioMasterRegister::new(),
             nr51: SoundPanningRegister::from_bits_retain(0),
@@ -55,6 +62,7 @@ impl APU {
             sequencer_cycles: 0,
             sequencer_step: 0,
             producer: Some(producer),
+            waveform_producer: waveform_producer,
             is_ios,
             is_paused: false
         }
@@ -121,6 +129,11 @@ impl APU {
         if let Some(producer) = &mut self.producer {
             producer.try_push(left_sample).unwrap_or(());
             producer.try_push(right_sample).unwrap_or(());
+        }
+
+        if let Some(waveform_producer) = &mut self.waveform_producer {
+            waveform_producer.try_push(left_sample).unwrap_or(());
+            waveform_producer.try_push(right_sample).unwrap_or(());
         }
     }
     // https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html

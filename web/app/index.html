@@ -35,7 +35,8 @@
             Misc
           </a>
           <div class="navbar-dropdown">
-            <a id="waveform-visualizer-button" class="navbar-item">Waveform visualizer [F2]</a>
+            <a id="dmg-color-palettes-item" class="navbar-item">DMG color palettes [F2]</a>
+            <a id="waveform-visualizer-button" class="navbar-item">Waveform visualizer [F4]</a>
           </div>
         </div>
         <div class="navbar-item has-dropdown is-hoverable">
@@ -113,6 +114,8 @@
             </ul>
             <h3>Keyboard hotkeys</h3>
             <ul>
+              <li><label>F2</label> Change DMG color palette</li>
+              <li><label>F4</label> Show waveform visualizer</li>
               <li><label>F5</label> Quick save state</li>
               <li><label>F7</label> Quick load state</li>
             </ul>
@@ -166,6 +169,23 @@
             <div class="state-buttons">
               <button id="create-save-state" class="button is-success">Create new save state</button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="color-palettes-modal" class="modal hide">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="card">
+        <header class="card-header">
+          <p class="card-header-title">DMG palettes</p>
+        </header>
+        <div class="card-content">
+          <p id="palette-header-message">Select a color palette to use with the Gameboy below:</p>
+          <div class="content">
+            <button id="hide-palettes-modal" class="modal-close" aria-label="close">Close</button>
+            <div id="color-palettes"></div>
           </div>
         </div>
       </div>

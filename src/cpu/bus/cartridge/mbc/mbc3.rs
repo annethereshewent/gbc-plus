@@ -75,22 +75,32 @@ pub struct MBC3 {
 }
 
 impl MBC3 {
-    pub fn check_save(&mut self) {
+    pub fn check_save(&mut self, is_cloud: bool) -> bool {
+        let min_diff = if is_cloud { 1500 } else { 500 };
+        // let min_last_saved = if is_cloud { 20000 } else { 10000 };
+
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
             .as_millis();
+
+        // let last_saved = self.backup_file.last_saved;
+
         let last_updated = self.backup_file.last_updated;
 
         if self.backup_file.is_dirty &&
             current_time > last_updated &&
-            last_updated != 0
+            last_updated != 0 // ||
+            // (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
             let diff = current_time - last_updated;
-            if diff >= 500 {
-                self.backup_file.save_file()
+            if diff >= min_diff {
+                self.backup_file.last_updated = 0;
+                return true;
             }
         }
+
+        false
     }
 
     pub fn has_saved(&mut self) -> bool {
@@ -314,9 +324,17 @@ impl MBC3 {
         (address as usize) & 0x3fff | (self.rom_bank as usize) << 14
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, has_timer: bool, rom_size: usize, ram_size: usize, rom_path: Option<String>) -> Self {
-        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(rom_path) = &rom_path {
-            let mut split_str: Vec<&str> = rom_path.split('.').collect();
+    pub fn new(
+        has_ram: bool,
+        has_battery: bool,
+        has_timer: bool,
+        rom_size: usize,
+        ram_size: usize,
+        save_path: Option<String>,
+        is_desktop: bool
+    ) -> Self {
+        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
+            let mut split_str: Vec<&str> = save_path.split('.').collect();
 
             split_str.pop();
 
@@ -357,7 +375,7 @@ impl MBC3 {
             ram_bank: 0,
             timer_ram_enable: false,
             latch_clock: ClockRegister::new(),
-            backup_file: BackupFile::new(rom_path.clone(), ram_size, has_battery && has_ram),
+            backup_file: BackupFile::new(save_path.clone(), ram_size, has_battery && has_ram, is_desktop),
             _rom_size: rom_size,
             has_ram,
             has_timer,

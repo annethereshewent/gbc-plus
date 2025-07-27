@@ -16,22 +16,32 @@ pub struct MBC5 {
 }
 
 impl MBC5 {
-    pub fn check_save(&mut self) {
+    pub fn check_save(&mut self, is_cloud: bool) -> bool {
+        let min_diff = if is_cloud { 1500 } else { 500 };
+        // let min_last_saved = if is_cloud { 20000 } else { 10000 };
+
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("an error occurred")
             .as_millis();
+
+        // let last_saved = self.backup_file.last_saved;
+
         let last_updated = self.backup_file.last_updated;
 
         if self.backup_file.is_dirty &&
             current_time > last_updated &&
-            last_updated != 0
+            last_updated != 0 // ||
+            // (last_saved == 0 || (current_time - last_saved) >= min_last_saved)
         {
             let diff = current_time - last_updated;
-            if diff >= 500 {
-                self.backup_file.save_file()
+            if diff >= min_diff {
+                self.backup_file.last_updated = 0;
+                return true;
             }
         }
+
+        false
     }
 
      pub fn has_saved(&mut self) -> bool {
@@ -124,7 +134,15 @@ impl MBC5 {
         }
     }
 
-    pub fn new(has_ram: bool, has_battery: bool, _has_rumble: bool, _rom_size: usize, ram_size: usize,  rom_path: Option<String>) -> Self {
+    pub fn new(
+        has_ram: bool,
+        has_battery: bool,
+        _has_rumble: bool,
+        _rom_size: usize,
+        ram_size: usize,
+        save_path: Option<String>,
+        is_desktop: bool
+    ) -> Self {
         Self {
             rom_bank: 0,
             ram_bank: 0,
@@ -132,7 +150,7 @@ impl MBC5 {
             has_ram,
             ram_size,
             _has_rumble,
-            backup_file: BackupFile::new(rom_path, ram_size, has_battery)
+            backup_file: BackupFile::new(save_path, ram_size, has_battery, is_desktop)
         }
     }
     fn get_ram_address(&self, address: u16) -> usize {

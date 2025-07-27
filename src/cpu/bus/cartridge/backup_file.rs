@@ -1,4 +1,4 @@
-use std::{fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashSet, fs::{File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, time::{SystemTime, UNIX_EPOCH}};
 
 use serde::{Deserialize, Serialize};
 
@@ -6,23 +6,20 @@ use serde::{Deserialize, Serialize};
 pub struct BackupFile {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    file: Option<File>,
+    pub file: Option<File>,
     pub is_dirty: bool,
     pub ram: Box<[u8]>,
-    pub last_updated: u128
+    pub last_updated: u128,
+    pub is_desktop: bool,
+    pub last_saved: u128,
+    pub dirty_reads: HashSet<u16>,
+    pub dirty_writes: HashSet<u16>
 }
 
 impl BackupFile {
-    pub fn new(rom_path: Option<String>, ram_size: usize, has_backup: bool) -> Self {
+    pub fn new(save_path: Option<String>, ram_size: usize, has_backup: bool, is_desktop: bool) -> Self {
          let mut ram = vec![0; ram_size];
-        let file = if let Some(rom_path) = rom_path {
-            let mut split_vec: Vec<&str> = rom_path.split('.').collect();
-
-            // remove the extension
-            split_vec.pop();
-
-            let filename = format!("{}.sav", split_vec.join("."));
-
+        let file = if let Some(filename) = save_path {
             let file = if has_backup {
                 let mut file = OpenOptions::new()
                     .read(true)
@@ -54,7 +51,11 @@ impl BackupFile {
             is_dirty: false,
             file,
             ram: ram.into_boxed_slice(),
-            last_updated: 0
+            last_updated: 0,
+            last_saved: 0,
+            is_desktop,
+            dirty_reads: HashSet::new(),
+            dirty_writes: HashSet::new()
         }
     }
 
@@ -64,40 +65,63 @@ impl BackupFile {
 
 
     pub fn write8(&mut self, address: usize, value: u8) {
+        self.dirty_writes.insert(address as u16);
         self.ram[address] = value;
-        self.is_dirty = true;
 
-        if self.file.is_some() {
-            self.last_updated = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("an error occurred")
-                .as_millis();
+
+        if self.dirty_reads.contains(&(address as u16)) {
+            if self.is_desktop {
+                self.last_updated = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("an error occurred")
+                    .as_millis();
+            }
+
+            self.is_dirty = true;
         }
     }
 
     pub fn write16(&mut self, address: usize, value: u16) {
+        self.dirty_writes.insert(address as u16);
         unsafe { *(&mut self.ram[address] as *mut u8 as *mut u16) = value };
-        self.is_dirty = true;
 
-        if self.file.is_some() {
-            self.last_updated = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("an error occurred")
-                .as_millis();
+        if self.dirty_reads.contains(&(address as u16)) {
+            if self.is_desktop {
+                self.last_updated = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("an error occurred")
+                    .as_millis();
+            }
+
+            self.is_dirty = true;
         }
     }
 
-    pub fn read8(&self, address: usize) -> u8 {
+    pub fn read8(&mut self, address: usize) -> u8 {
+        if !self.dirty_writes.contains(&(address as u16)) {
+            self.dirty_reads.insert(address as u16);
+        }
+
         self.ram[address]
     }
 
-    pub fn read16(&self, address: usize) -> u16 {
+    pub fn read16(&mut self, address: usize) -> u16 {
+        if !self.dirty_writes.contains(&(address as u16)) {
+            self.dirty_reads.insert(address as u16);
+        }
         unsafe { *(&self.ram[address] as *const u8 as *const u16) }
     }
 
     pub fn save_file(&mut self) {
         self.is_dirty = false;
         self.last_updated = 0;
+        if self.is_desktop {
+            self.last_saved = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("an error occurred")
+                .as_millis();
+        }
+
         if let Some(file) = &mut self.file {
             file.seek(SeekFrom::Start(0)).unwrap();
             file.write_all(&self.ram).unwrap();

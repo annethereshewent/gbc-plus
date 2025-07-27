@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use mbc::{mbc1::MBC1, mbc3::MBC3, mbc5::MBC5, MBC};
 use serde::{Deserialize, Serialize};
 
@@ -12,17 +14,19 @@ pub struct Cartridge {
     pub rom_size: usize,
     pub ram_size: usize,
     pub mbc: MBC,
-    pub rom_path: Option<String>
+    pub save_path: Option<String>,
+    is_desktop: bool
 }
 
 impl Cartridge {
-    pub fn new(rom_path: Option<String>) -> Self {
+    pub fn new(save_path: Option<String>, is_desktop: bool) -> Self {
         Self {
             rom: Vec::new(),
             rom_size: 0,
             ram_size: 0,
             mbc: MBC::None,
-            rom_path
+            save_path,
+            is_desktop
         }
     }
 
@@ -33,7 +37,8 @@ impl Cartridge {
                 battery,
                 self.rom_size,
                 self.ram_size,
-                self.rom_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }
@@ -46,7 +51,8 @@ impl Cartridge {
                 timer,
                 self.rom_size,
                 self.ram_size,
-                self.rom_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }
@@ -59,7 +65,8 @@ impl Cartridge {
                 rumble,
                 self.rom_size,
                 self.ram_size,
-                self.rom_path.clone()
+                self.save_path.clone(),
+                self.is_desktop
             )
         );
     }
@@ -103,6 +110,24 @@ impl Cartridge {
             MBC::MBC3(mbc3) => mbc3.write16(address, value),
             MBC::MBC5(mbc5) => mbc5.write16(address, value),
             _ => ()
+        }
+    }
+
+    pub fn set_save_file(&mut self, file: Option<File>) {
+        match &mut self.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.file = file,
+            MBC::MBC3(mbc) => mbc.backup_file.file = file,
+            MBC::MBC5(mbc) => mbc.backup_file.file = file,
+            MBC::None => ()
+        }
+    }
+
+    pub fn load_save(&mut self, bytes: &[u8]) {
+        match &mut self.mbc {
+            MBC::MBC1(mbc) => mbc.backup_file.load_save(bytes),
+            MBC::MBC3(mbc) => mbc.backup_file.load_save(bytes),
+            MBC::MBC5(mbc) => mbc.backup_file.load_save(bytes),
+            MBC::None => ()
         }
     }
 }

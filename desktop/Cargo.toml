@@ -13,3 +13,14 @@ dirs-next = "2.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ringbuf="0.4.8"
+glow = "0.16.0"
+imgui-glow-renderer = { version = "0.13.0" }
+imgui = { version = "0.12.0" }
+imgui-sdl2-support = { version = "0.13.0" }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+tiny_http = "0.12.0"
+url-escape = "0.1.1"
+open = "5.3.0"
+native-dialog = "0.7.0"
+zstd = "0.13"
+chrono = "0.4.41"

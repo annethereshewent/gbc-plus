@@ -134,7 +134,7 @@ impl GBCMobileEmulator {
         let (producer, consumer) = ringbuffer.split();
 
         Self {
-            cpu: CPU::new(producer, None, true),
+            cpu: CPU::new(producer, None, None, true, false),
             joypad_map,
             sample_buffer: Vec::new(),
             paused: false,

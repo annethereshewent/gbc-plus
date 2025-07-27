@@ -51,9 +51,15 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>, rom_path: Option<String>, is_ios: bool) -> Self {
+    pub fn new(
+        producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
+        save_path: Option<String>,
+        is_ios: bool,
+        is_desktop: bool
+    ) -> Self {
         Self {
-            cartridge: Cartridge::new(rom_path),
+            cartridge: Cartridge::new(save_path, is_desktop),
             wram: [
                 vec![0; 0x1000].into_boxed_slice(),
                 vec![0; 0x1000].into_boxed_slice(),
@@ -69,7 +75,7 @@ impl Bus {
             ie: InterruptRegister::from_bits_retain(0),
             ime: true,
             ppu: PPU::new(),
-            apu: APU::new(producer, is_ios),
+            apu: APU::new(producer, waveform_producer, is_ios),
             joypad: Joypad::new(),
             timer: Timer::new(),
             wram_bank: 1,
