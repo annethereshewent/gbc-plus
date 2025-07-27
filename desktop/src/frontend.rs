@@ -757,7 +757,7 @@ impl Frontend {
 
         cpu.load_save_state(&bytes);
 
-        cpu.load_rom(rom_bytes);
+        cpu.reload_rom(rom_bytes);
 
         cpu.bus.apu.producer = Some(producer);
         cpu.bus.apu.waveform_producer = Some(waveform_producer);
