@@ -244,7 +244,6 @@ impl Frontend {
             let filename = if filename == "quick_save" {
                 "Quick save".to_string()
             } else {
-
                 split = filename.split('_').collect();
 
                 let date_str = split.pop().unwrap();

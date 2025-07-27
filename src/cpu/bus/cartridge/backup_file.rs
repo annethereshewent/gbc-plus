@@ -106,7 +106,7 @@ impl BackupFile {
     }
 
     pub fn read16(&mut self, address: usize) -> u16 {
-         if !self.dirty_writes.contains(&(address as u16)) {
+        if !self.dirty_writes.contains(&(address as u16)) {
             self.dirty_reads.insert(address as u16);
         }
         unsafe { *(&self.ram[address] as *const u8 as *const u16) }
