@@ -88,6 +88,8 @@ const BUTTON_CROSS: u8 = 0;
 const BUTTON_SQUARE: u8 = 2;
 const BUTTON_SELECT: u8 = 4;
 const BUTTON_START: u8 = 6;
+const LEFT_THUMBSTICK: u8 = 7;
+const RIGHT_THUMBSTICK: u8 = 8;
 const BUTTON_UP: u8 = 11;
 const BUTTON_DOWN: u8 = 12;
 const BUTTON_LEFT: u8 = 13;
@@ -1041,6 +1043,51 @@ impl Frontend {
         }
     }
 
+    fn create_quick_state(cpu: &mut CPU, save_name: String) {
+        let (bytes, _) = cpu.create_save_state();
+
+        let compressed = zstd::encode_all(&*bytes, 9).unwrap();
+
+        let filename = "quick_save.state";
+
+        let game_path = save_name.replace(".sav", "");
+
+        let mut split: Vec<&str> = game_path.split('/').collect();
+
+        let game_name = split.pop().unwrap();
+
+        let mut dir = data_dir().unwrap();
+
+        dir.push("GBC+");
+        dir.push(game_name);
+
+        fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+        dir.push(filename);
+
+        fs::write(dir, compressed).unwrap();
+    }
+
+    fn get_quick_save_path(save_name: String) -> PathBuf {
+        let mut dir = data_dir().unwrap();
+
+        dir.push("GBC+");
+
+        let game_path = save_name.replace(".sav", "");
+
+        let mut split: Vec<&str> = game_path.split('/').collect();
+
+        let game_name = split.pop().unwrap();
+
+        dir.push(game_name);
+
+        fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+        dir.push("quick_save.state");
+
+        dir
+    }
+
     pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool, save_name: &str, rom_bytes: &[u8]) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
@@ -1093,44 +1140,9 @@ impl Frontend {
                                 self.waveform_canvas.window_mut().hide();
                             }
                         } else if keycode == Keycode::F5 {
-                            let (bytes, _) = cpu.create_save_state();
-
-                            let compressed = zstd::encode_all(&*bytes, 9).unwrap();
-
-                            let filename = "quick_save.state";
-
-                            let game_path = save_name.replace(".sav", "");
-
-                            let mut split: Vec<&str> = game_path.split('/').collect();
-
-                            let game_name = split.pop().unwrap();
-
-                            let mut dir = data_dir().unwrap();
-
-                            dir.push("GBC+");
-                            dir.push(game_name);
-
-                            fs::create_dir_all(&dir).expect("Couldn't create save state directory");
-
-                            dir.push(filename);
-
-                            fs::write(dir, compressed).unwrap();
+                            Self::create_quick_state(cpu, save_name.to_string());
                         } else if keycode == Keycode::F7 {
-                            let mut dir = data_dir().unwrap();
-
-                            dir.push("GBC+");
-
-                            let game_path = save_name.replace(".sav", "");
-
-                            let mut split: Vec<&str> = game_path.split('/').collect();
-
-                            let game_name = split.pop().unwrap();
-
-                            dir.push(game_name);
-
-                            fs::create_dir_all(&dir).expect("Couldn't create save state directory");
-
-                            dir.push("quick_save.state");
+                            let dir = Self::get_quick_save_path(save_name.to_string());
 
                             let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
 
@@ -1162,6 +1174,23 @@ impl Frontend {
                     if let Some(button) = self.button_map.get(&button_idx) {
                         self.display_ui = false;
                         cpu.bus.joypad.press_button(*button);
+                    } else if button_idx == LEFT_THUMBSTICK {
+                        Self::create_quick_state(cpu, save_name.to_string());
+                    } else if button_idx == RIGHT_THUMBSTICK {
+                        let dir = Self::get_quick_save_path(save_name.to_string());
+
+                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                        let (producer, consumer) = ringbuffer.split();
+
+                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                        Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+
+                        self.wave_consumer = waveform_consumer;
+                        self.device.lock().consumer = consumer;
                     }
                 }
                 Event::JoyButtonUp { button_idx, .. } => {
