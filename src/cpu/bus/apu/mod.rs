@@ -37,7 +37,7 @@ pub struct APU {
     pub producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
+    pub waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
     sequencer_step: usize,
     is_ios: bool,

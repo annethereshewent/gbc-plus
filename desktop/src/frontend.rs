@@ -134,7 +134,8 @@ pub struct Frontend {
     wave_consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
     samples: Vec<f32>,
     pub cloud_service: Arc<Mutex<CloudService>>,
-    display_ui: bool
+    display_ui: bool,
+    file_to_delete: Option<PathBuf>
 }
 
 pub struct GbcAudioCallback {
@@ -476,7 +477,8 @@ impl Frontend {
             wave_consumer,
             samples: Vec::with_capacity(NUM_SAMPLES),
             cloud_service: Arc::new(Mutex::new(CloudService::new(game_name))),
-            display_ui: true
+            display_ui: true,
+            file_to_delete: None
         }
     }
 
@@ -716,6 +718,29 @@ impl Frontend {
         let ui = self.imgui.new_frame();
 
         if self.display_ui {
+            if let Some(token) = ui.begin_popup("confirm_delete") {
+                ui.text("Are you sure you want to delete this save state?");
+
+                if ui.button("Yes") {
+                    if let Some(filepath) = &self.file_to_delete {
+                        fs::remove_file(filepath).unwrap();
+
+                        self.file_to_delete = None;
+
+                        ui.close_current_popup();
+                    }
+                }
+
+                ui.same_line();
+
+                if ui.button("No") {
+                    self.file_to_delete = None;
+
+                    ui.close_current_popup();
+                }
+
+                token.end();
+            }
             ui.main_menu_bar(|| {
                 if let Some(menu) = ui.begin_menu("File") {
                     if ui.menu_item("Open") {
@@ -818,14 +843,33 @@ impl Frontend {
                                 cpu.load_save_state(&bytes);
 
                                 cpu.load_rom(rom_bytes);
+
+                                let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                let (producer, consumer) = ringbuffer.split();
+
+                                let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                                self.wave_consumer = waveform_consumer;
+                                self.device.lock().consumer = consumer;
+
+                                cpu.bus.apu.producer = Some(producer);
+                                cpu.bus.apu.waveform_producer = Some(waveform_producer);
                             }
                         });
+
                         menu.end();
                     }
                     if let Some(menu) = ui.begin_menu("Delete save state") {
                         Self::process_save_states(|file, dir| {
+                            // if ui.menu_item(file) {
+                            //     fs::remove_file(dir).unwrap();
+                            // }
                             if ui.menu_item(file) {
-                                fs::remove_file(dir).unwrap();
+                                ui.open_popup("confirm_delete");
+                                self.file_to_delete = Some(dir.clone());
                             }
                         });
 
