@@ -195,12 +195,16 @@ impl Frontend {
         }
     }
 
-    pub fn process_save_states<F>(game_name: String, mut callback: F)
+    pub fn process_save_states<F>(game_path: String, mut callback: F)
         where F: FnMut(String, PathBuf)
     {
         let mut dir = data_dir().unwrap();
 
         dir.push("GBC+");
+
+        let mut split: Vec<&str> = game_path.split('/').collect();
+
+        let game_name = split.pop().unwrap();
 
         dir.push(&game_name);
 
@@ -714,7 +718,7 @@ impl Frontend {
         Vec::new()
     }
 
-    fn create_state(cpu: &mut CPU, game_name: String) {
+    fn create_state(cpu: &mut CPU, game_path: String) {
         let (data, _) = cpu.create_save_state();
 
         let compressed = zstd::encode_all(&*data, 9).unwrap();
@@ -726,6 +730,10 @@ impl Frontend {
         let mut dir = data_dir().unwrap();
 
         dir.push("GBC+");
+
+        let mut split: Vec<&str> = game_path.split('/').collect();
+
+        let game_name = split.pop().unwrap();
 
         dir.push(game_name);
 
@@ -1091,10 +1099,16 @@ impl Frontend {
 
                             let filename = "quick_save.state";
 
+                            let game_path = save_name.replace(".sav", "");
+
+                            let mut split: Vec<&str> = game_path.split('/').collect();
+
+                            let game_name = split.pop().unwrap();
+
                             let mut dir = data_dir().unwrap();
 
                             dir.push("GBC+");
-                            dir.push(save_name.replace(".sav", ""));
+                            dir.push(game_name);
 
                             fs::create_dir_all(&dir).expect("Couldn't create save state directory");
 
@@ -1105,7 +1119,14 @@ impl Frontend {
                             let mut dir = data_dir().unwrap();
 
                             dir.push("GBC+");
-                            dir.push(save_name.replace(".sav", ""));
+
+                            let game_path = save_name.replace(".sav", "");
+
+                            let mut split: Vec<&str> = game_path.split('/').collect();
+
+                            let game_name = split.pop().unwrap();
+
+                            dir.push(game_name);
 
                             fs::create_dir_all(&dir).expect("Couldn't create save state directory");
 
