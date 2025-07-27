@@ -195,14 +195,18 @@ impl Frontend {
         }
     }
 
-    pub fn process_save_states<F>(mut callback: F)
+    pub fn process_save_states<F>(game_name: String, mut callback: F)
         where F: FnMut(String, PathBuf)
     {
         let mut dir = data_dir().unwrap();
 
         dir.push("GBC+");
 
-        let paths = fs::read_dir(dir).unwrap();
+        dir.push(&game_name);
+
+        fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+        let paths = fs::read_dir(&dir).unwrap();
 
         let mut files: Vec<String> = Vec::new();
 
@@ -222,6 +226,7 @@ impl Frontend {
             let mut dir = data_dir().unwrap();
 
             dir.push("GBC+");
+            dir.push(&game_name);
             dir.push(&file);
 
             let mut split: Vec<&str> = file.split('.').collect();
@@ -230,13 +235,18 @@ impl Frontend {
 
             let filename = split.pop().unwrap().to_string();
 
-            split = filename.split('_').collect();
+            let filename = if filename == "quick_save" {
+                "Quick save".to_string()
+            } else {
 
-            let date_str = split.pop().unwrap();
+                split = filename.split('_').collect();
 
-            let date = NaiveDateTime::parse_from_str(date_str, "%Y%m%d%H%M%S").unwrap();
+                let date_str = split.pop().unwrap();
 
-            let filename = format!("Save on {}", date.format("%m-%d-%Y %H:%M:%S"));
+                let date = NaiveDateTime::parse_from_str(date_str, "%Y%m%d%H%M%S").unwrap();
+
+                format!("Save on {}", date.format("%m-%d-%Y %H:%M:%S"))
+            };
 
             callback(filename, dir);
         }
@@ -704,6 +714,47 @@ impl Frontend {
         Vec::new()
     }
 
+    fn create_state(cpu: &mut CPU, game_name: String) {
+        let (data, _) = cpu.create_save_state();
+
+        let compressed = zstd::encode_all(&*data, 9).unwrap();
+
+        let now = Local::now();
+
+        let name = format!("save_state_{}.state", now.format("%Y%m%d%H%M%S"));
+
+        let mut dir = data_dir().unwrap();
+
+        dir.push("GBC+");
+
+        dir.push(game_name);
+
+        fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+        dir.push(name);
+
+        fs::write(dir, compressed).unwrap();
+    }
+
+    fn load_state(
+        cpu: &mut CPU,
+        dir: PathBuf,
+        rom_bytes: &[u8],
+        producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>,
+        waveform_producer: Caching<Arc<SharedRb<Heap<f32>>>, true, false>
+    ) {
+        let compressed = fs::read(dir).unwrap();
+
+        let bytes = zstd::decode_all(&*compressed).unwrap();
+
+        cpu.load_save_state(&bytes);
+
+        cpu.load_rom(rom_bytes);
+
+        cpu.bus.apu.producer = Some(producer);
+        cpu.bus.apu.waveform_producer = Some(waveform_producer);
+    }
+
     pub fn render_ui(
         &mut self,
         cpu: &mut CPU,
@@ -822,34 +873,12 @@ impl Frontend {
                 }
                 if let Some(menu) = ui.begin_menu("Save states") {
                     if ui.menu_item("Create save state") {
-                        let (data, _) = cpu.create_save_state();
-
-                        let compressed = zstd::encode_all(&*data, 9).unwrap();
-
-                        let now = Local::now();
-
-                        let name = format!("save_state_{}.state", now.format("%Y%m%d%H%M%S"));
-
-                        let mut dir = data_dir().unwrap();
-
-                        dir.push("GBC+");
-
-                        dir.push(name);
-
-                        fs::write(dir, compressed).unwrap();
+                        Self::create_state(cpu, save_name.replace(".sav", ""));
                     }
                     if let Some(menu) = ui.begin_menu("Load save state") {
                         // load save states from dir
-                        Self::process_save_states(|file, dir| {
+                        Self::process_save_states(save_name.replace(".sav", ""), |file, dir| {
                             if ui.menu_item(file) {
-                                let compressed = fs::read(dir).unwrap();
-
-                                let bytes = zstd::decode_all(&*compressed).unwrap();
-
-                                cpu.load_save_state(&bytes);
-
-                                cpu.load_rom(rom_bytes);
-
                                 let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
 
                                 let (producer, consumer) = ringbuffer.split();
@@ -858,18 +887,17 @@ impl Frontend {
 
                                 let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
 
+                                Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+
                                 self.wave_consumer = waveform_consumer;
                                 self.device.lock().consumer = consumer;
-
-                                cpu.bus.apu.producer = Some(producer);
-                                cpu.bus.apu.waveform_producer = Some(waveform_producer);
                             }
                         });
 
                         menu.end();
                     }
                     if let Some(menu) = ui.begin_menu("Delete save state") {
-                        Self::process_save_states(|file, dir| {
+                        Self::process_save_states(save_name.replace(".sav", ""), |file, dir| {
                             if ui.menu_item(file) {
                                 self.confirm_delete_dialog = true;
                                 self.file_to_delete = Some(dir.clone());
@@ -1005,7 +1033,7 @@ impl Frontend {
         }
     }
 
-    pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool) {
+    pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool, save_name: &str, rom_bytes: &[u8]) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
             match event {
@@ -1056,6 +1084,47 @@ impl Frontend {
                             } else {
                                 self.waveform_canvas.window_mut().hide();
                             }
+                        } else if keycode == Keycode::F5 {
+                            let (bytes, _) = cpu.create_save_state();
+
+                            let compressed = zstd::encode_all(&*bytes, 9).unwrap();
+
+                            let filename = "quick_save.state";
+
+                            let mut dir = data_dir().unwrap();
+
+                            dir.push("GBC+");
+                            dir.push(save_name.replace(".sav", ""));
+
+                            fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+                            dir.push(filename);
+
+                            fs::write(dir, compressed).unwrap();
+                        } else if keycode == Keycode::F7 {
+                            let mut dir = data_dir().unwrap();
+
+                            dir.push("GBC+");
+                            dir.push(save_name.replace(".sav", ""));
+
+                            fs::create_dir_all(&dir).expect("Couldn't create save state directory");
+
+                            dir.push("quick_save.state");
+
+                            let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                            let (producer, consumer) = ringbuffer.split();
+
+                            let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                            let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                            Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+
+                            self.wave_consumer = waveform_consumer;
+                            self.device.lock().consumer = consumer;
+
+
                         } else if keycode == Keycode::Escape {
                             self.display_ui = !self.display_ui;
                         }
