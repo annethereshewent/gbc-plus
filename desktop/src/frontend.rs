@@ -827,7 +827,9 @@ impl Frontend {
                             if ui.menu_item(file) {
                                 fs::remove_file(dir).unwrap();
                             }
-                        })
+                        });
+
+                        menu.end();
                     }
                     menu.end();
                 }
