@@ -190,7 +190,7 @@ export class GBC {
       }
 
       // check if save exists and whether it's on the cloud
-      const saveBuffer = this.cloudService.usingCloud ?
+      const saveBuffer = this.cloudService.loggedIn.value ?
         (await this.cloudService.getSave(this.saveName)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName) || '[]'))
 
       if (saveBuffer != null && saveBuffer.length > 0) {
@@ -239,7 +239,7 @@ export class GBC {
         // entire memory
         const uint8Clone = new Uint8Array(saveArr)
 
-        if (!this.cloudService.usingCloud) {
+        if (!this.cloudService.loggedIn.value) {
           localStorage.setItem(this.saveName, JSON.stringify(saveArr))
         } else {
           this.cloudService.uploadSave(this.saveName, uint8Clone)
@@ -541,7 +541,7 @@ export class GBC {
   }
 
   async displaySavesModal() {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     const saves = await this.cloudService.getSaves()
@@ -592,6 +592,25 @@ export class GBC {
     }
   }
 
+  showSaveNotification() {
+    const notification = document.getElementById("save-notification")
+
+    if (notification != null) {
+      notification.style.display = "block"
+
+      let opacity = 1.0
+
+      let interval = setInterval(() => {
+        opacity -= 0.05
+        notification.style.opacity = `${opacity}`
+
+        if (opacity <= 0) {
+          clearInterval(interval)
+        }
+      }, 100)
+    }
+  }
+
   generateFile(data: Uint8Array, gameName: string) {
     const blob = new Blob([data], {
       type: "application/octet-stream"
@@ -613,7 +632,7 @@ export class GBC {
   }
 
   async handleSaveChange(e: Event) {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     let saveName = (e.target as HTMLInputElement)?.files?.[0].name?.split('/')?.pop()
@@ -634,23 +653,7 @@ export class GBC {
         this.cloudService.uploadSave(this.updateSaveGame, bytes)
       }
 
-      const notification = document.getElementById("save-notification")
-
-      if (notification != null) {
-        console.log("hello world!")
-        notification.style.display = "block"
-
-        let opacity = 1.0
-
-        let interval = setInterval(() => {
-          opacity -= 0.05
-          notification.style.opacity = `${opacity}`
-
-          if (opacity <= 0) {
-            clearInterval(interval)
-          }
-        }, 100)
-      }
+      this.showSaveNotification()
 
       const savesModal = document.getElementById("saves-modal")
 
@@ -662,7 +665,7 @@ export class GBC {
   }
 
   async downloadSave(gameName: string) {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     const entry = await this.cloudService.getSave(gameName)
@@ -679,7 +682,7 @@ export class GBC {
   }
 
   async deleteSave(gameName: string) {
-    if (this.cloudService.usingCloud && confirm("are you sure you want to delete this save?")) {
+    if (this.cloudService.loggedIn.value && confirm("are you sure you want to delete this save?")) {
       const result = await this.cloudService.deleteSave(gameName)
 
       if (result) {
@@ -820,6 +823,24 @@ export class GBC {
     }
   }
 
+  async uploadSave() {
+    if (this.saveName != "" && this.cloudService.loggedIn.value) {
+      if (confirm(
+        "Are you sure you want to upload your local save? This will overwrite your existing data."
+      )) {
+        const saveArr = JSON.parse(localStorage.getItem(this.saveName) ?? "[]")
+
+        if (saveArr.length > 0) {
+          const saveData = new Uint8Array(saveArr)
+
+          await this.cloudService.uploadSave(this.saveName, saveData)
+
+          this.showSaveNotification()
+        }
+      }
+    }
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
@@ -833,6 +854,7 @@ export class GBC {
     document.getElementById("dmg-color-palettes-item")?.addEventListener("click", () => this.showColorPalettes())
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
+    document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {

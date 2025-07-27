@@ -12,9 +12,7 @@ export class CloudService {
   private accessToken: string = ""
   private gbcFolderId: string|null = null
 
-  private loggedIn = reactive(false)
-
-  usingCloud = false
+  loggedIn = reactive(false)
 
   constructor() {
     window.addEventListener("message", (e) => {
@@ -38,12 +36,36 @@ export class CloudService {
     this.loggedIn.subscribe(() => {
       if (this.loggedIn.value) {
         document.getElementById("upload-save")!.style.display = "block"
+
+        const signIn = document.getElementById("cloud-button")
+
+        if (signIn != null) {
+          signIn.style.display = "none"
+          const signOut = document.getElementById("cloud-logged-in")
+
+          if (signOut != null) {
+            signOut.style.display = "block"
+            signOut.addEventListener("click", () => this.logout())
+          }
+        }
       } else {
         document.getElementById("upload-save")!.style.display = "none"
+        const signIn = document.getElementById("cloud-button")
+
+        if (signIn != null) {
+          signIn.style.display = "block"
+
+          signIn.addEventListener("click", () => this.oauthSignIn())
+
+          const signOut = document.getElementById("cloud-logged-in")
+
+          if (signOut != null) {
+            signOut.style.display = "none"
+          }
+        }
       }
     })
 
-    const signIn = document.getElementById("cloud-button")
     const accessToken = localStorage.getItem("gbc_access_token")
     const expiresIn = parseInt(localStorage.getItem("gbc_access_expires") || "null")
     const gbcFolderId = localStorage.getItem("gbc_folder_id")
@@ -52,33 +74,20 @@ export class CloudService {
       this.gbcFolderId = gbcFolderId
     }
 
-    if (signIn != null) {
-      if (accessToken == null) {
+    if (accessToken == null) {
+      this.loggedIn.value = false
+    } else if (expiresIn != null && (Date.now() < expiresIn)) {
+      this.accessToken = accessToken
 
-        this.usingCloud = false
-        this.loggedIn.value = false
+      this.loggedIn.value = true
+    } else {
+      localStorage.removeItem("gbc_access_token")
+      localStorage.removeItem("gbc_access_expires")
+      localStorage.removeItem("gbc_folder_id")
 
-        signIn.addEventListener("click", () => this.oauthSignIn())
-      } else if (expiresIn != null && (Date.now() < expiresIn)) {
-        this.accessToken = accessToken
-        this.usingCloud = true
-        this.loggedIn.value = true
-
-        signIn.style.display = "none"
-        const signOut = document.getElementById("cloud-logged-in")
-
-        if (signOut != null) {
-          signOut.style.display = "block"
-          signOut.addEventListener("click", () => this.logout())
-        }
-      } else {
-        localStorage.removeItem("gbc_access_token")
-        localStorage.removeItem("gbc_access_expires")
-        localStorage.removeItem("gbc_folder_id")
-
-        this.silentSignIn()
-      }
+      this.silentSignIn()
     }
+
   }
 
   async createGbcSavesFolder() {
@@ -126,7 +135,7 @@ export class CloudService {
 
     if (accessToken != null) {
       this.accessToken = accessToken
-      this.usingCloud = true
+
       this.loggedIn.value = true
     }
   }
@@ -152,23 +161,8 @@ export class CloudService {
     localStorage.removeItem("gbc_user_email")
     localStorage.removeItem("gbc_folder_id")
 
-    this.usingCloud = false
     this.loggedIn.value = false
     this.accessToken = ""
-
-    const signIn = document.getElementById("cloud-button")
-
-    if (signIn != null) {
-      signIn.style.display = "block"
-
-      signIn.addEventListener("click", () => this.oauthSignIn())
-
-      const signOut = document.getElementById("cloud-logged-in")
-
-      if (signOut != null) {
-        signOut.style.display = "none"
-      }
-    }
   }
 
   silentSignIn() {
@@ -463,7 +457,6 @@ export class CloudService {
         localStorage.setItem("gbc_access_token", accessToken)
 
         this.accessToken = accessToken
-        this.usingCloud = true
         this.loggedIn.value = true
 
         // finally get logged in user email
