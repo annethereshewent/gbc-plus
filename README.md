@@ -35,6 +35,14 @@ Keyboard:
 - **Select**: Shift
 - **Start**: Enter
 
+Hotkeys:
+
+- **Quick save**: F5
+- **Quick load**: F7
+- **DMG palette toggle**: F2
+- **Waveform toggle**: F4
+
+
 Controller (tested on PS5 controller, Xbox controllers should also work)
 
 - **Up, down, left, right**: Control pad
@@ -42,6 +50,11 @@ Controller (tested on PS5 controller, Xbox controllers should also work)
 - **A button**: Cross/A
 - **Select**: Select
 - **Start**: Start
+
+Hotkeys:
+
+- **Quick save**: Left thumbstick
+- **Quick load**: Right thumbstick
 
 ## Screenshots
 
