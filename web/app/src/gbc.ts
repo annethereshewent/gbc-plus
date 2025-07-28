@@ -108,11 +108,18 @@ export class GBC {
       this.palette = parseInt(palette)
     }
 
+    (document.getElementById("upload-save") as HTMLInputElement).style.display = "none"
+
     this.saveName.subscribe(() => {
-      if (this.saveName.value != "") {
-        (document.getElementById("upload-save") as HTMLInputElement).disabled = false
+      if (this.saveName.value != "" && this.cloudService.loggedIn.value) {
+        const data = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
+
+        if (data.length == 0) {
+          return
+        }
+        (document.getElementById("upload-save") as HTMLInputElement).style.display = "block"
       } else {
-        (document.getElementById("upload-save") as HTMLInputElement).disabled = true
+        (document.getElementById("upload-save") as HTMLInputElement).style.display = "none"
       }
     })
   }
@@ -199,22 +206,10 @@ export class GBC {
         this.fetchRtc()
       }
 
-      let saveBuffer = new Uint8Array()
-
-      if (this.cloudService.loggedIn.value) {
-        saveBuffer = (await this.cloudService.getSave(this.saveName.value)).data!
-        let localData = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
-
-        if (localData.length == 0) {
-          (document.getElementById("upload-save") as HTMLInputElement).disabled = true
-        }
-      } else {
-        const saveArr = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
-
-        if (saveArr.length > 0) {
-          saveBuffer = new Uint8Array(saveBuffer)
-        }
-      }
+      const saveBuffer =
+        this.cloudService.loggedIn.value ?
+        (await this.cloudService.getSave(this.saveName.value)).data! :
+        new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || '[]'))
 
       if (saveBuffer.length > 0) {
         this.emulator.load_save(saveBuffer)
