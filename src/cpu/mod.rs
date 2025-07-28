@@ -60,7 +60,7 @@ impl CPU {
         is_desktop: bool
     ) -> CPU {
         CPU {
-            registers: [0x1, 0, 0x13, 0, 0xd8, 0x1, 0x4d],
+            registers: [0x1, 0x0, 0x13, 0x0, 0xd8, 0x1, 0x4d],
             pc: 0x100,
             sp: 0xfffe,
             f: FlagRegister::from_bits_retain(0xb0),
