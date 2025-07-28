@@ -10,6 +10,7 @@ import moment from 'moment'
 import { StateEntry } from './interface/game_state_entry'
 import { GbcDatabase } from './saves/gbc_database'
 import { StateManager } from './saves/state_manager'
+import { reactive } from './util/reactive'
 
 const FPS_INTERVAL = 1000 / 60
 
@@ -83,7 +84,8 @@ export class GBC {
 
   private cloudService = new CloudService()
 
-  private saveName = ""
+  private saveName = reactive("")
+
   private rtcName = ""
   gameName = ""
   private isPaused = false
@@ -105,6 +107,21 @@ export class GBC {
     if (palette != null) {
       this.palette = parseInt(palette)
     }
+
+    (document.getElementById("upload-save") as HTMLInputElement).style.display = "none"
+
+    this.saveName.subscribe(() => {
+      if (this.saveName.value != "" && this.cloudService.loggedIn.value) {
+        const data = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
+
+        if (data.length == 0) {
+          return
+        }
+        (document.getElementById("upload-save") as HTMLInputElement).style.display = "block"
+      } else {
+        (document.getElementById("upload-save") as HTMLInputElement).style.display = "none"
+      }
+    })
   }
 
   checkOauth() {
@@ -150,7 +167,7 @@ export class GBC {
     }
 
     if (data != null) {
-      this.saveName = saveName
+      this.saveName.value = saveName
 
       this.startGame(data)
     }
@@ -184,17 +201,18 @@ export class GBC {
       this.emulator.load_rom(byteArr)
 
       if (this.emulator.has_timer()) {
-        this.rtcName = this.saveName.replace(/\.sav$/, '.rtc')
+        this.rtcName = this.saveName.value.replace(/\.sav$/, '.rtc')
 
         this.fetchRtc()
       }
 
-      // check if save exists and whether it's on the cloud
-      const saveBuffer = this.cloudService.usingCloud ?
-        (await this.cloudService.getSave(this.saveName)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName) || '[]'))
+      const saveBuffer =
+        this.cloudService.loggedIn.value ?
+        (await this.cloudService.getSave(this.saveName.value)).data! :
+        new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || '[]'))
 
-      if (saveBuffer != null && saveBuffer.length > 0) {
-        this.emulator!.load_save(saveBuffer)
+      if (saveBuffer.length > 0) {
+        this.emulator.load_save(saveBuffer)
       }
 
       this.audio = new AudioInterface()
@@ -227,7 +245,7 @@ export class GBC {
   }
 
   saveGame() {
-    if (this.saveName != "") {
+    if (this.saveName.value != "") {
       const dataPointer = this.emulator!.save_game()
       const saveLength = this.emulator!.get_save_length()
 
@@ -239,10 +257,10 @@ export class GBC {
         // entire memory
         const uint8Clone = new Uint8Array(saveArr)
 
-        if (!this.cloudService.usingCloud) {
-          localStorage.setItem(this.saveName, JSON.stringify(saveArr))
+        if (!this.cloudService.loggedIn.value) {
+          localStorage.setItem(this.saveName.value, JSON.stringify(saveArr))
         } else {
-          this.cloudService.uploadSave(this.saveName, uint8Clone)
+          this.cloudService.uploadSave(this.saveName.value, uint8Clone)
         }
       }
     }
@@ -541,7 +559,7 @@ export class GBC {
   }
 
   async displaySavesModal() {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     const saves = await this.cloudService.getSaves()
@@ -592,6 +610,27 @@ export class GBC {
     }
   }
 
+  showSaveNotification() {
+    const notification = document.getElementById("save-notification")
+
+    if (notification != null) {
+      notification.style.display = "block"
+
+      let opacity = 1.0
+
+      let interval = setInterval(() => {
+        opacity -= 0.05
+        notification.style.opacity = `${opacity}`
+
+        if (opacity <= 0) {
+          clearInterval(interval)
+
+          notification.style.display = "none"
+        }
+      }, 100)
+    }
+  }
+
   generateFile(data: Uint8Array, gameName: string) {
     const blob = new Blob([data], {
       type: "application/octet-stream"
@@ -613,7 +652,7 @@ export class GBC {
   }
 
   async handleSaveChange(e: Event) {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     let saveName = (e.target as HTMLInputElement)?.files?.[0].name?.split('/')?.pop()
@@ -634,23 +673,7 @@ export class GBC {
         this.cloudService.uploadSave(this.updateSaveGame, bytes)
       }
 
-      const notification = document.getElementById("save-notification")
-
-      if (notification != null) {
-        console.log("hello world!")
-        notification.style.display = "block"
-
-        let opacity = 1.0
-
-        let interval = setInterval(() => {
-          opacity -= 0.05
-          notification.style.opacity = `${opacity}`
-
-          if (opacity <= 0) {
-            clearInterval(interval)
-          }
-        }, 100)
-      }
+      this.showSaveNotification()
 
       const savesModal = document.getElementById("saves-modal")
 
@@ -662,7 +685,7 @@ export class GBC {
   }
 
   async downloadSave(gameName: string) {
-    if (!this.cloudService.usingCloud) {
+    if (!this.cloudService.loggedIn.value) {
       return
     }
     const entry = await this.cloudService.getSave(gameName)
@@ -679,7 +702,7 @@ export class GBC {
   }
 
   async deleteSave(gameName: string) {
-    if (this.cloudService.usingCloud && confirm("are you sure you want to delete this save?")) {
+    if (this.cloudService.loggedIn.value && confirm("are you sure you want to delete this save?")) {
       const result = await this.cloudService.deleteSave(gameName)
 
       if (result) {
@@ -794,6 +817,7 @@ export class GBC {
             notification.style.opacity = `${opacity}`
 
             if (opacity <= 0) {
+              notification.style.display = "none"
               clearInterval(interval)
             }
           }, 100)
@@ -820,11 +844,51 @@ export class GBC {
     }
   }
 
+  async uploadSave() {
+    if (this.saveName.value != "" && this.cloudService.loggedIn.value) {
+      if (confirm(
+        `Are you sure you want to upload your local save? This will overwrite your existing data
+        and delete your local save.
+        `
+      )) {
+        const saveArr = JSON.parse(localStorage.getItem(this.saveName.value) ?? "[]")
+
+        if (saveArr.length > 0) {
+          const saveData = new Uint8Array(saveArr)
+
+          await this.cloudService.uploadSave(this.saveName.value, saveData)
+
+          this.showSaveNotification()
+
+          localStorage.removeItem(this.saveName.value)
+        }
+      }
+    }
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
 
-    document.getElementById("states-modal-close")?.addEventListener("click", () => this.closeStatesModal())
+    const closeButtons = document.getElementsByClassName("modal-close")
+
+    if (closeButtons != null) {
+      for (const closeButton of closeButtons) {
+        closeButton.addEventListener("click", () => {
+          const modals = document.getElementsByClassName("modal")
+
+          if (modals != null) {
+            for (const modal of modals) {
+              // need that semi-colon here because javascript thinks the next line is a function call otherwise.
+              // good old javascript!
+              (modal as HTMLElement).style.display = "none";
+              (modal as HTMLElement).className = "modal hide"
+            }
+          }
+        })
+      }
+    }
+
     document.getElementById("hide-saves-modal")?.addEventListener("click", () => this.hideSavesModal())
     document.getElementById("save-states")?.addEventListener("click", () => this.displaySaveStatesModal())
     document.getElementById("create-save-state")?.addEventListener("click", () => this.createSaveState())
@@ -833,6 +897,7 @@ export class GBC {
     document.getElementById("dmg-color-palettes-item")?.addEventListener("click", () => this.showColorPalettes())
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
+    document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {

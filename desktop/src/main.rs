@@ -87,7 +87,7 @@ fn main() {
 
     let cloud_service_clone = frontend.cloud_service.clone();
 
-    let logged_in = {
+    let mut logged_in = {
         cloud_service_clone.lock().unwrap().logged_in
     };
 
@@ -117,7 +117,7 @@ fn main() {
         frontend.render_screen(&mut cpu);
         frontend.render_ui(
             &mut cpu,
-            logged_in,
+            &mut logged_in,
             &mut rom_bytes,
             &mut filename,
             &mut save_bytes
