@@ -103,6 +103,9 @@ mod ffi {
 
         #[swift_bridge(swift_name="setPausedAudio")]
         fn set_paused_audio(&mut self, value: bool);
+
+        #[swift_bridge(swift_name="setPalette")]
+        fn set_palette(&mut self, value: usize);
     }
 }
 
@@ -116,8 +119,7 @@ pub struct GBCMobileEmulator {
 }
 
 impl GBCMobileEmulator {
-        pub fn new() -> Self {
-
+    pub fn new() -> Self {
         let joypad_map = HashMap::<usize, JoypadButtons>::from([
             (BUTTON_CIRCLE, JoypadButtons::A),
             (BUTTON_CROSS, JoypadButtons::B),
@@ -141,6 +143,10 @@ impl GBCMobileEmulator {
             consumer,
             state_data: Vec::new()
         }
+    }
+
+    pub fn set_palette(&mut self, value: usize) {
+        self.cpu.bus.ppu.set_dmg_palette(value);
     }
 
     pub fn set_paused_audio(&mut self, value: bool) {
