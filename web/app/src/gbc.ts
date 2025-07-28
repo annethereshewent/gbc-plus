@@ -199,12 +199,25 @@ export class GBC {
         this.fetchRtc()
       }
 
-      // check if save exists and whether it's on the cloud
-      const saveBuffer = this.cloudService.loggedIn.value ?
-        (await this.cloudService.getSave(this.saveName.value)).data : new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || '[]'))
+      let saveBuffer = new Uint8Array()
 
-      if (saveBuffer != null && saveBuffer.length > 0) {
-        this.emulator!.load_save(saveBuffer)
+      if (this.cloudService.loggedIn.value) {
+        saveBuffer = (await this.cloudService.getSave(this.saveName.value)).data!
+        let localData = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
+
+        if (localData.length == 0) {
+          (document.getElementById("upload-save") as HTMLInputElement).disabled = true
+        }
+      } else {
+        const saveArr = JSON.parse(localStorage.getItem(this.saveName.value) || '[]')
+
+        if (saveArr.length > 0) {
+          saveBuffer = new Uint8Array(saveBuffer)
+        }
+      }
+
+      if (saveBuffer.length > 0) {
+        this.emulator.load_save(saveBuffer)
       }
 
       this.audio = new AudioInterface()
@@ -616,6 +629,8 @@ export class GBC {
 
         if (opacity <= 0) {
           clearInterval(interval)
+
+          notification.style.display = "none"
         }
       }, 100)
     }
@@ -807,6 +822,7 @@ export class GBC {
             notification.style.opacity = `${opacity}`
 
             if (opacity <= 0) {
+              notification.style.display = "none"
               clearInterval(interval)
             }
           }, 100)
@@ -836,7 +852,9 @@ export class GBC {
   async uploadSave() {
     if (this.saveName.value != "" && this.cloudService.loggedIn.value) {
       if (confirm(
-        "Are you sure you want to upload your local save? This will overwrite your existing data."
+        `Are you sure you want to upload your local save? This will overwrite your existing data
+        and delete your local save.
+        `
       )) {
         const saveArr = JSON.parse(localStorage.getItem(this.saveName.value) ?? "[]")
 
@@ -846,6 +864,8 @@ export class GBC {
           await this.cloudService.uploadSave(this.saveName.value, saveData)
 
           this.showSaveNotification()
+
+          localStorage.removeItem(this.saveName.value)
         }
       }
     }
