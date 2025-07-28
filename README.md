@@ -10,6 +10,12 @@ This is a Gameboy Color emulator written in Rust with ports for desktop, web, an
 - Palette picker for DMG titles
 - Waveform visualizer on desktop and web
 
+Coming soon:
+
+- Fixed RTC support (currently busted)
+- SGB support for borders
+- MBC 2 and 6 support
+
 To use on desktop, type `cargo run --release <path to rom>`.
 
 Web version is now live! To use the web version, go here: https://gbc-plus.onrender.com/
@@ -20,22 +26,22 @@ iOS version can be found here in the <a href="https://github.com/annethereshewen
 
 Keyboard:
 
-- *Up*: W
-- *Down*: S
-- *Left*: A
-- *Right: D
-- *B button*: J
-- *A button*: K
-- *Select*: Shift
-- *Start*: Enter
+- **Up**: W
+- **Down**: S
+- **Left**: A
+- **Right**: D
+- **B button**: J
+- **A button**: K
+- **Select**: Shift
+- **Start**: Enter
 
 Controller (tested on PS5 controller, Xbox controllers should also work)
 
-- *Up, down, left, right*: Control pad
-- *B button*: Square/X
-- *A button*: Cross/A
-- *Select*: Select
-- *Start*: Start
+- **Up, down, left, right**: Control pad
+- **B button**: Square/X
+- **A button**: Cross/A
+- **Select**: Select
+- **Start**: Start
 
 ## Screenshots
 
