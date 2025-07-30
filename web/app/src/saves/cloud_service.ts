@@ -156,7 +156,7 @@ export class CloudService {
             location.reload()
           }
         }, 300)
-      }, 500)
+      }, 1000)
 
     }
   }
