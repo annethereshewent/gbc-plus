@@ -150,10 +150,11 @@ export class CloudService {
       setTimeout(() => {
         let interval = setInterval(() => {
           console.log("checking if popup is closed")
+          console.log(popup)
           if (popup.closed) {
             console.log("popup is closed!")
             clearInterval(interval)
-            location.reload()
+            // location.reload()
           }
         }, 300)
       }, 1000)
