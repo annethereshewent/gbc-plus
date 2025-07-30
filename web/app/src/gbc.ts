@@ -117,6 +117,7 @@ export class GBC {
         if (data.length == 0) {
           return
         }
+
         (document.getElementById("upload-save") as HTMLInputElement).style.display = "block"
       } else {
         (document.getElementById("upload-save") as HTMLInputElement).style.display = "none"

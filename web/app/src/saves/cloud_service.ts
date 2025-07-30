@@ -25,8 +25,6 @@ export class CloudService {
 
     this.loggedIn.subscribe(() => {
       if (this.loggedIn.value) {
-        document.getElementById("upload-save")!.style.display = "block"
-
         const signIn = document.getElementById("cloud-button")
 
         if (signIn != null) {
@@ -39,7 +37,6 @@ export class CloudService {
           }
         }
       } else {
-        document.getElementById("upload-save")!.style.display = "none"
         const signIn = document.getElementById("cloud-button")
 
         if (signIn != null) {
@@ -174,7 +171,6 @@ export class CloudService {
         // refresh tokens as they're expired
         window.addEventListener("message", async (e) => {
           if (e.data == "authFinished") {
-            console.log("got an authFinished message! (refreshTokensIfNeeded)")
             this.getTokenFromStorage()
 
             resolve(null)
