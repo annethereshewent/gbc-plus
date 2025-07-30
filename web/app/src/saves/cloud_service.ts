@@ -17,6 +17,7 @@ export class CloudService {
   constructor() {
     window.addEventListener("message", (e) => {
       console.log("got message")
+      console.log(e.data)
       if (e.data == "authFinished") {
         this.getTokenFromStorage()
 
