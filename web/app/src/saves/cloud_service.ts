@@ -79,7 +79,6 @@ export class CloudService {
     } else if (expiresIn != null && (Date.now() < expiresIn)) {
       this.accessToken = accessToken
 
-      console.log("setting logged in to true")
       this.loggedIn.value = true
     } else {
       localStorage.removeItem("gbc_access_token")
@@ -465,7 +464,7 @@ export class CloudService {
 
         console.log("posting authFinished message!")
 
-        parent.postMessage("authFinished", "* ")
+        parent.postMessage("authFinished", "https://gbc-plus.onrender.com ")
 
         window.close()
       }
