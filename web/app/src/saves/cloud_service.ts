@@ -446,9 +446,12 @@ export class CloudService {
         console.log("posting authFinished message!")
 
         parent.postMessage("authFinished", "https://gbc-plus.onrender.com")
+
+        console.log(window.opener)
+
         window.opener?.postMessage("authFinished", "https://gbc-plus.onrender.com")
 
-        window.close()
+        // window.close()
       }
     }
 
