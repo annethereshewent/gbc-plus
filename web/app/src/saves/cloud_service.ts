@@ -144,22 +144,11 @@ export class CloudService {
     console
     const params = this.getLoginParams()
 
-    const popup = window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
+    window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
 
-    if (popup != null) {
-      setTimeout(() => {
-        let interval = setInterval(() => {
-          console.log("checking if popup is closed")
-          console.log(popup)
-          if (popup.closed) {
-            console.log("popup is closed!")
-            clearInterval(interval)
-            // location.reload()
-          }
-        }, 300)
-      }, 1000)
-
-    }
+    window.addEventListener("message", () => {
+      this.getTokenFromStorage()
+    })
   }
 
   logout() {
@@ -471,7 +460,8 @@ export class CloudService {
 
         console.log("posting authFinished message!")
 
-        parent.postMessage("authFinished", "https://gbc-plus.onrender.com")
+        parent.postMessage("authFinished", "*")
+        window.opener?.postMessage("authFinished", "*")
 
         window.close()
       }
