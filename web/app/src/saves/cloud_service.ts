@@ -145,9 +145,13 @@ export class CloudService {
 
     const popup = window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
 
+    console.log(popup)
+
     if (popup != null) {
       let interval = setInterval(() => {
+        console.log("checking if popup is closed")
         if (popup.closed) {
+          console.log("popup is closed!")
           clearInterval(interval)
           location.reload()
         }
