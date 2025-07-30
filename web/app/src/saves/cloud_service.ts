@@ -50,20 +50,7 @@ export class CloudService {
 
     window.addEventListener("message", (e) => {
       if (e.data == "authFinished") {
-        console.log("got an authFinished message! (constructor)")
         this.getTokenFromStorage()
-
-        const signIn = document.getElementById("cloud-button")
-
-        if (signIn != null) {
-          signIn.style.display = "none"
-        }
-
-        const isLoggedIn = document.getElementById("cloud-logged-in")
-
-        if (isLoggedIn != null) {
-          isLoggedIn.style.display = "block"
-        }
       }
     })
 
@@ -146,13 +133,6 @@ export class CloudService {
     const params = this.getLoginParams()
 
     window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
-
-    window.addEventListener("message", (e) => {
-      if (e.data == "authFinished") {
-        console.log("got an authFinished message!")
-        this.getTokenFromStorage()
-      }
-    })
   }
 
   logout() {
