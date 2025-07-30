@@ -50,6 +50,7 @@ export class CloudService {
 
     window.addEventListener("message", (e) => {
       if (e.data == "authFinished") {
+        console.log("got an authFinished message! (constructor)")
         this.getTokenFromStorage()
 
         const signIn = document.getElementById("cloud-button")
@@ -146,8 +147,11 @@ export class CloudService {
 
     window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
 
-    window.addEventListener("message", () => {
-      this.getTokenFromStorage()
+    window.addEventListener("message", (e) => {
+      if (e.data == "authFinished") {
+        console.log("got an authFinished message!")
+        this.getTokenFromStorage()
+      }
     })
   }
 
@@ -185,6 +189,7 @@ export class CloudService {
         // refresh tokens as they're expired
         window.addEventListener("message", async (e) => {
           if (e.data == "authFinished") {
+            console.log("got an authFinished message! (refreshTokensIfNeeded)")
             this.getTokenFromStorage()
 
             resolve(null)
