@@ -15,6 +15,15 @@ export class CloudService {
   loggedIn = reactive(false)
 
   constructor() {
+    const queryParams = new URL(document.location.toString()).searchParams
+
+    if (queryParams.has("oauth")) {
+      const params = this.getLoginParams()
+
+      location.href = `${BASE_URL}?${params.toString()}`
+    }
+
+    console.log(new URL(document.location.toString()).searchParams.entries())
     this.loggedIn.subscribe(() => {
       if (this.loggedIn.value) {
         document.getElementById("upload-save")!.style.display = "block"
@@ -129,10 +138,7 @@ export class CloudService {
   }
 
   async oauthSignIn() {
-    console
-    const params = this.getLoginParams()
-
-    window.open(`${BASE_URL}?${params.toString()}`, "popup", "popup=true,width=650,height=650,resizable=true")
+    window.open(`${location.href}?oauth=true`, "popup", "popup=true,width=650,height=650,resizable=true")
   }
 
   logout() {
@@ -221,7 +227,7 @@ export class CloudService {
     // since it always redirects back to the root, location.href should be fine (hopefully!)
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
-      redirect_uri: location.href.replace(/\/$/, ''), // remove the trailing slash
+      redirect_uri: location.href.split('?')[0].replace(/\/$/, ''), // remove the trailing slash
       response_type: "token",
       scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email",
     })
@@ -443,15 +449,11 @@ export class CloudService {
         // finally get logged in user email
         await this.getLoggedInEmail()
 
-        console.log("posting authFinished message!")
+        parent.postMessage("authFinished", "*")
 
-        parent.postMessage("authFinished", "https://gbc-plus.onrender.com")
+        window.opener?.postMessage("authFinished", "*")
 
-        console.log(window.opener)
-
-        window.opener?.postMessage("authFinished", "https://gbc-plus.onrender.com")
-
-        // window.close()
+        window.close()
       }
     }
 
