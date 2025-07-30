@@ -16,8 +16,11 @@ export class CloudService {
 
   constructor() {
     window.addEventListener("message", (e) => {
+      console.log("got message")
       if (e.data == "authFinished") {
         this.getTokenFromStorage()
+
+        console.log("user logged in successfully,")
 
         const signIn = document.getElementById("cloud-button")
 
