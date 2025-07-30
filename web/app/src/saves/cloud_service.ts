@@ -15,24 +15,6 @@ export class CloudService {
   loggedIn = reactive(false)
 
   constructor() {
-    window.addEventListener("message", (e) => {
-      if (e.data == "authFinished") {
-        this.getTokenFromStorage()
-
-        const signIn = document.getElementById("cloud-button")
-
-        if (signIn != null) {
-          signIn.style.display = "none"
-        }
-
-        const isLoggedIn = document.getElementById("cloud-logged-in")
-
-        if (isLoggedIn != null) {
-          isLoggedIn.style.display = "block"
-        }
-      }
-    })
-
     this.loggedIn.subscribe(() => {
       if (this.loggedIn.value) {
         document.getElementById("upload-save")!.style.display = "block"
@@ -62,6 +44,24 @@ export class CloudService {
           if (signOut != null) {
             signOut.style.display = "none"
           }
+        }
+      }
+    })
+
+    window.addEventListener("message", (e) => {
+      if (e.data == "authFinished") {
+        this.getTokenFromStorage()
+
+        const signIn = document.getElementById("cloud-button")
+
+        if (signIn != null) {
+          signIn.style.display = "none"
+        }
+
+        const isLoggedIn = document.getElementById("cloud-logged-in")
+
+        if (isLoggedIn != null) {
+          isLoggedIn.style.display = "block"
         }
       }
     })
