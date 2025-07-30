@@ -466,6 +466,8 @@ export class CloudService {
         // finally get logged in user email
         await this.getLoggedInEmail()
 
+        console.log("sendine authFinished message")
+
         parent.postMessage("authFinished", "*")
 
         window.close()
