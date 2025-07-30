@@ -16,12 +16,8 @@ export class CloudService {
 
   constructor() {
     window.addEventListener("message", (e) => {
-      console.log("got message")
-      console.log(e.data)
       if (e.data == "authFinished") {
         this.getTokenFromStorage()
-
-        console.log("user logged in successfully,")
 
         const signIn = document.getElementById("cloud-button")
 
@@ -83,6 +79,7 @@ export class CloudService {
     } else if (expiresIn != null && (Date.now() < expiresIn)) {
       this.accessToken = accessToken
 
+      console.log("setting logged in to true")
       this.loggedIn.value = true
     } else {
       localStorage.removeItem("gbc_access_token")
@@ -465,8 +462,6 @@ export class CloudService {
 
         // finally get logged in user email
         await this.getLoggedInEmail()
-
-        console.log("sendine authFinished message")
 
         parent.postMessage("authFinished", "*")
 
