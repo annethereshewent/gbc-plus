@@ -20,9 +20,7 @@ export class CloudService {
     if (queryParams.has("oauth")) {
       const params = this.getLoginParams()
 
-      console.log(params.toString())
-
-      // location.href = `${BASE_URL}?${params.toString()}`
+      location.href = `${BASE_URL}?${params.toString()}`
     }
 
     console.log(new URL(document.location.toString()).searchParams.entries())
