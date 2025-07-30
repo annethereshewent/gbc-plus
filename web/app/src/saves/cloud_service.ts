@@ -451,9 +451,11 @@ export class CloudService {
 
         parent.postMessage("authFinished", "*")
 
+        console.log(window.opener)
+
         window.opener?.postMessage("authFinished", "*")
 
-        window.close()
+        // window.close()
       }
     }
 
