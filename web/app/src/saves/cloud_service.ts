@@ -23,7 +23,6 @@ export class CloudService {
       location.href = `${BASE_URL}?${params.toString()}`
     }
 
-    console.log(new URL(document.location.toString()).searchParams.entries())
     this.loggedIn.subscribe(() => {
       if (this.loggedIn.value) {
         document.getElementById("upload-save")!.style.display = "block"
