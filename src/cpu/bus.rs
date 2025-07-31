@@ -460,7 +460,7 @@ impl Bus {
             0xff1e => if self.apu.nr52.audio_on { self.apu.channel3.write_period_high_control(value) },
             0xff1f => (), // used by pokemon gold but doesn't seem to do or be anything.
             0xff20 => if self.apu.nr52.audio_on { self.apu.channel4.write_length(value) },
-            0xff21 => if self.apu.nr52.audio_on { self.apu.channel4.nr42.write(value) },
+            0xff21 => if self.apu.nr52.audio_on { self.apu.channel4.write_volume(value) },
             0xff22 => if self.apu.nr52.audio_on { self.apu.channel4.nr43.write(value) },
             0xff23 => if self.apu.nr52.audio_on { self.apu.channel4.write_control(value) },
             0xff24 => if self.apu.nr52.audio_on { self.apu.nr50.write(value) },

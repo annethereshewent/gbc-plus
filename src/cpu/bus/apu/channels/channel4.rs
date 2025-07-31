@@ -69,14 +69,16 @@ impl Channel4 {
         self.lfsr = 1;
     }
 
+    pub fn write_volume(&mut self, value: u8) {
+        self.nr42.write(value);
+    }
+
     pub fn tick_length(&mut self) {
         if self.nr44.length_enable {
-            if self.current_timer > 0 {
-                self.current_timer += 1;
+            self.current_timer += 1;
 
-                if self.current_timer >= 64 {
-                    self.enabled = false;
-                }
+            if self.current_timer >= 64 {
+                self.enabled = false;
             }
         }
     }
@@ -108,7 +110,7 @@ impl Channel4 {
     }
 
     fn get_frequency_timer(&self) -> isize {
-        self.nr43.clock_divider as isize * (1 << self.nr43.clock_shift as isize) * 16
+        (self.nr43.clock_divider as isize) << self.nr43.clock_shift as isize
     }
 
     pub fn tick(&mut self, cycles: usize) {
