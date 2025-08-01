@@ -174,7 +174,7 @@ impl APU {
     pub fn read_channel_status(&self) -> u8 {
         let audio_on = self.nr52.read();
 
-        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel3.enabled as u8) << 3 | 0x7 << 4 | audio_on << 7
+        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel4.enabled as u8) << 3 | 0x7 << 4 | audio_on << 7
     }
 
     pub fn write_audio_master(&mut self, value: u8) {

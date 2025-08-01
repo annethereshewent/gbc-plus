@@ -54,8 +54,6 @@ impl Channel3 {
 
         if previous_enable && !self.dac_enable {
             self.enabled = false;
-        } else if !previous_enable && self.dac_enable {
-            self.enabled = true;
         }
     }
 
@@ -72,7 +70,7 @@ impl Channel3 {
     fn restart_channel(&mut self) {
         self.nr34.trigger = false;
 
-        self.enabled = true;
+        self.enabled = self.dac_enable;
 
         if self.current_timer >= 256 {
             self.current_timer = 0;

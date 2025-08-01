@@ -52,7 +52,10 @@ impl Channel4 {
 
     pub fn write_control(&mut self, value: u8) {
         self.nr44.write(value);
-        if self.nr44.length_enable && self.current_timer >= 64 {
+
+        if (self.nr44.length_enable && self.current_timer >= 64) ||
+            (self.nr42.env_dir == EnvelopeDirection::Decrease && self.nr42.initial_volume == 0)
+        {
             self.enabled = false;
         }
     }
@@ -60,7 +63,7 @@ impl Channel4 {
     fn restart_channel(&mut self) {
         self.nr44.trigger = false;
 
-        self.enabled = true;
+        self.enabled = !(self.nr42.initial_volume == 0 && self.nr42.env_dir == EnvelopeDirection::Decrease);
         self.frequency_timer = self.get_frequency_timer();
 
         if self.current_timer >= 64 {
@@ -74,6 +77,10 @@ impl Channel4 {
 
     pub fn write_volume(&mut self, value: u8) {
         self.nr42.write(value);
+
+        if self.nr42.env_dir == EnvelopeDirection::Decrease && self.nr42.initial_volume == 0 {
+            self.enabled = false;
+        }
     }
 
     pub fn tick_length(&mut self) {

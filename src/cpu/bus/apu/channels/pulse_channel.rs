@@ -69,6 +69,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     pub fn write_volume_register(&mut self, value: u8) {
         self.nrx2.write(value);
+
+        if self.nrx2.env_dir == EnvelopeDirection::Decrease && self.nrx2.initial_volume == 0 {
+            self.enabled = false;
+        }
     }
 
     pub fn write_period_high_control(&mut self, value: u8) {
@@ -174,7 +178,7 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
     fn restart_channel(&mut self) {
         self.nrx4.trigger = false;
 
-        self.enabled = true;
+        self.enabled = !(self.nrx2.initial_volume == 0 && self.nrx2.env_dir == EnvelopeDirection::Decrease);
 
         self.frequency_timer = (2048 - self.period as isize) * 4;
         self.envelope_timer = self.nrx2.sweep_pace as usize;
