@@ -84,7 +84,7 @@ impl Channel4 {
     }
 
     pub fn tick_length(&mut self) {
-        if self.nr44.length_enable {
+        if self.nr44.length_enable && self.current_timer < 64 {
             self.current_timer += 1;
 
             if self.current_timer >= 64 {

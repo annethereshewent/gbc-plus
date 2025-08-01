@@ -83,7 +83,7 @@ impl Channel3 {
     }
 
     pub fn tick_length(&mut self) {
-        if self.nr34.length_enable {
+        if self.nr34.length_enable && self.current_timer < 256 {
             self.current_timer += 1;
 
             if self.current_timer >= 256 {
