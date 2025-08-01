@@ -102,10 +102,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.enabled {
             let bit = DUTY_PATTERNS[self.nrx1.wave_duty as usize][self.duty_step];
 
-            (bit * self.current_volume) as f32
-        } else {
-            0.0
+            return (bit * self.current_volume) as f32;
         }
+
+        0.0
     }
 
     pub fn tick_envelope(&mut self) {
