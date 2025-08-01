@@ -84,8 +84,11 @@ impl APU {
 
         let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
-        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
+        let left_volume = if self.nr50.left_volume == 0 { 1 } else { self.nr50.left_volume };
+        let right_volume = if self.nr50.right_volume == 0 { 1 } else { self.nr50.right_volume };
+
+        let mut left_sample = sample * left_volume as f32 / 7.0;
+        let mut right_sample = sample * right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(-1.0, 1.0);
         right_sample = right_sample.clamp(-1.0, 1.0);
@@ -115,8 +118,11 @@ impl APU {
 
         let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
-        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
+        let left_volume = if self.nr50.left_volume == 0 { 1 } else { self.nr50.left_volume };
+        let right_volume = if self.nr50.right_volume == 0 { 1 } else { self.nr50.right_volume };
+
+        let mut left_sample = sample * left_volume as f32 / 7.0;
+        let mut right_sample = sample * right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(0.0, 1.0);
         right_sample = right_sample.clamp(0.0, 1.0);
