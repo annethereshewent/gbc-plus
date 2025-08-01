@@ -52,6 +52,9 @@ impl Channel4 {
 
     pub fn write_control(&mut self, value: u8) {
         self.nr44.write(value);
+        if self.nr44.length_enable && self.current_timer >= 64 {
+            self.enabled = false;
+        }
     }
 
     fn restart_channel(&mut self) {
@@ -66,7 +69,7 @@ impl Channel4 {
 
         self.envelope_timer = self.nr42.sweep_pace as usize;
         self.current_volume = self.nr42.initial_volume as usize;
-        self.lfsr = 1;
+        self.lfsr = 0x7fff;
     }
 
     pub fn write_volume(&mut self, value: u8) {
@@ -92,6 +95,10 @@ impl Channel4 {
     }
 
     pub fn tick_envelope(&mut self) {
+        if self.envelope_timer == 0 {
+            return;
+        }
+
         self.envelope_timer -= 1;
 
         if self.envelope_timer == 0 {
