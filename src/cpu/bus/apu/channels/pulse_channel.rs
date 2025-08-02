@@ -109,6 +109,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
     }
 
     pub fn tick_envelope(&mut self) {
+        if self.envelope_timer == 0 {
+            return;
+        }
+
         self.envelope_timer -= 1;
 
         if self.envelope_timer == 0 {
