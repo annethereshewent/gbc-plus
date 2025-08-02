@@ -73,6 +73,8 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.nrx2.env_dir == EnvelopeDirection::Decrease && self.nrx2.initial_volume == 0 {
             self.enabled = false;
         }
+
+        self.envelope_timer = self.nrx2.sweep_pace as usize;
     }
 
     pub fn write_period_high_control(&mut self, value: u8, sequencer_step: usize) {

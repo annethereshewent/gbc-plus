@@ -81,6 +81,11 @@ impl Channel4 {
         }
 
         self.envelope_timer = self.nr42.sweep_pace as usize;
+
+        if sequencer_step == 7 {
+            self.tick_envelope();
+        }
+
         self.current_volume = self.nr42.initial_volume as usize;
         self.lfsr = 0x7fff;
     }
@@ -91,6 +96,8 @@ impl Channel4 {
         if self.nr42.env_dir == EnvelopeDirection::Decrease && self.nr42.initial_volume == 0 {
             self.enabled = false;
         }
+
+        self.envelope_timer = self.nr42.sweep_pace as usize;
     }
 
     pub fn tick_length(&mut self) {
