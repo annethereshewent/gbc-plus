@@ -50,7 +50,9 @@ impl Channel4 {
         self.current_timer = self.length as usize;
     }
 
-    pub fn write_control(&mut self, value: u8) {
+    pub fn write_control(&mut self, value: u8, sequencer_step: usize)  {
+        let previous_enable = self.nr44.length_enable;
+
         self.nr44.write(value);
 
         if (self.nr44.length_enable && self.current_timer >= 64) ||
@@ -58,9 +60,13 @@ impl Channel4 {
         {
             self.enabled = false;
         }
+
+        if !previous_enable && self.nr44.length_enable && sequencer_step & 1 == 1 {
+            self.tick_length();
+        }
     }
 
-    fn restart_channel(&mut self) {
+    fn restart_channel(&mut self, sequencer_step: usize) {
         self.nr44.trigger = false;
 
         self.enabled = !(self.nr42.initial_volume == 0 && self.nr42.env_dir == EnvelopeDirection::Decrease);
@@ -68,6 +74,10 @@ impl Channel4 {
 
         if self.current_timer >= 64 {
             self.current_timer = 0;
+
+            if self.nr44.length_enable && sequencer_step & 1 == 1 {
+                self.tick_length();
+            }
         }
 
         self.envelope_timer = self.nr42.sweep_pace as usize;
@@ -128,9 +138,9 @@ impl Channel4 {
         (self.nr43.clock_divider as isize) << self.nr43.clock_shift as isize
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: usize, sequencer_step: usize) {
         if self.nr44.trigger {
-            self.restart_channel();
+            self.restart_channel(sequencer_step);
         }
 
         self.frequency_timer -= cycles as isize;

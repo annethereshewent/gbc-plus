@@ -75,11 +75,16 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
-    pub fn write_period_high_control(&mut self, value: u8) {
+    pub fn write_period_high_control(&mut self, value: u8, sequencer_step: usize) {
+        let previous_enable = self.nrx4.length_enable;
         self.period &= 0xff;
         self.period |= ((value & 0x7) as u16) << 8;
 
         self.nrx4.write(value);
+
+        if !previous_enable && self.nrx4.length_enable && sequencer_step & 1 == 1 {
+            self.tick_length();
+        }
     }
 
     pub fn write_length_register(&mut self, value: u8) {
@@ -179,7 +184,7 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         self.nrx2.read()
     }
 
-    fn restart_channel(&mut self) {
+    fn restart_channel(&mut self, sequencer_step: usize) {
         self.nrx4.trigger = false;
 
         self.enabled = !(self.nrx2.initial_volume == 0 && self.nrx2.env_dir == EnvelopeDirection::Decrease);
@@ -191,6 +196,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
         if self.current_timer >= 64 {
             self.current_timer = 0;
+
+            if self.nrx4.length_enable && sequencer_step & 1 == 1 {
+                self.tick_length();
+            }
         }
 
         if let Some(nrx0) = &mut self.nrx0 {
@@ -202,11 +211,11 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: usize, sequencer_step: usize) {
         self.frequency_timer -= cycles as isize;
 
         if self.nrx4.trigger {
-            self.restart_channel();
+            self.restart_channel(sequencer_step);
         }
 
         if self.frequency_timer <= 0 {

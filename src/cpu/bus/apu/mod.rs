@@ -39,7 +39,7 @@ pub struct APU {
     #[serde(skip_deserializing)]
     pub waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
-    sequencer_step: usize,
+    pub sequencer_step: usize,
     is_ios: bool,
     pub is_paused: bool
 }
@@ -250,10 +250,10 @@ impl APU {
         self.cycles += cycles;
         self.sequencer_cycles += cycles;
 
-        self.channel1.tick(cycles);
-        self.channel2.tick(cycles);
-        self.channel3.tick(cycles);
-        self.channel4.tick(cycles);
+        self.channel1.tick(cycles, self.sequencer_step);
+        self.channel2.tick(cycles, self.sequencer_step);
+        self.channel3.tick(cycles, self.sequencer_step);
+        self.channel4.tick(cycles, self.sequencer_step);
 
         if self.sequencer_cycles >= HZ_512 {
             self.sequencer_cycles -= HZ_512;
