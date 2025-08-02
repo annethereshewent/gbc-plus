@@ -69,13 +69,24 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
     pub fn write_volume_register(&mut self, value: u8) {
         self.nrx2.write(value);
+
+        if self.nrx2.env_dir == EnvelopeDirection::Decrease && self.nrx2.initial_volume == 0 {
+            self.enabled = false;
+        }
+
+        self.envelope_timer = self.nrx2.sweep_pace as usize;
     }
 
-    pub fn write_period_high_control(&mut self, value: u8) {
+    pub fn write_period_high_control(&mut self, value: u8, sequencer_step: usize) {
+        let previous_enable = self.nrx4.length_enable;
         self.period &= 0xff;
         self.period |= ((value & 0x7) as u16) << 8;
 
         self.nrx4.write(value);
+
+        if !previous_enable && self.nrx4.length_enable && sequencer_step & 1 == 1 {
+            self.tick_length();
+        }
     }
 
     pub fn write_length_register(&mut self, value: u8) {
@@ -98,13 +109,17 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         if self.enabled {
             let bit = DUTY_PATTERNS[self.nrx1.wave_duty as usize][self.duty_step];
 
-            (bit * self.current_volume) as f32
-        } else {
-            0.0
+            return (bit * self.current_volume) as f32;
         }
+
+        0.0
     }
 
     pub fn tick_envelope(&mut self) {
+        if self.envelope_timer == 0 {
+            return;
+        }
+
         self.envelope_timer -= 1;
 
         if self.envelope_timer == 0 {
@@ -123,7 +138,7 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
     }
 
     pub fn tick_length(&mut self) {
-        if self.nrx4.length_enable {
+        if self.nrx4.length_enable && self.current_timer < 64 {
             self.current_timer += 1;
 
             if self.current_timer >= 64 {
@@ -171,10 +186,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         self.nrx2.read()
     }
 
-    fn restart_channel(&mut self) {
+    fn restart_channel(&mut self, sequencer_step: usize) {
         self.nrx4.trigger = false;
 
-        self.enabled = true;
+        self.enabled = !(self.nrx2.initial_volume == 0 && self.nrx2.env_dir == EnvelopeDirection::Decrease);
 
         self.frequency_timer = (2048 - self.period as isize) * 4;
         self.envelope_timer = self.nrx2.sweep_pace as usize;
@@ -183,6 +198,10 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
 
         if self.current_timer >= 64 {
             self.current_timer = 0;
+
+            if self.nrx4.length_enable && sequencer_step & 1 == 1 {
+                self.tick_length();
+            }
         }
 
         if let Some(nrx0) = &mut self.nrx0 {
@@ -194,11 +213,11 @@ impl<const IS_CHANNEL1: bool> PulseChannel<IS_CHANNEL1> {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: usize, sequencer_step: usize) {
         self.frequency_timer -= cycles as isize;
 
         if self.nrx4.trigger {
-            self.restart_channel();
+            self.restart_channel(sequencer_step);
         }
 
         if self.frequency_timer <= 0 {

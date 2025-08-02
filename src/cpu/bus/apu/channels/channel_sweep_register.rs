@@ -10,7 +10,7 @@ pub enum SweepDirection {
 pub struct ChannelSweepRegister {
     pub step: u8,
     pub direction: SweepDirection,
-    pub pace: u8
+    pub pace: u8,
 }
 
 impl ChannelSweepRegister {
@@ -25,6 +25,7 @@ impl ChannelSweepRegister {
     pub fn write(&mut self, value: u8) {
         self.step = value & 0x7;
         self.pace = (value >> 4) & 0x7;
+
         self.direction = match (value >> 3) & 0x1 {
             0 => SweepDirection::Addition,
             1 => SweepDirection::Subtraction,

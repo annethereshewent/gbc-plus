@@ -41,11 +41,16 @@ impl Channel3 {
         self.current_timer = self.length as usize;
     }
 
-    pub fn write_period_high_control(&mut self, value: u8) {
+    pub fn write_period_high_control(&mut self, value: u8, sequencer_step: usize) {
+        let previous_enable = self.nr34.length_enable;
         self.period &= 0xff;
         self.period |= ((value as u16) & 0x7) << 8;
 
         self.nr34.write(value);
+
+        if !previous_enable && self.nr34.length_enable && sequencer_step & 1 == 1 {
+             self.tick_length();
+        }
     }
 
     pub fn write_dac_enable(&mut self, value: u8) {
@@ -54,8 +59,6 @@ impl Channel3 {
 
         if previous_enable && !self.dac_enable {
             self.enabled = false;
-        } else if !previous_enable && self.dac_enable {
-            self.enabled = true;
         }
     }
 
@@ -69,13 +72,17 @@ impl Channel3 {
         0.0
     }
 
-    fn restart_channel(&mut self) {
+    fn restart_channel(&mut self, sequencer_step: usize) {
         self.nr34.trigger = false;
 
-        self.enabled = true;
+        self.enabled = self.dac_enable;
 
         if self.current_timer >= 256 {
             self.current_timer = 0;
+
+            if self.nr34.length_enable && sequencer_step & 1 == 1 {
+                self.tick_length();
+            }
         }
 
         // could also be calculated as CLOCK_SPEED / sample_frequency where sample_frequency = 2097152 / (2048 - period)
@@ -85,19 +92,18 @@ impl Channel3 {
     }
 
     pub fn tick_length(&mut self) {
-        if self.nr34.length_enable {
+        if self.nr34.length_enable && self.current_timer < 256 {
             self.current_timer += 1;
 
             if self.current_timer >= 256 {
                 self.enabled = false;
-
             }
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
-        if self.nr34.trigger && self.dac_enable {
-            self.restart_channel();
+    pub fn tick(&mut self, cycles: usize, sequencer_step: usize) {
+        if self.nr34.trigger {
+            self.restart_channel(sequencer_step);
         }
 
         self.frequency_timer -= cycles as isize;

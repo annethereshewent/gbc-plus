@@ -53,7 +53,7 @@ impl MBC5 {
     }
 
     pub fn read(&mut self, address: u16, rom: &[u8]) -> u8 {
-       match address {
+        match address {
             0x0000..=0x3fff => {
                 rom[address as usize]
             }

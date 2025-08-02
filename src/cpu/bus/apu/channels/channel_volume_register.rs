@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum EnvelopeDirection {
     Decrease = 0,
     Increase = 1
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ChannelVolumeRegister {
     pub sweep_pace: u8,
     pub env_dir: EnvelopeDirection,

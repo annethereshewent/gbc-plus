@@ -429,7 +429,7 @@ impl Bus {
                     self.apu.channel1.period |= value as u16;
                 }
             }
-            0xff14 => if self.apu.nr52.audio_on { self.apu.channel1.write_period_high_control(value) },
+            0xff14 => if self.apu.nr52.audio_on { self.apu.channel1.write_period_high_control(value, self.apu.sequencer_step) },
             0xff15 => (),
             0xff16 => if self.apu.nr52.audio_on { self.apu.channel2.write_length_register(value) },
             0xff17 => if self.apu.nr52.audio_on { self.apu.channel2.write_volume_register(value) },
@@ -439,7 +439,7 @@ impl Bus {
                     self.apu.channel2.period |= value as u16;
                 }
             }
-            0xff19 => if self.apu.nr52.audio_on { self.apu.channel2.write_period_high_control(value) },
+            0xff19 => if self.apu.nr52.audio_on { self.apu.channel2.write_period_high_control(value, self.apu.sequencer_step) },
             0xff1a => if self.apu.nr52.audio_on { self.apu.channel3.write_dac_enable(value) },
             0xff1b => if self.apu.nr52.audio_on { self.apu.channel3.write_length(value) },
             0xff1c => if self.apu.nr52.audio_on {
@@ -457,12 +457,12 @@ impl Bus {
                     self.apu.channel3.period |= value as u16;
                 }
             }
-            0xff1e => if self.apu.nr52.audio_on { self.apu.channel3.write_period_high_control(value) },
+            0xff1e => if self.apu.nr52.audio_on { self.apu.channel3.write_period_high_control(value, self.apu.sequencer_step) },
             0xff1f => (), // used by pokemon gold but doesn't seem to do or be anything.
             0xff20 => if self.apu.nr52.audio_on { self.apu.channel4.write_length(value) },
             0xff21 => if self.apu.nr52.audio_on { self.apu.channel4.write_volume(value) },
             0xff22 => if self.apu.nr52.audio_on { self.apu.channel4.nr43.write(value) },
-            0xff23 => if self.apu.nr52.audio_on { self.apu.channel4.write_control(value) },
+            0xff23 => if self.apu.nr52.audio_on { self.apu.channel4.write_control(value, self.apu.sequencer_step) },
             0xff24 => if self.apu.nr52.audio_on { self.apu.nr50.write(value) },
             0xff25 => if self.apu.nr52.audio_on { self.apu.nr51 = SoundPanningRegister::from_bits_truncate(value) },
             0xff26 => self.apu.write_audio_master(value),

@@ -8,7 +8,7 @@ pub struct AudioMasterRegister {
 impl AudioMasterRegister {
     pub fn new() -> Self {
         Self {
-            audio_on: false
+            audio_on: true
         }
     }
 

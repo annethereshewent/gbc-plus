@@ -50,34 +50,58 @@ impl Channel4 {
         self.current_timer = self.length as usize;
     }
 
-    pub fn write_control(&mut self, value: u8) {
+    pub fn write_control(&mut self, value: u8, sequencer_step: usize)  {
+        let previous_enable = self.nr44.length_enable;
+
         self.nr44.write(value);
-        if self.nr44.length_enable && self.current_timer >= 64 {
+
+        if (self.nr44.length_enable && self.current_timer >= 64) ||
+            (self.nr42.env_dir == EnvelopeDirection::Decrease && self.nr42.initial_volume == 0)
+        {
             self.enabled = false;
+        }
+
+        if !previous_enable && self.nr44.length_enable && sequencer_step & 1 == 1 {
+            self.tick_length();
         }
     }
 
-    fn restart_channel(&mut self) {
+    fn restart_channel(&mut self, sequencer_step: usize) {
         self.nr44.trigger = false;
 
-        self.enabled = true;
+        self.enabled = !(self.nr42.initial_volume == 0 && self.nr42.env_dir == EnvelopeDirection::Decrease);
         self.frequency_timer = self.get_frequency_timer();
 
         if self.current_timer >= 64 {
             self.current_timer = 0;
+
+            if self.nr44.length_enable && sequencer_step & 1 == 1 {
+                self.tick_length();
+            }
         }
 
         self.envelope_timer = self.nr42.sweep_pace as usize;
+
+        if sequencer_step == 7 {
+            self.tick_envelope();
+        }
+
         self.current_volume = self.nr42.initial_volume as usize;
         self.lfsr = 0x7fff;
     }
 
     pub fn write_volume(&mut self, value: u8) {
         self.nr42.write(value);
+
+        if self.nr42.env_dir == EnvelopeDirection::Decrease && self.nr42.initial_volume == 0 {
+            self.enabled = false;
+        }
+
+        self.envelope_timer = self.nr42.sweep_pace as usize;
     }
 
     pub fn tick_length(&mut self) {
-        if self.nr44.length_enable {
+        if self.nr44.length_enable && self.current_timer < 64 {
             self.current_timer += 1;
 
             if self.current_timer >= 64 {
@@ -88,10 +112,11 @@ impl Channel4 {
 
     pub fn generate_sample(&self) -> f32 {
         if self.enabled {
-            self.output as f32
-        } else {
-            0.0
+            return self.output as f32;
         }
+
+        0.0
+
     }
 
     pub fn tick_envelope(&mut self) {
@@ -120,9 +145,9 @@ impl Channel4 {
         (self.nr43.clock_divider as isize) << self.nr43.clock_shift as isize
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: usize, sequencer_step: usize) {
         if self.nr44.trigger {
-            self.restart_channel();
+            self.restart_channel(sequencer_step);
         }
 
         self.frequency_timer -= cycles as isize;

@@ -39,7 +39,7 @@ pub struct APU {
     #[serde(skip_deserializing)]
     pub waveform_producer: Option<Caching<Arc<SharedRb<Heap<f32>>>, true, false>>,
     sequencer_cycles: usize,
-    sequencer_step: usize,
+    pub sequencer_step: usize,
     is_ios: bool,
     pub is_paused: bool
 }
@@ -84,8 +84,11 @@ impl APU {
 
         let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
-        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
+        let left_volume = if self.nr50.left_volume == 0 { 1 } else { self.nr50.left_volume };
+        let right_volume = if self.nr50.right_volume == 0 { 1 } else { self.nr50.right_volume };
+
+        let mut left_sample = sample * left_volume as f32 / 7.0;
+        let mut right_sample = sample * right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(-1.0, 1.0);
         right_sample = right_sample.clamp(-1.0, 1.0);
@@ -115,8 +118,11 @@ impl APU {
 
         let sample = (ch1_sample + ch2_sample + ch3_sample + ch4_sample) / 4.0;
 
-        let mut left_sample = sample * self.nr50.left_volume as f32 / 7.0;
-        let mut right_sample = sample * self.nr50.right_volume as f32 / 7.0;
+        let left_volume = if self.nr50.left_volume == 0 { 1 } else { self.nr50.left_volume };
+        let right_volume = if self.nr50.right_volume == 0 { 1 } else { self.nr50.right_volume };
+
+        let mut left_sample = sample * left_volume as f32 / 7.0;
+        let mut right_sample = sample * right_volume as f32 / 7.0;
 
         left_sample = left_sample.clamp(0.0, 1.0);
         right_sample = right_sample.clamp(0.0, 1.0);
@@ -174,7 +180,7 @@ impl APU {
     pub fn read_channel_status(&self) -> u8 {
         let audio_on = self.nr52.read();
 
-        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel3.enabled as u8) << 3 | 0x7 << 4 | audio_on << 7
+        self.channel1.enabled as u8 | (self.channel2.enabled as u8) << 1 | (self.channel3.enabled as u8) << 2 | (self.channel4.enabled as u8) << 3 | 0x7 << 4 | audio_on << 7
     }
 
     pub fn write_audio_master(&mut self, value: u8) {
@@ -244,10 +250,10 @@ impl APU {
         self.cycles += cycles;
         self.sequencer_cycles += cycles;
 
-        self.channel1.tick(cycles);
-        self.channel2.tick(cycles);
-        self.channel3.tick(cycles);
-        self.channel4.tick(cycles);
+        self.channel1.tick(cycles, self.sequencer_step);
+        self.channel2.tick(cycles, self.sequencer_step);
+        self.channel3.tick(cycles, self.sequencer_step);
+        self.channel4.tick(cycles, self.sequencer_step);
 
         if self.sequencer_cycles >= HZ_512 {
             self.sequencer_cycles -= HZ_512;

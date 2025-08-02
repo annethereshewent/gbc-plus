@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 
-#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum LFSRWidth {
     Bit15 = 0,
     Bit7 = 1
@@ -9,7 +9,7 @@ pub enum LFSRWidth {
 
 const DIVIDERS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ChannelFreqRandomRegister {
     pub clock_divider: u8,
     pub clock_shift: u8,
