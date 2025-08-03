@@ -69,6 +69,10 @@ export class CloudService {
 
     if (accessToken == null) {
       this.loggedIn.value = false
+
+      if (localStorage.getItem("gbc_user_email") != null) {
+        this.silentSignIn()
+      }
     } else if (expiresIn != null && (Date.now() < expiresIn)) {
       this.accessToken = accessToken
 
