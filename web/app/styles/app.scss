@@ -7,34 +7,6 @@
 #cloud-logged-in {
   display: none;
 }
-@media all and (display-mode: fullscreen) {
-  #emulator {
-    width: 100%;
-    margin-top: 0px;
-    margin-left: 3%;
-  }
-  #fps-counter {
-    display: none;
-  }
-  canvas {
-    height: 80vh !important;
-    width: auto !important;
-  }
-  .navbar:hover {
-    opacity: 1.0 !important;
-  }
-  .navbar:not(:hover) {
-    opacity: 0.0 !important;
-  }
-  body {
-    background: #000000;
-    height: 100vh !important;
-    overflow: none !important;
-  }
-  #waveform-visualizer {
-    display: none !important
-  }
-}
 #palette-header-message {
   margin-bottom: 20px;
 }
@@ -61,13 +33,14 @@
   display: block;
 }
 .canvas-wrapper {
+  margin-top: 150px;
   width: 100%;
   height: 100%;
   text-align: center;
   #game-canvas {
     width: 640px;
     height: 576px;
-    margin: 150px auto;
+    margin: auto;
   }
 }
 
@@ -100,4 +73,36 @@
   font-size: 18px;
   cursor: pointer;
   margin-right: 10px;
+}
+@media all and (display-mode: fullscreen) {
+  #emulator {
+    width: 100%;
+    margin-top: 0px;
+    margin-left: 3%;
+  }
+  #fps-counter {
+    display: none;
+  }
+  .canvas-wrapper {
+    margin-top: 0px;
+    #game-canvas {
+      height: 90vh;
+      width: auto;
+      margin: auto;
+    }
+  }
+  .navbar:hover {
+    opacity: 1.0;
+  }
+  .navbar:not(:hover) {
+    opacity: 0.0;
+  }
+  body {
+    background: #000000;
+    height: 100vh;
+    overflow: none !important;
+  }
+  #waveform-visualizer {
+    display: none !important;
+  }
 }

@@ -76,11 +76,14 @@ export class GBC {
   private video: VideoInterface = new VideoInterface(this.canvas, this.context!)
   private audio: AudioInterface|null = null
   private previousTime = 0
+  private realPreviousTime = 0
   private joypad: Joypad = new Joypad(this)
   private waveVisualizer = new WaveformVisualizer(this.plotCanvas)
   private showWaveform = false
   private updateSaveGame = ""
   private fullScreen = false
+
+  private fps = 0
 
   private cloudService = new CloudService()
 
@@ -100,6 +103,8 @@ export class GBC {
   private romData = new Uint8Array()
 
   private palette = 1
+
+  private frames = 0
 
   constructor() {
     const palette = localStorage.getItem('dmg-palette')
@@ -267,10 +272,23 @@ export class GBC {
     }
   }
 
+  updateFps() {
+    document.getElementById("fps-counter")!.innerText = `${this.fps}`
+  }
+
   runFrame(time: number) {
     const diff = time - this.previousTime
-
     if (!this.isPaused) {
+      const realDiff = time - this.realPreviousTime
+      this.fps = Math.floor(1000 / realDiff)
+
+      if (this.frames >= 60) {
+        this.frames -= 60
+
+        this.updateFps()
+      }
+
+      this.realPreviousTime = time
       if (diff >= FPS_INTERVAL || this.previousTime == 0) {
         const samples = this.audio!.pushSamples()
         if (this.showWaveform) {
@@ -285,6 +303,7 @@ export class GBC {
         this.previousTime = time - (diff % FPS_INTERVAL)
       }
 
+      this.frames++
       this.frameNumber = requestAnimationFrame((time) => this.runFrame(time))
     }
   }
@@ -876,6 +895,7 @@ export class GBC {
     if (closeButtons != null) {
       for (const closeButton of closeButtons) {
         closeButton.addEventListener("click", () => {
+          this.emulator!.set_pause(false)
           const modals = document.getElementsByClassName("modal")
 
           if (modals != null) {
