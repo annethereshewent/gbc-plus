@@ -236,7 +236,7 @@ export class GBC {
 
       this.rtcInterval = setInterval(() => {
         this.updateRtc()
-      }, 5 * 60 * 1000)
+      }, 30 * 60 * 1000)
 
       this.emulator!.change_palette(this.palette)
 

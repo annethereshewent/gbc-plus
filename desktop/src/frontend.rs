@@ -587,7 +587,7 @@ impl Frontend {
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
                     .as_millis();
-                if (self.last_check.is_some() && current_time - self.last_check.unwrap() >= 5 * 60 * 1000) ||
+                if (self.last_check.is_some() && current_time - self.last_check.unwrap() >= 30 * 60 * 1000) ||
                     is_initial ||
                     mbc3.is_dirty
                 {
