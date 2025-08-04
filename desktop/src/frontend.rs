@@ -43,7 +43,7 @@ use dirs_next::data_dir;
 use gbc_plus::cpu::{
     bus::{
         apu::NUM_SAMPLES,
-        cartridge::mbc::MBC,
+        cartridge::mbc::{mbc3::RtcFile, MBC},
         joypad::JoypadButtons,
         ppu::{
             SCREEN_HEIGHT,
@@ -556,16 +556,54 @@ impl Frontend {
         self.window.gl_swap_window();
     }
 
-    pub fn update_rtc(&mut self, cpu: &mut CPU) {
+    pub fn load_rtc(&mut self, cpu: &mut CPU) {
+        match &mut cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => {
+                let mut cloud_service = self.cloud_service.lock().unwrap();
+                let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
+
+                rtc_name.push_str(".rtc");
+
+                let bytes = cloud_service.get_file(Some(rtc_name));
+
+                let json_str = str::from_utf8(&bytes).unwrap();
+
+                if json_str != "" {
+                    mbc3.load_rtc(json_str.to_string());
+                }
+            }
+            _ => ()
+        }
+    }
+
+    pub fn update_rtc(&mut self, cpu: &mut CPU, logged_in: bool, is_initial: bool) {
         match &mut cpu.bus.cartridge.mbc {
             MBC::MBC3(mbc3) => {
                 let current_time = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
                     .as_millis();
-                if let Some(last_check) = self.last_check {
-                    if current_time - last_check >= 1500 {
-                        mbc3.save_rtc();
+                if self.last_check.is_some() || is_initial {
+                    if is_initial || (current_time - self.last_check.unwrap() >= 5 * 60 * 1000) {
+                        if logged_in {
+                            let rtc_json = RtcFile::new(
+                                mbc3.start.timestamp() as usize,
+                                mbc3.halted,
+                                mbc3.carry_bit
+                            );
+
+                            let json_str = serde_json::to_string::<RtcFile>(&rtc_json).unwrap();
+
+                            let mut cloud_service = self.cloud_service.lock().unwrap();
+
+                            let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
+
+                            rtc_name.push_str(".rtc");
+
+                            cloud_service.upload_file(json_str.as_bytes(), Some(rtc_name));
+                        } else {
+                            mbc3.save_rtc();
+                        }
                         self.last_check = None;
                     }
                 } else {
@@ -598,7 +636,7 @@ impl Frontend {
 
                         let cloud_service = self.cloud_service.clone();
                         thread::spawn(move || {
-                            cloud_service.lock().unwrap().upload_save(&data);
+                            cloud_service.lock().unwrap().upload_file(&data, None);
                         });
                     } else {
                         mbc.backup_file.save_file();
@@ -619,7 +657,7 @@ impl Frontend {
 
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
-                        cloud_service.lock().unwrap().upload_save(&data);
+                        cloud_service.lock().unwrap().upload_file(&data, None);
                     });
                 } else {
                     mbc.backup_file.save_file();
@@ -639,7 +677,7 @@ impl Frontend {
 
                     let cloud_service = self.cloud_service.clone();
                     thread::spawn(move || {
-                        cloud_service.lock().unwrap().upload_save(&data);
+                        cloud_service.lock().unwrap().upload_file(&data, None);
                     });
                 } else {
                     mbc.backup_file.save_file();
@@ -722,7 +760,7 @@ impl Frontend {
         cpu.bus.ppu.set_dmg_palette(current_palette);
 
         if logged_in && fetch_save {
-            let bytes = cloud_service.lock().unwrap().get_save();
+            let bytes = cloud_service.lock().unwrap().get_file(None);
 
             if bytes.len() > 0 {
                 cpu.bus.cartridge.load_save(&bytes);
@@ -1009,7 +1047,7 @@ impl Frontend {
 
             if !previous_logged_in && *logged_in {
                 if let Some(save_bytes) = save_bytes {
-                    let new_bytes = self.cloud_service.lock().unwrap().get_save();
+                    let new_bytes = self.cloud_service.lock().unwrap().get_file(None);
 
                     *save_bytes = new_bytes;
 
@@ -1064,7 +1102,7 @@ impl Frontend {
 
                         let cloud_service = self.cloud_service.clone();
                         thread::spawn(move || {
-                            cloud_service.lock().unwrap().upload_save(&data);
+                            cloud_service.lock().unwrap().upload_file(&data, None);
                         });
                     } else {
                         mbc.backup_file.save_file();
@@ -1086,7 +1124,7 @@ impl Frontend {
 
                         let cloud_service = self.cloud_service.clone();
                         thread::spawn(move || {
-                            cloud_service.lock().unwrap().upload_save(&data);
+                            cloud_service.lock().unwrap().upload_file(&data, None);
                         });
                     } else {
                         mbc.backup_file.save_file();
@@ -1108,7 +1146,7 @@ impl Frontend {
 
                         let cloud_service = self.cloud_service.clone();
                         thread::spawn(move || {
-                            cloud_service.lock().unwrap().upload_save(&data);
+                            cloud_service.lock().unwrap().upload_file(&data, None);
                         });
                     } else {
                         mbc.backup_file.save_file();

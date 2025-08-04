@@ -96,13 +96,16 @@ fn main() {
     if logged_in {
         cpu.bus.cartridge.set_save_file(None);
 
-        let data = frontend.cloud_service.lock().unwrap().get_save();
+        let data = frontend.cloud_service.lock().unwrap().get_file(None);
 
         if data.len() > 0 {
             cpu.bus.cartridge.load_save(&data);
 
             save_bytes = Some(data);
         }
+
+        frontend.load_rtc(&mut cpu);
+        frontend.update_rtc(&mut cpu, true, true);
     }
 
     loop {
@@ -112,7 +115,7 @@ fn main() {
 
         frontend.clear_framebuffer();
 
-        frontend.update_rtc(&mut cpu);
+        frontend.update_rtc(&mut cpu, logged_in, false);
         frontend.check_saves(&mut cpu, logged_in);
         frontend.render_screen(&mut cpu);
         frontend.render_ui(

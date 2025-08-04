@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
 #[derive(Serialize, Deserialize)]
-struct RtcFile {
+pub struct RtcFile {
     timestamp: usize,
     carry_bit: bool,
     halted: bool
@@ -52,7 +52,7 @@ impl ClockRegister {
 pub struct MBC3 {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    start: DateTime<Local>,
+    pub start: DateTime<Local>,
     rom_bank: u8,
     ram_bank: u8,
     timer_ram_enable: bool,
@@ -66,9 +66,9 @@ pub struct MBC3 {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     rtc_file: Option<File>,
-    carry_bit: bool,
+    pub carry_bit: bool,
     previous_wrapped_days: u16,
-    halted: bool,
+    pub halted: bool,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     halted_elapsed: TimeDelta

@@ -313,11 +313,16 @@ impl CloudService {
   }
 
   // TODO: Fix this really long unfortunate method
-  pub fn upload_save(&mut self, bytes: &[u8]) {
-    println!("uploading save!");
-    if self.game_name == "" {
-      return;
-    }
+  pub fn upload_file(&mut self, bytes: &[u8], rtc_name: Option<String>) {
+    let game_name = if let Some(rtc_name) = rtc_name {
+      rtc_name
+    } else if self.game_name != "" {
+      self.game_name.clone()
+    } else {
+      return
+    };
+
+    println!("uploading file!");
 
     self.refresh_token_if_needed();
 
@@ -325,7 +330,7 @@ impl CloudService {
       self.check_for_gbc_folder();
     }
 
-    let json = self.get_save_info();
+    let json = self.get_file_info(game_name);
 
     let mut headers = HeaderMap::new();
 
@@ -398,16 +403,20 @@ impl CloudService {
     }
   }
 
-  pub fn get_save(&mut self) -> Vec<u8> {
-    if self.game_name == "" {
-      return Vec::new();
-    }
+  pub fn get_file(&mut self, rtc_name: Option<String>) -> Vec<u8> {
+    let file_name = if let Some(rtc_name) = rtc_name {
+      rtc_name
+    } else if self.game_name != "" {
+      self.game_name.clone()
+    } else {
+      return Vec::new()
+    };
 
     self.refresh_token_if_needed();
 
     self.check_for_gbc_folder();
 
-    let json = self.get_save_info();
+    let json = self.get_file_info(file_name);
 
     if let Some(file) = json.files.get(0) {
       let url = format!("https://www.googleapis.com/drive/v3/files/{}?alt=media", file.id);
@@ -423,11 +432,11 @@ impl CloudService {
     Vec::new()
   }
 
-  fn get_save_info(&mut self) -> DriveResponse {
+  fn get_file_info(&mut self, file_name: String) -> DriveResponse {
     self.refresh_token_if_needed();
     let mut query_params: Vec<[&str; 2]> = Vec::new();
 
-    let query = &format!("name = \"{}\" and parents in \"{}\"", self.game_name, self.gbc_folder_id);
+    let query = &format!("name = \"{}\" and parents in \"{}\"", file_name, self.gbc_folder_id);
 
     // rust complaining here if i just pass &String::new() to the encode method below,
     // so i have to initialize this variable here
