@@ -300,7 +300,7 @@ impl MBC3 {
     fn update_rtc_latch(&mut self) {
         let now = Local::now();
 
-        let delta = if self.halted { self.halted_elapsed } else { cmp::max(now.signed_duration_since(self.start), Duration::zero()) };
+        let delta = cmp::max(now.signed_duration_since(self.start), Duration::zero());
 
         let seconds = delta.num_seconds() % 60;
         let minutes = (delta.num_seconds() / 60) % 60;
