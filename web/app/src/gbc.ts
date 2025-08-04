@@ -152,7 +152,6 @@ export class GBC {
     gameName = gameNameTokens.join('.')
 
     let saveName = gameName + ".sav"
-    this.rtcName = gameName + ".rtc"
 
     let data = null
     if (extension.toLowerCase() == 'zip') {
@@ -167,7 +166,6 @@ export class GBC {
       zipTokens.pop()
 
       saveName = zipTokens.join('.') + ".sav"
-      this.rtcName = zipTokens.join('.') + ".rtc"
 
       data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
