@@ -316,8 +316,6 @@ impl MBC3 {
 
         let days = delta.num_seconds() / 60 / 60 / 24;
 
-        println!("days = {days}");
-
         let num_wraps = days / 0x1ff;
 
         if num_wraps as usize > self.num_wraps {
