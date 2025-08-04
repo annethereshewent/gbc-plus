@@ -312,7 +312,7 @@ impl MBC3 {
 
         if num_wraps as usize > self.num_wraps {
             self.carry_bit = true;
-            self.num_wraps += 1;
+            self.num_wraps = num_wraps as usize;
         }
 
         let new_wrapped_days = days & 0x1ff;
