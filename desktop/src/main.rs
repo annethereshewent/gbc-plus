@@ -105,7 +105,6 @@ fn main() {
         }
 
         frontend.load_rtc(&mut cpu);
-        frontend.update_rtc(&mut cpu, true, true);
     }
 
     loop {

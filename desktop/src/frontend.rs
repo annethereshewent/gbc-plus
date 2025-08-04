@@ -135,7 +135,6 @@ pub struct Frontend {
     retry_attempts: usize,
     config: EmuConfig,
     config_file: File,
-    last_check: Option<u128>,
     gl: imgui_glow_renderer::glow::Context,
     texture: NativeTexture,
     platform: SdlPlatform,
@@ -152,7 +151,8 @@ pub struct Frontend {
     display_ui: bool,
     file_to_delete: Option<PathBuf>,
     confirm_delete_dialog: bool,
-    show_palette_picker_popup: bool
+    show_palette_picker_popup: bool,
+    last_check: Option<u128>
 }
 
 pub struct GbcAudioCallback {
@@ -559,17 +559,21 @@ impl Frontend {
     pub fn load_rtc(&mut self, cpu: &mut CPU) {
         match &mut cpu.bus.cartridge.mbc {
             MBC::MBC3(mbc3) => {
-                let mut cloud_service = self.cloud_service.lock().unwrap();
-                let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
+                let bytes = {
+                    let mut cloud_service = self.cloud_service.lock().unwrap();
+                    let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
 
-                rtc_name.push_str(".rtc");
+                    rtc_name.push_str(".rtc");
 
-                let bytes = cloud_service.get_file(Some(rtc_name));
+                    cloud_service.get_file(Some(rtc_name))
+                };
 
                 let json_str = str::from_utf8(&bytes).unwrap();
 
                 if json_str != "" {
                     mbc3.load_rtc(json_str.to_string());
+                } else {
+                    self.update_rtc(cpu, true, true);
                 }
             }
             _ => ()
