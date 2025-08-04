@@ -75,7 +75,8 @@ pub struct MBC3 {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     halted_elapsed: TimeDelta,
-    pub num_wraps: usize
+    pub num_wraps: usize,
+    pub is_dirty: bool
 }
 
 impl MBC3 {
@@ -313,6 +314,7 @@ impl MBC3 {
         if num_wraps as usize > self.num_wraps {
             self.carry_bit = true;
             self.num_wraps = num_wraps as usize;
+            self.is_dirty = true;
         }
 
         let new_wrapped_days = days & 0x1ff;
@@ -399,7 +401,8 @@ impl MBC3 {
             previous_wrapped_days: 0,
             halted,
             halted_elapsed,
-            num_wraps
+            num_wraps,
+            is_dirty: false
         }
     }
 

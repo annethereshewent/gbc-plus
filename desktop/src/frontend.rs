@@ -583,30 +583,32 @@ impl Frontend {
                     .duration_since(UNIX_EPOCH)
                     .expect("an error occurred")
                     .as_millis();
-                if self.last_check.is_some() || is_initial {
-                    if is_initial || (current_time - self.last_check.unwrap() >= 5 * 60 * 1000) {
-                        if logged_in {
-                            let rtc_json = RtcFile::new(
-                                mbc3.start.timestamp() as usize,
-                                mbc3.halted,
-                                mbc3.carry_bit,
-                                mbc3.num_wraps
-                            );
+                if (self.last_check.is_some() && current_time - self.last_check.unwrap() >= 5 * 60 * 1000) ||
+                    is_initial ||
+                    mbc3.is_dirty
+                {
+                    mbc3.is_dirty = false;
+                    if logged_in {
+                        let rtc_json = RtcFile::new(
+                            mbc3.start.timestamp() as usize,
+                            mbc3.halted,
+                            mbc3.carry_bit,
+                            mbc3.num_wraps
+                        );
 
-                            let json_str = serde_json::to_string::<RtcFile>(&rtc_json).unwrap();
+                        let json_str = serde_json::to_string::<RtcFile>(&rtc_json).unwrap();
 
-                            let mut cloud_service = self.cloud_service.lock().unwrap();
+                        let mut cloud_service = self.cloud_service.lock().unwrap();
 
-                            let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
+                        let mut rtc_name = cloud_service.game_name.strip_suffix(".sav").unwrap().to_string();
 
-                            rtc_name.push_str(".rtc");
+                        rtc_name.push_str(".rtc");
 
-                            cloud_service.upload_file(json_str.as_bytes(), Some(rtc_name));
-                        } else {
-                            mbc3.save_rtc();
-                        }
-                        self.last_check = None;
+                        cloud_service.upload_file(json_str.as_bytes(), Some(rtc_name));
+                    } else {
+                        mbc3.save_rtc();
                     }
+                    self.last_check = None;
                 } else {
                     self.last_check = Some(SystemTime::now()
                         .duration_since(UNIX_EPOCH)

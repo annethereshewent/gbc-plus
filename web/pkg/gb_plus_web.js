@@ -254,6 +254,16 @@ export class WebEmulator {
         return ret >>> 0;
     }
     /**
+     * @returns {boolean}
+     */
+    is_rtc_dirty() {
+        const ret = wasm.webemulator_is_rtc_dirty(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    clear_rtc_dirty() {
+        wasm.webemulator_clear_rtc_dirty(this.__wbg_ptr);
+    }
+    /**
      * @returns {number}
      */
     get_buffer_len() {

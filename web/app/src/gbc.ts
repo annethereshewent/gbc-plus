@@ -291,6 +291,11 @@ export class GBC {
         this.updateFps()
       }
 
+      if (this.emulator!.is_rtc_dirty()) {
+        this.emulator!.clear_rtc_dirty()
+        this.updateRtc()
+      }
+
       this.realPreviousTime = time
       if (diff >= FPS_INTERVAL || this.previousTime == 0) {
         const samples = this.audio!.pushSamples()

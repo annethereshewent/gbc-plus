@@ -22,6 +22,8 @@ export class WebEmulator {
   has_saved(): boolean;
   get_save_length(): number;
   save_game(): number;
+  is_rtc_dirty(): boolean;
+  clear_rtc_dirty(): void;
   get_buffer_len(): number;
   update_input(button: number, pressed: boolean): void;
 }
@@ -51,6 +53,8 @@ export interface InitOutput {
   readonly webemulator_has_saved: (a: number) => number;
   readonly webemulator_get_save_length: (a: number) => number;
   readonly webemulator_save_game: (a: number) => number;
+  readonly webemulator_is_rtc_dirty: (a: number) => number;
+  readonly webemulator_clear_rtc_dirty: (a: number) => void;
   readonly webemulator_get_buffer_len: (a: number) => number;
   readonly webemulator_update_input: (a: number, b: number, c: number) => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;

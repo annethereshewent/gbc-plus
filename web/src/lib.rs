@@ -195,6 +195,20 @@ impl WebEmulator {
         }
     }
 
+    pub fn is_rtc_dirty(&self) -> bool {
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty,
+            _ => false
+        }
+    }
+
+    pub fn clear_rtc_dirty(&mut self) {
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty = false,
+            _ => ()
+        }
+    }
+
     pub fn get_buffer_len(&self) -> usize {
         self.sample_buffer.len()
     }
