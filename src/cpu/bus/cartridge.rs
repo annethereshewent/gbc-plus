@@ -117,10 +117,7 @@ impl Cartridge {
     pub fn clear_save_file(&mut self) {
         match &mut self.mbc {
             MBC::MBC1(mbc) => mbc.backup_file.file = None,
-            MBC::MBC3(mbc) => {
-                mbc.rtc_file = None;
-                mbc.backup_file.file = None;
-            }
+            MBC::MBC3(mbc) => mbc.backup_file.file = None,
             MBC::MBC5(mbc) => mbc.backup_file.file = None,
             MBC::None => ()
         }
