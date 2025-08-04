@@ -277,7 +277,14 @@ impl MBC3 {
 
         let previous_halted = self.halted;
 
+        let previous_carry = self.carry_bit;
+
         self.carry_bit = ((self.latch_clock.rtc_dh >> 7) & 0x1) == 1;
+
+        if previous_carry != self.carry_bit {
+            self.is_dirty = true;
+        }
+
         self.halted = ((self.latch_clock.rtc_dh >> 6) & 0x1) == 1;
 
         if !previous_halted && self.halted {
@@ -307,7 +314,9 @@ impl MBC3 {
         let minutes = (delta.num_seconds() / 60) % 60;
         let hours = (delta.num_seconds() / 60 / 60) % 24;
 
-        let days = hours / 24;
+        let days = delta.num_seconds() / 60 / 60 / 24;
+
+        println!("days = {days}");
 
         let num_wraps = days / 0x1ff;
 
