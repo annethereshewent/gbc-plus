@@ -106,6 +106,15 @@ mod ffi {
 
         #[swift_bridge(swift_name="setPalette")]
         fn set_palette(&mut self, value: usize);
+
+        #[swift_bridge(swift_name="clearRtcDirty")]
+        fn clear_rtc_dirty(&mut self);
+
+        #[swift_bridge(swift_name="isRtcDirty")]
+        fn is_rtc_dirty(&self) -> bool;
+
+        #[swift_bridge(swift_name="hasRtc")]
+        fn has_rtc(&self) -> bool;
     }
 }
 
@@ -197,6 +206,13 @@ impl GBCMobileEmulator {
         }
     }
 
+    pub fn has_rtc(&self) -> bool {
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc) => mbc.has_timer,
+            _ => false
+        }
+    }
+
     pub fn load_rtc(&mut self, json: String) {
         match &mut self.cpu.bus.cartridge.mbc {
             MBC::MBC3(mbc) => mbc.load_rtc(json),
@@ -205,7 +221,7 @@ impl GBCMobileEmulator {
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
-        self.cpu.load_rom(data);
+        self.cpu.load_rom(data, false);
     }
 
     pub fn step_frame(&mut self) {
@@ -303,6 +319,20 @@ impl GBCMobileEmulator {
             if let Some(joypad_button) = self.joypad_map.get(&button) {
                 self.cpu.bus.joypad.release_button(*joypad_button);
             }
+        }
+    }
+
+    pub fn is_rtc_dirty(&self) -> bool {
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty,
+            _ => false
+        }
+    }
+
+    pub fn clear_rtc_dirty(&mut self) {
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty = false,
+            _ => ()
         }
     }
 }

@@ -106,6 +106,8 @@ export class GBC {
 
   private frames = 0
 
+  private rtcInterval: any|null = null
+
   constructor() {
     const palette = localStorage.getItem('dmg-palette')
 
@@ -150,7 +152,6 @@ export class GBC {
     gameName = gameNameTokens.join('.')
 
     let saveName = gameName + ".sav"
-    this.rtcName = gameName + ".rtc"
 
     let data = null
     if (extension.toLowerCase() == 'zip') {
@@ -165,7 +166,6 @@ export class GBC {
       zipTokens.pop()
 
       saveName = zipTokens.join('.') + ".sav"
-      this.rtcName = zipTokens.join('.') + ".rtc"
 
       data = await zipFile?.file(zipFileName)?.async('arraybuffer')
     } else if (['gb', 'gbc'].includes(extension.toLowerCase())) {
@@ -195,6 +195,7 @@ export class GBC {
   }
 
   async startGame(data: ArrayBuffer) {
+    clearInterval(this.rtcInterval)
     if (this.frameNumber != -1) {
       this.emulator = new WebEmulator()
       cancelAnimationFrame(this.frameNumber)
@@ -214,11 +215,11 @@ export class GBC {
 
       const saveBuffer =
         this.cloudService.loggedIn.value ?
-        (await this.cloudService.getSave(this.saveName.value)).data! :
-        new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || '[]'))
+        (await this.cloudService.getFile(this.saveName.value)).data :
+        new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || "null"))
 
-      if (saveBuffer.length > 0) {
-        this.emulator.load_save(saveBuffer)
+      if (saveBuffer != null) {
+        this.emulator.load_save(saveBuffer as Uint8Array)
       }
 
       this.audio = new AudioInterface()
@@ -233,9 +234,9 @@ export class GBC {
 
       this.joypad.setStateManager(this.stateManager)
 
-      setInterval(() => {
+      this.rtcInterval = setInterval(() => {
         this.updateRtc()
-      }, 5 * 60 * 1000)
+      }, 30 * 60 * 1000)
 
       this.emulator!.change_palette(this.palette)
 
@@ -266,7 +267,7 @@ export class GBC {
         if (!this.cloudService.loggedIn.value) {
           localStorage.setItem(this.saveName.value, JSON.stringify(saveArr))
         } else {
-          this.cloudService.uploadSave(this.saveName.value, uint8Clone)
+          this.cloudService.uploadFile(this.saveName.value, uint8Clone)
         }
       }
     }
@@ -286,6 +287,11 @@ export class GBC {
         this.frames -= 60
 
         this.updateFps()
+      }
+
+      if (this.emulator!.is_rtc_dirty()) {
+        this.emulator!.clear_rtc_dirty()
+        this.updateRtc()
       }
 
       this.realPreviousTime = time
@@ -327,14 +333,24 @@ export class GBC {
     this.emulator!.load_rtc(json)
   }
 
-  fetchRtc() {
+  async fetchRtc() {
     if (this.rtcName != "") {
-      let json = localStorage.getItem(this.rtcName) || ""
+      if (this.cloudService.loggedIn.value) {
+        const rtc = await this.cloudService.getFile(this.rtcName, false)
 
-      if (json === "") {
-        this.updateRtc()
-      } else  {
-        this.loadRtc(json)
+        if (rtc.data != null) {
+          this.loadRtc(JSON.stringify(rtc.data))
+        } else {
+          this.updateRtc()
+        }
+      } else {
+        let json = localStorage.getItem(this.rtcName) || ""
+
+        if (json === "") {
+          this.updateRtc()
+        } else  {
+          this.loadRtc(json)
+        }
       }
     }
   }
@@ -343,7 +359,7 @@ export class GBC {
     const json = this.emulator!.fetch_rtc()
 
     if (json !== "" && this.rtcName != null) {
-      localStorage.setItem(this.rtcName, json)
+      this.cloudService.loggedIn ? this.cloudService.uploadFile(this.rtcName, null, json) : localStorage.setItem(this.rtcName, json)
     }
   }
 
@@ -600,25 +616,25 @@ export class GBC {
 
         const spanEl = document.createElement("span")
 
-        spanEl.innerText = save.gameName.length > 50 ? save.gameName.substring(0, 50) + "..." : save.gameName
+        spanEl.innerText = save.filename.length > 50 ? save.filename.substring(0, 50) + "..." : save.filename
 
         const deleteSaveEl = document.createElement('i')
 
         deleteSaveEl.className = "fa-solid fa-x save-icon delete-save"
 
-        deleteSaveEl.addEventListener('click', () => this.deleteSave(save.gameName))
+        deleteSaveEl.addEventListener('click', () => this.deleteSave(save.filename))
 
         const updateSaveEl = document.createElement('i')
 
         updateSaveEl.className = "fa-solid fa-file-pen save-icon update"
 
-        updateSaveEl.addEventListener("click", () => this.updateSave(save.gameName))
+        updateSaveEl.addEventListener("click", () => this.updateSave(save.filename))
 
         const downloadSaveEl = document.createElement("div")
 
         downloadSaveEl.className = "fa-solid fa-download save-icon download"
 
-        downloadSaveEl.addEventListener("click", () => this.downloadSave(save.gameName))
+        downloadSaveEl.addEventListener("click", () => this.downloadSave(save.filename))
 
         divEl.append(spanEl)
         divEl.append(downloadSaveEl)
@@ -690,7 +706,7 @@ export class GBC {
       const bytes = new Uint8Array(data as ArrayBuffer)
 
       if (this.updateSaveGame != "") {
-        this.cloudService.uploadSave(this.updateSaveGame, bytes)
+        this.cloudService.uploadFile(this.updateSaveGame, bytes)
       }
 
       this.showSaveNotification()
@@ -708,10 +724,10 @@ export class GBC {
     if (!this.cloudService.loggedIn.value) {
       return
     }
-    const entry = await this.cloudService.getSave(gameName)
+    const entry = await this.cloudService.getFile(gameName)
 
-    if (entry != null) {
-      this.generateFile(entry.data!!, gameName)
+    if (entry != null && entry.data != null) {
+      this.generateFile(entry.data as Uint8Array, gameName)
     }
   }
 
@@ -876,7 +892,7 @@ export class GBC {
         if (saveArr.length > 0) {
           const saveData = new Uint8Array(saveArr)
 
-          await this.cloudService.uploadSave(this.saveName.value, saveData)
+          await this.cloudService.uploadFile(this.saveName.value, saveData)
 
           this.showSaveNotification()
 

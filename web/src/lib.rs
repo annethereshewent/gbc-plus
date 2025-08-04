@@ -98,7 +98,7 @@ impl WebEmulator {
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
-        self.cpu.load_rom(data);
+        self.cpu.load_rom(data, false);
     }
 
     pub fn step_frame(&mut self) {
@@ -192,6 +192,20 @@ impl WebEmulator {
 
                 vec.as_ptr()
             }
+        }
+    }
+
+    pub fn is_rtc_dirty(&self) -> bool {
+        match &self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty,
+            _ => false
+        }
+    }
+
+    pub fn clear_rtc_dirty(&mut self) {
+        match &mut self.cpu.bus.cartridge.mbc {
+            MBC::MBC3(mbc3) => mbc3.is_dirty = false,
+            _ => ()
         }
     }
 

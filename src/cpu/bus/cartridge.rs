@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use mbc::{mbc1::MBC1, mbc3::MBC3, mbc5::MBC5, MBC};
 use serde::{Deserialize, Serialize};
 
@@ -43,7 +41,7 @@ impl Cartridge {
         );
     }
 
-    pub fn set_mbc3(&mut self, ram: bool, battery: bool, timer: bool) {
+    pub fn set_mbc3(&mut self, ram: bool, battery: bool, timer: bool, logged_in: bool) {
         self.mbc = MBC::MBC3(
             MBC3::new(
                 ram,
@@ -52,7 +50,8 @@ impl Cartridge {
                 self.rom_size,
                 self.ram_size,
                 self.save_path.clone(),
-                self.is_desktop
+                self.is_desktop,
+                logged_in
             )
         );
     }
@@ -113,11 +112,11 @@ impl Cartridge {
         }
     }
 
-    pub fn set_save_file(&mut self, file: Option<File>) {
+    pub fn clear_save_file(&mut self) {
         match &mut self.mbc {
-            MBC::MBC1(mbc) => mbc.backup_file.file = file,
-            MBC::MBC3(mbc) => mbc.backup_file.file = file,
-            MBC::MBC5(mbc) => mbc.backup_file.file = file,
+            MBC::MBC1(mbc) => mbc.backup_file.file = None,
+            MBC::MBC3(mbc) => mbc.backup_file.file = None,
+            MBC::MBC5(mbc) => mbc.backup_file.file = None,
             MBC::None => ()
         }
     }

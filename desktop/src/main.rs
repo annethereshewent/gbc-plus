@@ -83,8 +83,6 @@ fn main() {
 
     let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 
-    cpu.load_rom(&rom_bytes);
-
     let cloud_service_clone = frontend.cloud_service.clone();
 
     let mut logged_in = {
@@ -93,16 +91,20 @@ fn main() {
 
     let mut save_bytes: Option<Vec<u8>> = None;
 
-    if logged_in {
-        cpu.bus.cartridge.set_save_file(None);
+    cpu.load_rom(&rom_bytes, logged_in);
 
-        let data = frontend.cloud_service.lock().unwrap().get_save();
+    if logged_in {
+        cpu.bus.cartridge.clear_save_file();
+
+        let data = frontend.cloud_service.lock().unwrap().get_file(None);
 
         if data.len() > 0 {
             cpu.bus.cartridge.load_save(&data);
 
             save_bytes = Some(data);
         }
+
+        frontend.load_rtc(&mut cpu);
     }
 
     loop {
@@ -112,7 +114,7 @@ fn main() {
 
         frontend.clear_framebuffer();
 
-        frontend.update_rtc(&mut cpu);
+        frontend.update_rtc(&mut cpu, logged_in, false);
         frontend.check_saves(&mut cpu, logged_in);
         frontend.render_screen(&mut cpu);
         frontend.render_ui(

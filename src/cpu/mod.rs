@@ -130,11 +130,11 @@ impl CPU {
         }
     }
 
-    pub fn load_rom(&mut self, bytes: &[u8]) {
+    pub fn load_rom(&mut self, bytes: &[u8], logged_in: bool) {
         self.bus.cartridge.rom = bytes.to_vec();
 
         self.check_cgb_header();
-        self.bus.check_header();
+        self.bus.check_header(logged_in);
     }
 
     pub fn reload_rom(&mut self, bytes: &[u8]) {

@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 use crate::cpu::bus::cartridge::backup_file::BackupFile;
 
 #[derive(Serialize, Deserialize)]
-struct RtcFile {
+pub struct RtcFile {
     timestamp: usize,
     carry_bit: bool,
-    halted: bool
+    halted: bool,
+    num_wraps: usize
 }
 
 impl RtcFile {
@@ -17,12 +18,14 @@ impl RtcFile {
         timestamp: usize,
         halted: bool,
         carry_bit: bool,
+        num_wraps: usize
     ) -> Self
     {
         Self {
             timestamp,
             carry_bit,
-            halted
+            halted,
+            num_wraps
         }
     }
 }
@@ -52,7 +55,7 @@ impl ClockRegister {
 pub struct MBC3 {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    start: DateTime<Local>,
+    pub start: DateTime<Local>,
     rom_bank: u8,
     ram_bank: u8,
     timer_ram_enable: bool,
@@ -65,13 +68,15 @@ pub struct MBC3 {
     clock_latched: bool,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    rtc_file: Option<File>,
-    carry_bit: bool,
+    pub rtc_file: Option<File>,
+    pub carry_bit: bool,
     previous_wrapped_days: u16,
-    halted: bool,
+    pub halted: bool,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    halted_elapsed: TimeDelta
+    halted_elapsed: TimeDelta,
+    pub num_wraps: usize,
+    pub is_dirty: bool
 }
 
 impl MBC3 {
@@ -116,7 +121,8 @@ impl MBC3 {
             let rtc_json = RtcFile::new(
                 self.start.timestamp() as usize,
                 self.halted,
-                self.carry_bit
+                self.carry_bit,
+                self.num_wraps
             );
             serde_json::to_string::<RtcFile>(&rtc_json).unwrap_or("".to_string())
         } else {
@@ -146,7 +152,8 @@ impl MBC3 {
         let rtc_json = RtcFile::new(
             self.start.timestamp() as usize,
             self.halted,
-            self.carry_bit
+            self.carry_bit,
+            self.num_wraps
         );
 
 
@@ -270,7 +277,14 @@ impl MBC3 {
 
         let previous_halted = self.halted;
 
+        let previous_carry = self.carry_bit;
+
         self.carry_bit = ((self.latch_clock.rtc_dh >> 7) & 0x1) == 1;
+
+        if previous_carry != self.carry_bit {
+            self.is_dirty = true;
+        }
+
         self.halted = ((self.latch_clock.rtc_dh >> 6) & 0x1) == 1;
 
         if !previous_halted && self.halted {
@@ -294,23 +308,26 @@ impl MBC3 {
     fn update_rtc_latch(&mut self) {
         let now = Local::now();
 
-        let delta = if self.halted { self.halted_elapsed } else { cmp::max(now.signed_duration_since(self.start), Duration::zero()) };
+        let delta = cmp::max(now.signed_duration_since(self.start), Duration::zero());
 
         let seconds = delta.num_seconds() % 60;
         let minutes = (delta.num_seconds() / 60) % 60;
         let hours = (delta.num_seconds() / 60 / 60) % 24;
 
-        let days = hours / 24;
+        let days = delta.num_seconds() / 60 / 60 / 24;
+
+        let num_wraps = days / 0x1ff;
+
+        if num_wraps as usize > self.num_wraps {
+            self.carry_bit = true;
+            self.num_wraps = num_wraps as usize;
+            self.is_dirty = true;
+        }
 
         let new_wrapped_days = days & 0x1ff;
 
-        if new_wrapped_days < self.previous_wrapped_days as i64 {
-            self.carry_bit = true;
-        }
-        self.previous_wrapped_days = new_wrapped_days as u16;
-
-        self.latch_clock.rtc_dh = ((days >> 8) & 0x1) as u8 | (self.carry_bit as u8) << 7;
-        self.latch_clock.rtc_dl = days as u8;
+        self.latch_clock.rtc_dh = ((new_wrapped_days >> 8) & 0x1) as u8 | (self.carry_bit as u8) << 7;
+        self.latch_clock.rtc_dl = new_wrapped_days as u8;
         self.latch_clock.rtc_h = hours as u8;
         self.latch_clock.rtc_m = minutes as u8;
         self.latch_clock.rtc_s = seconds as u8;
@@ -331,43 +348,47 @@ impl MBC3 {
         rom_size: usize,
         ram_size: usize,
         save_path: Option<String>,
-        is_desktop: bool
+        is_desktop: bool,
+        logged_in: bool
     ) -> Self {
-        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
-            let mut split_str: Vec<&str> = save_path.split('.').collect();
+        let (start, carry_bit, halted, halted_elapsed, rtc_file, num_wraps) = if let Some(save_path) = &save_path {
+            if has_timer && !logged_in {
+                let mut split_str: Vec<&str> = save_path.split('.').collect();
 
-            split_str.pop();
+                split_str.pop();
 
-            split_str.push("rtc");
+                split_str.push("rtc");
 
-            let rtc_path = split_str.join(".");
+                let rtc_path = split_str.join(".");
 
-            let mut rtc_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(rtc_path)
-                .unwrap();
+                let mut rtc_file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(rtc_path)
+                    .unwrap();
 
-            let mut str = "".to_string();
+                let mut str = "".to_string();
 
-            rtc_file.read_to_string( &mut str).unwrap();
-            rtc_file.seek(SeekFrom::Start(0)).unwrap();
+                rtc_file.read_to_string( &mut str).unwrap();
+                rtc_file.seek(SeekFrom::Start(0)).unwrap();
 
-            let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
-                Ok(result) => {
-                    let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
-                    let halted_elapsed = TimeDelta::new(0, 0).unwrap();
+                let (start, carry_bit, halted, halted_elapsed, num_wraps) = match serde_json::from_str::<RtcFile>(&str) {
+                    Ok(result) => {
+                        let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                        let halted_elapsed = TimeDelta::new(0, 0).unwrap();
 
-                    (start, result.carry_bit, result.halted, halted_elapsed)
-                }
-                Err(_) => (Local::now(), false, false, Duration::seconds(0))
-            };
+                        (start, result.carry_bit, result.halted, halted_elapsed, result.num_wraps)
+                    }
+                    Err(_) => (Local::now(), false, false, Duration::seconds(0), 0)
+                };
 
-            (start, carry_bit, halted, halted_elapsed, Some(rtc_file))
+                (start, carry_bit, halted, halted_elapsed, Some(rtc_file), num_wraps)
+            } else {
+                (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None, 0)
+            }
         } else {
-            // TODO: parse some json sent by web emulator
-            (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
+            (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None, 0)
         };
 
         Self {
@@ -386,7 +407,9 @@ impl MBC3 {
             carry_bit,
             previous_wrapped_days: 0,
             halted,
-            halted_elapsed
+            halted_elapsed,
+            num_wraps,
+            is_dirty: false
         }
     }
 
