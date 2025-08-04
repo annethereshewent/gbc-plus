@@ -1,8 +1,8 @@
 import { reactive } from "../util/reactive"
 
-export interface SaveEntry {
-  gameName: string,
-  data?: Uint8Array
+export interface FileEntry {
+  filename: string,
+  data?: Uint8Array|string
 }
 
 const BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -244,14 +244,12 @@ export class CloudService {
     return params
   }
 
-  async getSaveInfo(gameName: string, searchRoot: boolean = false) {
+  async getFileInfo(name: string, searchRoot: boolean = false) {
     await this.createGbcSavesFolder()
 
-    const fileName = gameName.match(/\.sav$/) ? gameName : `${gameName}.sav`
-
+    const fileName = name.match(/\.sav$/) || name.match(/\.rtc$/) ? name : `${name}.sav`
 
     const query = searchRoot ? `name = "${fileName}"` : `name = "${fileName}" and parents in "${this.gbcFolderId}"`
-
 
     const params = new URLSearchParams({
       q: query,
@@ -267,8 +265,8 @@ export class CloudService {
     }))
   }
 
-  async getSave(gameName: string): Promise<SaveEntry> {
-    const json = await this.getSaveInfo(gameName)
+  async getFile(filename: string, fetchBytes = true): Promise<FileEntry> {
+    const json = await this.getFileInfo(filename)
 
     if (json != null && json.files != null) {
       const file = json.files[0]
@@ -284,22 +282,27 @@ export class CloudService {
           }
         }), true)
 
-        return {
-          gameName,
+        const returnVal = fetchBytes ? {
+          filename,
           data: new Uint8Array((body as ArrayBuffer))
+        } : {
+          filename,
+          data: body as string
         }
+
+        return returnVal
       }
 
     }
 
     return {
-      gameName,
-      data: new Uint8Array(0)
+      filename,
+      data: undefined
     }
   }
 
   async deleteSave(gameName: string): Promise<boolean> {
-    const json = await this.getSaveInfo(gameName)
+    const json = await this.getFileInfo(gameName)
 
     if (json != null && json.files != null) {
       const url = `https://www.googleapis.com/drive/v3/files/${json.files[0].id}`
@@ -317,7 +320,7 @@ export class CloudService {
     return false
   }
 
-  async getSaves(): Promise<SaveEntry[]> {
+  async getSaves(): Promise<FileEntry[]> {
     await this.createGbcSavesFolder()
 
     const params = new URLSearchParams({
@@ -331,11 +334,11 @@ export class CloudService {
       }
     }))
 
-    const saveEntries: SaveEntry[] = []
+    const saveEntries: FileEntry[] = []
     if (json != null && json.files != null) {
       for (const file of json.files) {
         saveEntries.push({
-          gameName: file.name
+          filename: file.name
         })
       }
     }
@@ -343,14 +346,15 @@ export class CloudService {
     return saveEntries
   }
 
-  async uploadSave(gameName: string, bytes: Uint8Array) {
-    const json = await this.getSaveInfo(gameName)
+  async uploadFile(filename: string, bytes: Uint8Array|null, jsonStr: string|null = null) {
+    const json = await this.getFileInfo(filename)
 
     // this is a hack to get it to change the underlying array buffer
     // (so it doesn't save a bunch of junk from memory unrelated to save)
-    const bytesCopy = new Uint8Array(Array.from(bytes))
 
-    const buffer = bytesCopy.buffer
+    const payload: Uint8Array|string = bytes == null ? jsonStr! : new Uint8Array(Array.from(bytes))
+
+    const buffer = bytes == null ? payload : (payload as Uint8Array).buffer
 
     let resultFile: any
     if (json != null && json.files != null) {
@@ -363,7 +367,7 @@ export class CloudService {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/octet-stream",
-            "Content-Length": `${bytes.length}`
+            "Content-Length": `${payload.length}`
           },
           body: buffer
         }))
@@ -376,7 +380,7 @@ export class CloudService {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/octet-stream",
-            "Content-Length": `${bytes.length}`
+            "Content-Length": `${payload.length}`
           },
           body: buffer
         }))
@@ -384,7 +388,7 @@ export class CloudService {
     }
 
     if (resultFile != null) {
-      let fileName = !gameName.match(/\.sav$/) ? `${gameName}.sav` : gameName
+      let fileName = !filename.match(/\.sav$/) && !filename.match(/\.rtc$/) ? `${filename}.sav` : filename
 
       const params = new URLSearchParams({
         uploadType: "media",
