@@ -755,7 +755,7 @@ impl Frontend {
     ) -> Vec<u8> {
         *cpu = CPU::new(producer, Some(waveform_producer), Some(rom_path), false, true);
 
-        cpu.load_rom(rom_bytes);
+        cpu.load_rom(rom_bytes, logged_in);
 
         cpu.bus.ppu.set_dmg_palette(current_palette);
 

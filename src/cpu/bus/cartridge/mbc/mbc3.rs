@@ -65,7 +65,7 @@ pub struct MBC3 {
     clock_latched: bool,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    rtc_file: Option<File>,
+    pub rtc_file: Option<File>,
     pub carry_bit: bool,
     previous_wrapped_days: u16,
     pub halted: bool,
@@ -331,42 +331,46 @@ impl MBC3 {
         rom_size: usize,
         ram_size: usize,
         save_path: Option<String>,
-        is_desktop: bool
+        is_desktop: bool,
+        logged_in: bool
     ) -> Self {
         let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
-            let mut split_str: Vec<&str> = save_path.split('.').collect();
+            if has_timer && !logged_in {
+                let mut split_str: Vec<&str> = save_path.split('.').collect();
 
-            split_str.pop();
+                split_str.pop();
 
-            split_str.push("rtc");
+                split_str.push("rtc");
 
-            let rtc_path = split_str.join(".");
+                let rtc_path = split_str.join(".");
 
-            let mut rtc_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(rtc_path)
-                .unwrap();
+                let mut rtc_file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(rtc_path)
+                    .unwrap();
 
-            let mut str = "".to_string();
+                let mut str = "".to_string();
 
-            rtc_file.read_to_string( &mut str).unwrap();
-            rtc_file.seek(SeekFrom::Start(0)).unwrap();
+                rtc_file.read_to_string( &mut str).unwrap();
+                rtc_file.seek(SeekFrom::Start(0)).unwrap();
 
-            let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
-                Ok(result) => {
-                    let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
-                    let halted_elapsed = TimeDelta::new(0, 0).unwrap();
+                let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
+                    Ok(result) => {
+                        let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
+                        let halted_elapsed = TimeDelta::new(0, 0).unwrap();
 
-                    (start, result.carry_bit, result.halted, halted_elapsed)
-                }
-                Err(_) => (Local::now(), false, false, Duration::seconds(0))
-            };
+                        (start, result.carry_bit, result.halted, halted_elapsed)
+                    }
+                    Err(_) => (Local::now(), false, false, Duration::seconds(0))
+                };
 
-            (start, carry_bit, halted, halted_elapsed, Some(rtc_file))
+                (start, carry_bit, halted, halted_elapsed, Some(rtc_file))
+            } else {
+                (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
+            }
         } else {
-            // TODO: parse some json sent by web emulator
             (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
         };
 

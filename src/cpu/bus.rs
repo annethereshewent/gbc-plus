@@ -256,7 +256,7 @@ impl Bus {
             }
             0xff80..=0xfffe => unsafe { *(&self.hram[(address - 0xff80) as usize] as *const u8 as *const u16) },
             _ => {
-                println!("(mem_read16): invalid address given: 0x{:x}", address);
+                println!("[WARN] (mem_read16): invalid address given: 0x{:x}", address);
                 0xff
             }
         }
@@ -298,7 +298,7 @@ impl Bus {
         self.tick( 640);
     }
 
-    pub fn check_header(&mut self) {
+    pub fn check_header(&mut self, logged_in: bool) {
         let cartridge_type = self.cartridge.rom[CARTRIDGE_TYPE_ADDR];
 
         let rom_size_header = self.cartridge.rom[ROM_SIZE_ADDR];
@@ -332,11 +332,11 @@ impl Bus {
             0x01 => self.cartridge.set_mbc1(false, false),
             0x02 => self.cartridge.set_mbc1(true, false),
             0x03 => self.cartridge.set_mbc1(true, true),
-            0x0f => self.cartridge.set_mbc3(false, true, true),
-            0x10 => self.cartridge.set_mbc3(true, true, true),
-            0x11 => self.cartridge.set_mbc3(false, false, false),
-            0x12 => self.cartridge.set_mbc3(true, false, false),
-            0x13 => self.cartridge.set_mbc3(true, true, false),
+            0x0f => self.cartridge.set_mbc3(false, true, true, logged_in),
+            0x10 => self.cartridge.set_mbc3(true, true, true, logged_in),
+            0x11 => self.cartridge.set_mbc3(false, false, false, logged_in),
+            0x12 => self.cartridge.set_mbc3(true, false, false, logged_in),
+            0x13 => self.cartridge.set_mbc3(true, true, false, logged_in),
             0x19 => self.cartridge.set_mbc5(false, false, false),
             0x1a => self.cartridge.set_mbc5(true, false, false),
             0x1b => self.cartridge.set_mbc5(true, true, false),

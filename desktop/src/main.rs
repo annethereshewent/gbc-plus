@@ -8,7 +8,7 @@ use std::{
 extern crate gbc_plus;
 
 use frontend::Frontend;
-use gbc_plus::cpu::{bus::apu::NUM_SAMPLES, CPU};
+use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, cartridge::mbc::MBC}, CPU};
 use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 
@@ -83,8 +83,6 @@ fn main() {
 
     let mut frontend = Frontend::new(&mut cpu, consumer, waveform_consumer, save_name.to_string());
 
-    cpu.load_rom(&rom_bytes);
-
     let cloud_service_clone = frontend.cloud_service.clone();
 
     let mut logged_in = {
@@ -93,8 +91,10 @@ fn main() {
 
     let mut save_bytes: Option<Vec<u8>> = None;
 
+    cpu.load_rom(&rom_bytes, logged_in);
+
     if logged_in {
-        cpu.bus.cartridge.set_save_file(None);
+        cpu.bus.cartridge.clear_save_file();
 
         let data = frontend.cloud_service.lock().unwrap().get_file(None);
 

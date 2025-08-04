@@ -336,7 +336,7 @@ export class GBC {
         const rtc = await this.cloudService.getFile(this.rtcName, false)
 
         if (rtc.data != null) {
-          this.loadRtc(rtc.data as string)
+          this.loadRtc(JSON.stringify(rtc.data))
         } else {
           this.updateRtc()
         }

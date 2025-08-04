@@ -2,7 +2,13 @@ import { reactive } from "../util/reactive"
 
 export interface FileEntry {
   filename: string,
-  data?: Uint8Array|string
+  data?: Uint8Array|RtcJson
+}
+
+export interface RtcJson {
+  timestamp: number
+  carry_bit: boolean
+  halted: boolean
 }
 
 const BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -280,14 +286,14 @@ export class CloudService {
           headers: {
             Authorization: `Bearer ${this.accessToken}`
           }
-        }), true)
+        }), fetchBytes)
 
         const returnVal = fetchBytes ? {
           filename,
           data: new Uint8Array((body as ArrayBuffer))
         } : {
           filename,
-          data: body as string
+          data: body as RtcJson
         }
 
         return returnVal
@@ -398,7 +404,7 @@ export class CloudService {
 
       const url = `https://www.googleapis.com/drive/v3/files/${resultFile.id}?${params.toString()}`
 
-      const json = await this.cloudRequest(() => fetch(url, {
+      await this.cloudRequest(() => fetch(url, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
