@@ -9,6 +9,7 @@ export interface RtcJson {
   timestamp: number
   carry_bit: boolean
   halted: boolean
+  num_wraps: number
 }
 
 const BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"

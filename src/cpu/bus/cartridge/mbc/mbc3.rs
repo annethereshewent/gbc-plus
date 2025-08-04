@@ -9,7 +9,8 @@ use crate::cpu::bus::cartridge::backup_file::BackupFile;
 pub struct RtcFile {
     timestamp: usize,
     carry_bit: bool,
-    halted: bool
+    halted: bool,
+    num_wraps: usize
 }
 
 impl RtcFile {
@@ -17,12 +18,14 @@ impl RtcFile {
         timestamp: usize,
         halted: bool,
         carry_bit: bool,
+        num_wraps: usize
     ) -> Self
     {
         Self {
             timestamp,
             carry_bit,
-            halted
+            halted,
+            num_wraps
         }
     }
 }
@@ -71,7 +74,8 @@ pub struct MBC3 {
     pub halted: bool,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    halted_elapsed: TimeDelta
+    halted_elapsed: TimeDelta,
+    pub num_wraps: usize
 }
 
 impl MBC3 {
@@ -116,7 +120,8 @@ impl MBC3 {
             let rtc_json = RtcFile::new(
                 self.start.timestamp() as usize,
                 self.halted,
-                self.carry_bit
+                self.carry_bit,
+                self.num_wraps
             );
             serde_json::to_string::<RtcFile>(&rtc_json).unwrap_or("".to_string())
         } else {
@@ -146,7 +151,8 @@ impl MBC3 {
         let rtc_json = RtcFile::new(
             self.start.timestamp() as usize,
             self.halted,
-            self.carry_bit
+            self.carry_bit,
+            self.num_wraps
         );
 
 
@@ -302,15 +308,17 @@ impl MBC3 {
 
         let days = hours / 24;
 
+        let num_wraps = days / 0x1ff;
+
+        if num_wraps as usize > self.num_wraps {
+            self.carry_bit = true;
+            self.num_wraps += 1;
+        }
+
         let new_wrapped_days = days & 0x1ff;
 
-        if new_wrapped_days < self.previous_wrapped_days as i64 {
-            self.carry_bit = true;
-        }
-        self.previous_wrapped_days = new_wrapped_days as u16;
-
-        self.latch_clock.rtc_dh = ((days >> 8) & 0x1) as u8 | (self.carry_bit as u8) << 7;
-        self.latch_clock.rtc_dl = days as u8;
+        self.latch_clock.rtc_dh = ((new_wrapped_days >> 8) & 0x1) as u8 | (self.carry_bit as u8) << 7;
+        self.latch_clock.rtc_dl = new_wrapped_days as u8;
         self.latch_clock.rtc_h = hours as u8;
         self.latch_clock.rtc_m = minutes as u8;
         self.latch_clock.rtc_s = seconds as u8;
@@ -334,7 +342,7 @@ impl MBC3 {
         is_desktop: bool,
         logged_in: bool
     ) -> Self {
-        let (start, carry_bit, halted, halted_elapsed, rtc_file) = if let Some(save_path) = &save_path {
+        let (start, carry_bit, halted, halted_elapsed, rtc_file, num_wraps) = if let Some(save_path) = &save_path {
             if has_timer && !logged_in {
                 let mut split_str: Vec<&str> = save_path.split('.').collect();
 
@@ -356,22 +364,22 @@ impl MBC3 {
                 rtc_file.read_to_string( &mut str).unwrap();
                 rtc_file.seek(SeekFrom::Start(0)).unwrap();
 
-                let (start, carry_bit, halted, halted_elapsed) = match serde_json::from_str::<RtcFile>(&str) {
+                let (start, carry_bit, halted, halted_elapsed, num_wraps) = match serde_json::from_str::<RtcFile>(&str) {
                     Ok(result) => {
                         let start = Local.timestamp_opt(result.timestamp as i64, 0).unwrap();
                         let halted_elapsed = TimeDelta::new(0, 0).unwrap();
 
-                        (start, result.carry_bit, result.halted, halted_elapsed)
+                        (start, result.carry_bit, result.halted, halted_elapsed, result.num_wraps)
                     }
-                    Err(_) => (Local::now(), false, false, Duration::seconds(0))
+                    Err(_) => (Local::now(), false, false, Duration::seconds(0), 0)
                 };
 
-                (start, carry_bit, halted, halted_elapsed, Some(rtc_file))
+                (start, carry_bit, halted, halted_elapsed, Some(rtc_file), num_wraps)
             } else {
-                (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
+                (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None, 0)
             }
         } else {
-            (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None)
+            (Local::now(), false, false, TimeDelta::new(0, 0).unwrap(), None, 0)
         };
 
         Self {
@@ -390,7 +398,8 @@ impl MBC3 {
             carry_bit,
             previous_wrapped_days: 0,
             halted,
-            halted_elapsed
+            halted_elapsed,
+            num_wraps
         }
     }
 

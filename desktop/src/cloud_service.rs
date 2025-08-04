@@ -330,7 +330,7 @@ impl CloudService {
       self.check_for_gbc_folder();
     }
 
-    let json = self.get_file_info(game_name);
+    let json = self.get_file_info(game_name.clone());
 
     let mut headers = HeaderMap::new();
 
@@ -365,13 +365,13 @@ impl CloudService {
 
     if response.status() == StatusCode::OK {
       // move and rename file
-      self.rename_save(response);
+      self.rename_save(response, game_name);
     } else {
       println!("Warning: Couldn't upload save to cloud! status code: {}", response.status());
     }
   }
 
-  fn rename_save(&mut self, response: Response) {
+  fn rename_save(&mut self, response: Response, file_name: String) {
     self.refresh_token_if_needed();
 
     let file: File = response.json().unwrap();
@@ -385,7 +385,7 @@ impl CloudService {
     let url = format!("https://www.googleapis.com/drive/v3/files/{}?{}", file.id, query_string);
 
     let json = FileJson {
-      name: self.game_name.clone(),
+      name: file_name,
       mimeType: "application/octet-stream".to_string()
     };
 

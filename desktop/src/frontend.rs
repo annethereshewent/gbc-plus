@@ -589,7 +589,8 @@ impl Frontend {
                             let rtc_json = RtcFile::new(
                                 mbc3.start.timestamp() as usize,
                                 mbc3.halted,
-                                mbc3.carry_bit
+                                mbc3.carry_bit,
+                                mbc3.num_wraps
                             );
 
                             let json_str = serde_json::to_string::<RtcFile>(&rtc_json).unwrap();

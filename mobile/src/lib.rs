@@ -205,7 +205,7 @@ impl GBCMobileEmulator {
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
-        self.cpu.load_rom(data);
+        self.cpu.load_rom(data, false);
     }
 
     pub fn step_frame(&mut self) {
