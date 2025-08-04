@@ -273,7 +273,7 @@ export class GBC {
   }
 
   updateFps() {
-    document.getElementById("fps-counter")!.innerText = `${this.fps}`
+    document.getElementById("fps-counter")!.innerText = `${this.fps} FPS`
   }
 
   runFrame(time: number) {
