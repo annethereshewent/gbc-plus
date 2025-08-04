@@ -8,7 +8,7 @@ use std::{
 extern crate gbc_plus;
 
 use frontend::Frontend;
-use gbc_plus::cpu::{bus::{apu::NUM_SAMPLES, cartridge::mbc::MBC}, CPU};
+use gbc_plus::cpu::{bus::apu::NUM_SAMPLES, CPU};
 use ringbuf::{traits::Split, HeapRb};
 use zip::ZipArchive;
 

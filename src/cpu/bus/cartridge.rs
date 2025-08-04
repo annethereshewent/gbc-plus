@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use mbc::{mbc1::MBC1, mbc3::MBC3, mbc5::MBC5, MBC};
 use serde::{Deserialize, Serialize};
 
