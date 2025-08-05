@@ -84,16 +84,61 @@ use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;
 
-const BUTTON_CROSS: u8 = 0;
-const BUTTON_SQUARE: u8 = 2;
-const BUTTON_SELECT: u8 = 4;
-const BUTTON_START: u8 = 6;
-const LEFT_THUMBSTICK: u8 = 7;
-const RIGHT_THUMBSTICK: u8 = 8;
-const BUTTON_UP: u8 = 11;
-const BUTTON_DOWN: u8 = 12;
-const BUTTON_LEFT: u8 = 13;
-const BUTTON_RIGHT: u8 = 14;
+#[derive(Debug, Copy, Clone)]
+enum ButtonIndex {
+    Cross = 0,
+    Circle = 1,
+    Square = 2,
+    Triangle = 3,
+    Select = 4,
+    Home = 5,
+    Start = 6,
+    LeftThumbstick = 7,
+    RightThumbstick = 8,
+    L1 = 9,
+    R1 = 10,
+    Up = 11,
+    Down = 12,
+    Left = 13,
+    Right = 14,
+    Touchpad = 15
+}
+
+impl ButtonIndex {
+    pub fn to_string(&self) -> String {
+        let mut val = format!("{:?}", self);
+
+        if val == "LeftThumbstick" {
+            val = "Left thumbstick".to_string();
+        } else if val == "RightThumbstick" {
+            val = "Right thumbstick".to_string();
+        }
+
+        val
+    }
+
+    pub fn to_index(val: u8) -> Self {
+        match val {
+            0 => ButtonIndex::Cross,
+            1 => ButtonIndex::Circle,
+            2 => ButtonIndex::Square,
+            3 => ButtonIndex::Triangle,
+            4 => ButtonIndex::Select,
+            5 => ButtonIndex::Home,
+            6 => ButtonIndex::Start,
+            7 => ButtonIndex::LeftThumbstick,
+            8 => ButtonIndex::RightThumbstick,
+            9 => ButtonIndex::L1,
+            10 => ButtonIndex::R1,
+            11 => ButtonIndex::Up,
+            12 => ButtonIndex::Down,
+            13 => ButtonIndex::Left,
+            14 => ButtonIndex::Right,
+            15 => ButtonIndex::Touchpad,
+            _ => panic!("invalid value given to to_index: {val}")
+        }
+    }
+}
 
 const WAVEFORM_LENGTH: usize = 683;
 const WAVEFORM_HEIGHT: usize = 256;
@@ -116,6 +161,13 @@ const ACTIONS: [&str; 8] = [
     "Down",
     "Left",
     "Right",
+    "Select",
+    "Start",
+    "B",
+    "A"
+];
+
+const JOY_ACTIONS: [&str; 4] = [
     "Select",
     "Start",
     "B",
@@ -168,7 +220,9 @@ pub struct Frontend {
     show_bindings_popup: bool,
     ctrl_strs_to_buttons: HashMap<String, JoypadButtons>,
     current_input: Option<JoypadButtons>,
-    current_action: Option<usize>
+    current_joy_input: Option<JoypadButtons>,
+    current_action: Option<usize>,
+    button_to_index: HashMap<JoypadButtons, ButtonIndex>
 }
 
 pub struct GbcAudioCallback {
@@ -446,27 +500,26 @@ impl Frontend {
         let event_pump = sdl_context.event_pump().unwrap();
 
         let button_map = HashMap::from([
-            (BUTTON_CROSS, JoypadButtons::A),
-            (BUTTON_SQUARE, JoypadButtons::B),
-            (BUTTON_SELECT, JoypadButtons::Select),
-            (BUTTON_START, JoypadButtons::Start),
-            (BUTTON_UP, JoypadButtons::Up),
-            (BUTTON_DOWN, JoypadButtons::Down),
-            (BUTTON_LEFT, JoypadButtons::Left),
-            (BUTTON_RIGHT, JoypadButtons::Right)
+            (ButtonIndex::Cross as u8, JoypadButtons::A),
+            (ButtonIndex::Square as u8, JoypadButtons::B),
+            (ButtonIndex::Select as u8, JoypadButtons::Select),
+            (ButtonIndex::Start as u8, JoypadButtons::Start),
+            (ButtonIndex::Up as u8, JoypadButtons::Up),
+            (ButtonIndex::Down as u8, JoypadButtons::Down),
+            (ButtonIndex::Left as u8, JoypadButtons::Left),
+            (ButtonIndex::Right as u8, JoypadButtons::Right)
         ]);
 
         let keyboard_map = HashMap::from([
-                (Keycode::W, JoypadButtons::Up),
-                (Keycode::S, JoypadButtons::Down),
-                (Keycode::A, JoypadButtons::Left),
-                (Keycode::D, JoypadButtons::Right),
-                (Keycode::J, JoypadButtons::B),
-                (Keycode::K, JoypadButtons::A),
-                (Keycode::Tab, JoypadButtons::Select),
-                (Keycode::Return, JoypadButtons::Start)
-            ]
-        );
+            (Keycode::W, JoypadButtons::Up),
+            (Keycode::S, JoypadButtons::Down),
+            (Keycode::A, JoypadButtons::Left),
+            (Keycode::D, JoypadButtons::Right),
+            (Keycode::J, JoypadButtons::B),
+            (Keycode::K, JoypadButtons::A),
+            (Keycode::Tab, JoypadButtons::Select),
+            (Keycode::Return, JoypadButtons::Start)
+        ]);
 
         let mut config_path = data_dir().expect("Couldn't find application directory");
 
@@ -548,8 +601,20 @@ impl Frontend {
                 (JoypadButtons::A, Keycode::K),
                 (JoypadButtons::B, Keycode::J)
             ]),
+            button_to_index: HashMap::from([
+                (JoypadButtons::Up, ButtonIndex::Up),
+                (JoypadButtons::Down, ButtonIndex::Down),
+                (JoypadButtons::Left, ButtonIndex::Left),
+                (JoypadButtons::Right, ButtonIndex::Right),
+                (JoypadButtons::Select, ButtonIndex::Select),
+                (JoypadButtons::Start, ButtonIndex::Start),
+                (JoypadButtons::A, ButtonIndex::Cross),
+                (JoypadButtons::B, ButtonIndex::Square)
+
+            ]),
             current_input: None,
-            current_action: None
+            current_action: None,
+            current_joy_input: None
         }
     }
 
@@ -990,6 +1055,36 @@ impl Frontend {
                         tab.end();
                     }
                     if let Some(tab) = ui.tab_item("Joypad") {
+                        let cursor = ui.cursor_pos();
+
+                        ui.set_cursor_pos([cursor[0], cursor[1] + 20.0]);
+
+                        for i in 0..JOY_ACTIONS.len() {
+                            let action = JOY_ACTIONS[i];
+
+                            ui.separator();
+
+                            let mut color = [1.0, 1.0, 1.0, 1.0];
+
+                            let button = *self.ctrl_strs_to_buttons.get(action).unwrap();
+
+                            if let Some(current_input) = self.current_joy_input {
+                                if current_input == button {
+                                    color = [0.0, 1.0, 0.0, 1.0];
+                                }
+                            }
+
+                            ui.text_colored(color, format!("{action}"));
+
+                            ui.same_line_with_spacing(100.0, 0.0);
+
+                            let button_index = *self.button_to_index.get(&button).unwrap();
+
+                            if ui.button_with_size(format!("{}", button_index.to_string()), [button_width, button_height]) {
+                                self.current_joy_input = Some(button);
+                                self.current_action = Some(i);
+                            }
+                        }
                         tab.end();
                     }
 
@@ -1434,26 +1529,56 @@ impl Frontend {
                     }
                 }
                 Event::JoyButtonDown { button_idx, .. } => {
-                    if let Some(button) = self.button_map.get(&button_idx) {
-                        self.display_ui = false;
-                        cpu.bus.joypad.press_button(*button);
-                    } else if button_idx == LEFT_THUMBSTICK {
-                        Self::create_quick_state(cpu, save_name.to_string());
-                    } else if button_idx == RIGHT_THUMBSTICK {
-                        let dir = Self::get_quick_save_path(save_name.to_string());
+                    if let Some(current_input) = self.current_joy_input {
+                        if let Some(old_index) = self.button_to_index.get(&current_input) {
+                            let old_index_u8 = *old_index as u8;
+                            let old_index = *old_index;
+                            self.button_map.remove(&old_index_u8);
 
-                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+                            if let Some(old_button) = self.button_map.get(&button_idx) {
+                                let old_button = *old_button;
 
-                        let (producer, consumer) = ringbuffer.split();
+                                self.button_map.insert(old_index_u8, old_button);
+                                self.button_to_index.insert(old_button, old_index);
+                            }
+                        }
 
-                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+                        self.button_map.insert(button_idx, current_input);
+                        self.button_to_index.insert(current_input, ButtonIndex::to_index(button_idx));
 
-                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+                        if let Some(current_action) = &mut self.current_action {
+                            *current_action += 1;
+                            if *current_action < JOY_ACTIONS.len() {
+                                let input = *self.ctrl_strs_to_buttons.get(JOY_ACTIONS[*current_action]).unwrap();
+                                self.current_joy_input = Some(input);
 
-                        Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+                            } else {
+                                self.current_joy_input = None;
+                                self.current_action = None;
+                            }
+                        }
+                    } else {
+                        if let Some(button) = self.button_map.get(&button_idx) {
+                            self.display_ui = false;
+                            cpu.bus.joypad.press_button(*button);
+                        } else if button_idx == ButtonIndex::LeftThumbstick as u8 {
+                            Self::create_quick_state(cpu, save_name.to_string());
+                        } else if button_idx == ButtonIndex::RightThumbstick as u8 {
+                            let dir = Self::get_quick_save_path(save_name.to_string());
 
-                        self.wave_consumer = waveform_consumer;
-                        self.device.lock().consumer = consumer;
+                            let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                            let (producer, consumer) = ringbuffer.split();
+
+                            let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                            let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                            Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+
+                            self.wave_consumer = waveform_consumer;
+                            self.device.lock().consumer = consumer;
+                        }
                     }
                 }
                 Event::JoyButtonUp { button_idx, .. } => {
