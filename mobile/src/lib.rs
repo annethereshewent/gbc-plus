@@ -13,8 +13,8 @@ use ringbuf::{
     SharedRb
 };
 
-const BUTTON_CROSS: usize = 0;
-const BUTTON_CIRCLE: usize = 1;
+const BUTTON_B: usize = 0;
+const BUTTON_A: usize = 1;
 // const BUTTON_SQUARE: usize = 2;
 // const BUTTON_TRIANGLE: usize = 3;
 const SELECT: usize = 4;
@@ -132,8 +132,8 @@ pub struct GBCMobileEmulator {
 impl GBCMobileEmulator {
     pub fn new() -> Self {
         let joypad_map = HashMap::<usize, JoypadButtons>::from([
-            (BUTTON_CIRCLE, JoypadButtons::A),
-            (BUTTON_CROSS, JoypadButtons::B),
+            (BUTTON_A, JoypadButtons::A),
+            (BUTTON_B, JoypadButtons::B),
             (SELECT, JoypadButtons::Select),
             (START, JoypadButtons::Start),
             (UP, JoypadButtons::Up),

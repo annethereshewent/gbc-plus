@@ -32,6 +32,23 @@
 .show {
   display: block;
 }
+#key-mappings {
+  .checkmark {
+    color: green;
+    display: none;
+    margin-top: 10px;
+  }
+  input {
+    margin-bottom: 20px;
+  }
+  .button-row {
+    text-align: center;
+    margin-top: 20px;
+  }
+}
+#controller-mappings-form {
+  display: none;
+}
 .canvas-wrapper {
   margin: 150px auto;
   height: 100%;

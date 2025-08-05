@@ -899,6 +899,36 @@ export class GBC {
     }
   }
 
+  showControllerMappingsModal() {
+    this.emulator!.set_pause(true)
+    const el = document.getElementById("controller-mappings-modal")!
+
+    el.style.display = 'block'
+    el.className = 'modal show'
+  }
+
+  showKeyboardTab() {
+    this.showTab("keyboard-mappings-form", "controller-mappings-form", "keyboard-tab", "controller-tab")
+  }
+
+  showControllerTab() {
+    this.showTab("controller-mappings-form", "keyboard-mappings-form", "controller-tab", "keyboard-tab")
+  }
+
+  showTab(formElId: string, hiddenElId: string, activeTab: string, hiddenTab: string) {
+    const formEl = document.getElementById(formElId)!
+
+    formEl.style.display = "block"
+
+    const hiddenEl = document.getElementById(hiddenElId)!
+
+    hiddenEl.style.display = "none"
+
+    document.getElementById(activeTab)!.className += "is-active"
+
+    document.getElementById(hiddenTab)!.className = document.getElementById(hiddenTab)!.className.replace("is-active", "").trim()
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
@@ -910,6 +940,8 @@ export class GBC {
         closeButton.addEventListener("click", () => {
           this.emulator!.set_pause(false)
           const modals = document.getElementsByClassName("modal")
+
+          this.joypad.cancelMappings()
 
           if (modals != null) {
             for (const modal of modals) {
@@ -932,6 +964,10 @@ export class GBC {
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
     document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
+    document.getElementById("controller-mappings")?.addEventListener("click", () => this.showControllerMappingsModal())
+    document.getElementById("mappings-cancel-button")?.addEventListener("click", () => this.joypad.cancelMappings())
+    document.getElementById("keyboard-tab")?.addEventListener("click", () => this.showKeyboardTab())
+    document.getElementById("controller-tab")?.addEventListener("click", () => this.showControllerTab())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {
@@ -963,32 +999,13 @@ export class GBC {
           ev.preventDefault()
 
           this.emulator?.set_pause(false)
-          const savesModal = document.getElementById('saves-modal')
 
-          if (savesModal != null) {
-            savesModal.className = 'modal hide'
-            savesModal.style.display = 'none'
-          }
+          const modals = document.getElementsByClassName('modal')
 
-          const helpModal = document.getElementById('help-modal')!
-
-          if (helpModal != null) {
-            helpModal.className = 'modal hide'
-            helpModal.style.display = 'none'
-          }
-
-          const statesModal = document.getElementById('states-modal')
-
-          if (statesModal != null) {
-            statesModal.className = 'modal hide'
-            statesModal.style.display = 'none'
-          }
-
-          const palettesModal = document.getElementById('color-palettes-modal')
-
-          if (palettesModal != null) {
-            palettesModal.className = 'modal hide'
-            palettesModal.style.display = 'none'
+          for (const modal of modals) {
+            const modalEl = modal as HTMLElement
+            modalEl.className = 'modal hide'
+            modalEl.style.display = 'none'
           }
 
           break

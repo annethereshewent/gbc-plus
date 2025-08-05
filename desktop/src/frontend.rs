@@ -54,6 +54,7 @@ use gbc_plus::cpu::{
 };
 use imgui_sdl2_support::SdlPlatform;
 use native_dialog::FileDialog;
+use num_enum::TryFromPrimitive;
 use ringbuf::{
     storage::Heap, traits::{
         Consumer,
@@ -84,16 +85,40 @@ use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;
 
-const BUTTON_CROSS: u8 = 0;
-const BUTTON_SQUARE: u8 = 2;
-const BUTTON_SELECT: u8 = 4;
-const BUTTON_START: u8 = 6;
-const LEFT_THUMBSTICK: u8 = 7;
-const RIGHT_THUMBSTICK: u8 = 8;
-const BUTTON_UP: u8 = 11;
-const BUTTON_DOWN: u8 = 12;
-const BUTTON_LEFT: u8 = 13;
-const BUTTON_RIGHT: u8 = 14;
+#[derive(Debug, Copy, Clone, TryFromPrimitive, Serialize, Deserialize)]
+#[repr(u8)]
+enum ButtonIndex {
+    Cross = 0,
+    Circle = 1,
+    Square = 2,
+    Triangle = 3,
+    Select = 4,
+    Home = 5,
+    Start = 6,
+    LeftThumbstick = 7,
+    RightThumbstick = 8,
+    L1 = 9,
+    R1 = 10,
+    Up = 11,
+    Down = 12,
+    Left = 13,
+    Right = 14,
+    Touchpad = 15
+}
+
+impl ButtonIndex {
+    pub fn to_string(&self) -> String {
+        let mut val = format!("{:?}", self);
+
+        if val == "LeftThumbstick" {
+            val = "Left thumbstick".to_string();
+        } else if val == "RightThumbstick" {
+            val = "Right thumbstick".to_string();
+        }
+
+        val
+    }
+}
 
 const WAVEFORM_LENGTH: usize = 683;
 const WAVEFORM_HEIGHT: usize = 256;
@@ -111,15 +136,41 @@ const THEME_NAMES: [&str; 10] = [
     "Void dream"
 ];
 
+const ACTIONS: [&str; 8] = [
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "Select",
+    "Start",
+    "B",
+    "A"
+];
+
+const JOY_ACTIONS: [&str; 4] = [
+    "Select",
+    "Start",
+    "B",
+    "A"
+];
+
 #[derive(Serialize, Deserialize)]
 struct EmuConfig {
-    current_palette: usize
+    current_palette: usize,
+    button_map: HashMap<u8, JoypadButtons>,
+    button_to_keys: HashMap<JoypadButtons, String>,
+    button_to_index: HashMap<JoypadButtons, ButtonIndex>,
+    keyboard_map: HashMap<String, JoypadButtons>,
 }
 
 impl EmuConfig {
     pub fn new() -> Self {
         Self {
-            current_palette: 1
+            current_palette: 1,
+            button_map: HashMap::new(),
+            keyboard_map: HashMap::new(),
+            button_to_index: HashMap::new(),
+            button_to_keys: HashMap::new()
         }
     }
 }
@@ -130,6 +181,7 @@ pub struct Frontend {
     event_pump: EventPump,
     button_map: HashMap<u8, JoypadButtons>,
     keyboard_map: HashMap<Keycode, JoypadButtons>,
+    button_to_keycode: HashMap<JoypadButtons, Keycode>,
     controller_id: Option<u32>,
     game_controller_subsystem: GameControllerSubsystem,
     retry_attempts: usize,
@@ -152,7 +204,13 @@ pub struct Frontend {
     file_to_delete: Option<PathBuf>,
     confirm_delete_dialog: bool,
     show_palette_picker_popup: bool,
-    last_check: Option<u128>
+    last_check: Option<u128>,
+    show_bindings_popup: bool,
+    ctrl_strs_to_buttons: HashMap<String, JoypadButtons>,
+    current_input: Option<JoypadButtons>,
+    current_joy_input: Option<JoypadButtons>,
+    current_action: Option<usize>,
+    button_to_index: HashMap<JoypadButtons, ButtonIndex>
 }
 
 pub struct GbcAudioCallback {
@@ -429,28 +487,50 @@ impl Frontend {
 
         let event_pump = sdl_context.event_pump().unwrap();
 
-        let button_map = HashMap::from([
-            (BUTTON_CROSS, JoypadButtons::A),
-            (BUTTON_SQUARE, JoypadButtons::B),
-            (BUTTON_SELECT, JoypadButtons::Select),
-            (BUTTON_START, JoypadButtons::Start),
-            (BUTTON_UP, JoypadButtons::Up),
-            (BUTTON_DOWN, JoypadButtons::Down),
-            (BUTTON_LEFT, JoypadButtons::Left),
-            (BUTTON_RIGHT, JoypadButtons::Right)
+        let mut button_map = HashMap::from([
+            (ButtonIndex::Cross as u8, JoypadButtons::A),
+            (ButtonIndex::Square as u8, JoypadButtons::B),
+            (ButtonIndex::Select as u8, JoypadButtons::Select),
+            (ButtonIndex::Start as u8, JoypadButtons::Start),
+            (ButtonIndex::Up as u8, JoypadButtons::Up),
+            (ButtonIndex::Down as u8, JoypadButtons::Down),
+            (ButtonIndex::Left as u8, JoypadButtons::Left),
+            (ButtonIndex::Right as u8, JoypadButtons::Right)
         ]);
 
-        let keyboard_map = HashMap::from([
-                (Keycode::W, JoypadButtons::Up),
-                (Keycode::S, JoypadButtons::Down),
-                (Keycode::A, JoypadButtons::Left),
-                (Keycode::D, JoypadButtons::Right),
-                (Keycode::J, JoypadButtons::B),
-                (Keycode::K, JoypadButtons::A),
-                (Keycode::LShift, JoypadButtons::Select),
-                (Keycode::Return, JoypadButtons::Start)
-            ]
-        );
+        let mut button_to_index = HashMap::from([
+            (JoypadButtons::Up, ButtonIndex::Up),
+            (JoypadButtons::Down, ButtonIndex::Down),
+            (JoypadButtons::Left, ButtonIndex::Left),
+            (JoypadButtons::Right, ButtonIndex::Right),
+            (JoypadButtons::Select, ButtonIndex::Select),
+            (JoypadButtons::Start, ButtonIndex::Start),
+            (JoypadButtons::A, ButtonIndex::Cross),
+            (JoypadButtons::B, ButtonIndex::Square)
+
+        ]);
+
+        let mut button_to_keys = HashMap::from([
+            (JoypadButtons::Up, Keycode::W),
+            (JoypadButtons::Down, Keycode::S),
+            (JoypadButtons::Left, Keycode::A),
+            (JoypadButtons::Right, Keycode::D),
+            (JoypadButtons::Select, Keycode::Tab),
+            (JoypadButtons::Start, Keycode::Return),
+            (JoypadButtons::A, Keycode::K),
+            (JoypadButtons::B, Keycode::J)
+        ]);
+
+        let mut keyboard_map = HashMap::from([
+            (Keycode::W, JoypadButtons::Up),
+            (Keycode::S, JoypadButtons::Down),
+            (Keycode::A, JoypadButtons::Left),
+            (Keycode::D, JoypadButtons::Right),
+            (Keycode::J, JoypadButtons::B),
+            (Keycode::K, JoypadButtons::A),
+            (Keycode::Tab, JoypadButtons::Select),
+            (Keycode::Return, JoypadButtons::Start)
+        ]);
 
         let mut config_path = data_dir().expect("Couldn't find application directory");
 
@@ -461,11 +541,11 @@ impl Frontend {
         config_path.push("config.json");
 
         let mut config_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(&config_path)
-                .unwrap();
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&config_path)
+            .unwrap();
 
         let mut str: String = "".to_string();
 
@@ -478,6 +558,24 @@ impl Frontend {
         match serde_json::from_str(&str) {
             Ok(config_json) => config = config_json,
             Err(_) => ()
+        }
+
+        if config.button_map.len() == 8 {
+            button_map = config.button_map.clone();
+            button_to_index = config.button_to_index.clone();
+
+        }
+        if config.keyboard_map.len() == 8 {
+            let mut keyboard_map_clone = HashMap::<Keycode, JoypadButtons>::new();
+            let mut button_to_keys_clone = HashMap::<JoypadButtons, Keycode>::new();
+
+            for (key, value) in config.keyboard_map.clone() {
+                keyboard_map_clone.insert(Keycode::from_name(&key).unwrap(), value);
+                button_to_keys_clone.insert(value, Keycode::from_name(&key).unwrap());
+            }
+
+            keyboard_map = keyboard_map_clone;
+            button_to_keys = button_to_keys_clone;
         }
 
         cpu.bus.ppu.set_dmg_palette(config.current_palette);
@@ -510,7 +608,23 @@ impl Frontend {
             display_ui: true,
             file_to_delete: None,
             confirm_delete_dialog: false,
-            show_palette_picker_popup: false
+            show_palette_picker_popup: false,
+            show_bindings_popup: false,
+            ctrl_strs_to_buttons:  HashMap::from([
+                ("Up".to_string(), JoypadButtons::Up),
+                ("Down".to_string(), JoypadButtons::Down),
+                ("Left".to_string(), JoypadButtons::Left),
+                ("Right".to_string(), JoypadButtons::Right),
+                ("Start".to_string(), JoypadButtons::Start),
+                ("Select".to_string(), JoypadButtons::Select),
+                ("A".to_string(), JoypadButtons::A),
+                ("B".to_string(), JoypadButtons::B)
+            ]),
+            button_to_keycode: button_to_keys,
+            button_to_index,
+            current_input: None,
+            current_action: None,
+            current_joy_input: None
         }
     }
 
@@ -839,9 +953,12 @@ impl Frontend {
 
         let ui = self.imgui.new_frame();
 
-        let mut previous_logged_in = *logged_in;
+        let previous_logged_in = *logged_in;
 
         if self.display_ui {
+            if self.show_bindings_popup {
+                ui.open_popup("bindings")
+            }
             if self.confirm_delete_dialog {
                 ui.open_popup("confirm_delete");
             }
@@ -866,15 +983,7 @@ impl Frontend {
 
                         self.config.current_palette = i;
 
-                        let json = match serde_json::to_string(&self.config) {
-                            Ok(result) => result,
-                            Err(_) => "".to_string()
-                        };
-
-                        if json != "" {
-                            self.config_file.seek(SeekFrom::Start(0)).unwrap();
-                            self.config_file.write_all(json.as_bytes()).unwrap();
-                        }
+                        Self::write_config_file(&self.config, &mut self.config_file);
 
                         self.show_palette_picker_popup = false;
                         ui.close_current_popup();
@@ -903,6 +1012,102 @@ impl Frontend {
                     self.confirm_delete_dialog = false;
 
                     ui.close_current_popup();
+                }
+
+                token.end();
+            }
+            if let Some(token) = ui.begin_popup("bindings") {
+                let button_width = 100.0;
+                let button_height = 15.0;
+
+                let popup_width = ui.content_region_avail()[0];
+
+                if let Some(tab_bar) = ui.tab_bar("Controller bindings") {
+                    if let Some(tab) = ui.tab_item("Keyboard") {
+                        let cursor = ui.cursor_pos();
+
+                        ui.set_cursor_pos([cursor[0], cursor[1] + 20.0]);
+
+                        for i in 0..ACTIONS.len() {
+                            let action = ACTIONS[i];
+
+                            ui.separator();
+
+                            let mut color = [1.0, 1.0, 1.0, 1.0];
+
+                            let button = *self.ctrl_strs_to_buttons.get(action).unwrap();
+
+                            if let Some(current_input) = self.current_input {
+                                if current_input == button {
+                                    color = [0.0, 1.0, 0.0, 1.0];
+                                }
+                            }
+
+                            ui.text_colored(color, format!("{action}"));
+
+                            ui.same_line_with_spacing(100.0, 0.0);
+
+                            let keycode = *self.button_to_keycode.get(&button).unwrap();
+
+                            if ui.button_with_size(Keycode::name(keycode), [button_width, button_height]) {
+                                self.current_input = Some(button);
+                                self.current_action = Some(i);
+                            }
+                        }
+                        tab.end();
+                    }
+                    if let Some(tab) = ui.tab_item("Joypad") {
+                        let cursor = ui.cursor_pos();
+
+                        ui.set_cursor_pos([cursor[0], cursor[1] + 20.0]);
+
+                        for i in 0..JOY_ACTIONS.len() {
+                            let action = JOY_ACTIONS[i];
+
+                            ui.separator();
+
+                            let mut color = [1.0, 1.0, 1.0, 1.0];
+
+                            let button = *self.ctrl_strs_to_buttons.get(action).unwrap();
+
+                            if let Some(current_input) = self.current_joy_input {
+                                if current_input == button {
+                                    color = [0.0, 1.0, 0.0, 1.0];
+                                }
+                            }
+
+                            ui.text_colored(color, format!("{action}"));
+
+                            ui.same_line_with_spacing(100.0, 0.0);
+
+                            let button_index = *self.button_to_index.get(&button).unwrap();
+
+                            if ui.button_with_size(format!("{}", button_index.to_string()), [button_width, button_height]) {
+                                self.current_joy_input = Some(button);
+                                self.current_action = Some(i);
+                            }
+                        }
+                        tab.end();
+                    }
+
+                    tab_bar.end();
+                }
+
+                ui.spacing();
+
+                if self.current_input.is_some() {
+                    ui.text_colored([0.0, 1.0, 0.0, 1.0], "Awaiting input...");
+                }
+
+                let cursor = ui.cursor_pos();
+
+                let x = (popup_width - button_width) * 0.5;
+
+                ui.set_cursor_pos([x, cursor[1] + 20.0]);
+
+                if ui.button_with_size("Close", [button_width, button_height]) {
+                    ui.close_current_popup();
+                    self.show_bindings_popup = false;
                 }
 
                 token.end();
@@ -1037,6 +1242,9 @@ impl Frontend {
                         } else {
                             self.waveform_canvas.window_mut().hide();
                         }
+                    }
+                    if ui.menu_item("Controller bindings") {
+                        self.show_bindings_popup = true;
                     }
                     menu.end();
                 }
@@ -1209,6 +1417,18 @@ impl Frontend {
         dir
     }
 
+    fn write_config_file(config: &EmuConfig, config_file: &mut File) {
+        let json = match serde_json::to_string(config) {
+            Ok(result) => result,
+            Err(_) => "".to_string()
+        };
+
+        if json != "" {
+            config_file.seek(SeekFrom::Start(0)).unwrap();
+            config_file.write_all(json.as_bytes()).unwrap();
+        }
+    }
+
     pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool, save_name: &str, rom_bytes: &[u8]) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
@@ -1229,40 +1449,156 @@ impl Frontend {
                     }
                 }
                 Event::KeyDown { keycode, .. } => {
+                    if let Some(button) = self.current_input {
+                        if let Some(keycode) = keycode {
+                            if let Some(old_keycode) = self.button_to_keycode.get(&button) {
+                                self.keyboard_map.remove(old_keycode);
+
+                                if let Some(old_button) = self.keyboard_map.get(&keycode) {
+                                    let old_button = *old_button;
+                                    let old_keycode = *old_keycode;
+
+                                    self.keyboard_map.insert(old_keycode, old_button);
+                                    self.button_to_keycode.insert(old_button, old_keycode);
+                                }
+                            }
+
+                            self.keyboard_map.insert(keycode, button);
+                            self.button_to_keycode.insert(button, keycode);
+
+                            if let Some(current_action) = &mut self.current_action {
+                                *current_action += 1;
+                                if *current_action < ACTIONS.len() {
+                                    let input = *self.ctrl_strs_to_buttons.get(ACTIONS[*current_action]).unwrap();
+                                    self.current_input = Some(input);
+
+                                } else {
+                                    self.current_input = None;
+                                    self.current_action = None;
+                                }
+                            }
+
+                            let mut keyboard_map = HashMap::<String, JoypadButtons>::new();
+
+                            for (key, value) in self.keyboard_map.iter() {
+                                keyboard_map.insert(Keycode::name(*key), *value);
+                            }
+
+                            self.config.keyboard_map = keyboard_map;
+
+                            let mut button_to_keys = HashMap::<JoypadButtons, String>::new();
+
+                            for (key, value) in self.keyboard_map.iter() {
+                                button_to_keys.insert(*value, Keycode::name(*key));
+                            }
+
+                            self.config.button_to_keys = button_to_keys;
+
+                            Self::write_config_file(&self.config, &mut self.config_file);
+                        }
+                    } else {
+                        if let Some(keycode) = keycode {
+                            if let Some(button) = self.keyboard_map.get(&keycode) {
+                                self.display_ui = false;
+                                cpu.bus.joypad.press_button(*button);
+                            } else if keycode == Keycode::G {
+
+                                cpu.bus.ppu.debug_on = !cpu.bus.ppu.debug_on;
+                                cpu.bus.debug_on = !cpu.bus.debug_on;
+                                cpu.debug_on = !cpu.debug_on;
+                            } else if keycode == Keycode::F2 {
+                                cpu.bus.ppu.current_palette = (cpu.bus.ppu.current_palette + 1) % cpu.bus.ppu.palette_colors.len();
+
+                                self.config.current_palette = cpu.bus.ppu.current_palette;
+
+                                // fuck you......... "cannot borrow self as mutable more than once" SHUT THE FUCK UP
+                                Self::write_config_file(&self.config, &mut self.config_file);
+                            } else if keycode == Keycode::F4 {
+                                self.show_waveform = !self.show_waveform;
+
+                                if self.show_waveform {
+                                    self.waveform_canvas.window_mut().show();
+                                } else {
+                                    self.waveform_canvas.window_mut().hide();
+                                }
+                            } else if keycode == Keycode::F5 {
+                                Self::create_quick_state(cpu, save_name.to_string());
+                            } else if keycode == Keycode::F7 {
+                                let dir = Self::get_quick_save_path(save_name.to_string());
+
+                                let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                let (producer, consumer) = ringbuffer.split();
+
+                                let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
+
+                                let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
+
+                                Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
+
+                                self.wave_consumer = waveform_consumer;
+                                self.device.lock().consumer = consumer;
+
+
+                            } else if keycode == Keycode::Escape {
+                                self.display_ui = !self.display_ui;
+                            }
+                        }
+                    }
+                }
+                Event::KeyUp { keycode, .. } => {
                     if let Some(keycode) = keycode {
                         if let Some(button) = self.keyboard_map.get(&keycode) {
+                            cpu.bus.joypad.release_button(*button);
+                        }
+                    }
+                }
+                Event::JoyButtonDown { button_idx, .. } => {
+                    if let Some(current_input) = self.current_joy_input {
+                        if let Some(old_index) = self.button_to_index.get(&current_input) {
+                            let old_index_u8 = *old_index as u8;
+                            let old_index = *old_index;
+                            self.button_map.remove(&old_index_u8);
+
+                            if let Some(old_button) = self.button_map.get(&button_idx) {
+                                let old_button = *old_button;
+
+                                self.button_map.insert(old_index_u8, old_button);
+                                self.button_to_index.insert(old_button, old_index);
+                            }
+                        }
+
+                        self.button_map.insert(button_idx, current_input);
+                        self.button_to_index
+                            .insert(
+                                current_input,
+                                ButtonIndex::try_from(button_idx)
+                                    .unwrap_or_else(|_| panic!("unknown button given: {button_idx}"))
+                            );
+
+                        if let Some(current_action) = &mut self.current_action {
+                            *current_action += 1;
+                            if *current_action < JOY_ACTIONS.len() {
+                                let input = *self.ctrl_strs_to_buttons.get(JOY_ACTIONS[*current_action]).unwrap();
+                                self.current_joy_input = Some(input);
+
+                            } else {
+                                self.current_joy_input = None;
+                                self.current_action = None;
+                            }
+                        }
+
+                        self.config.button_map = self.button_map.clone();
+                        self.config.button_to_index = self.button_to_index.clone();
+
+                        Self::write_config_file(&self.config, &mut self.config_file);
+                    } else {
+                        if let Some(button) = self.button_map.get(&button_idx) {
                             self.display_ui = false;
                             cpu.bus.joypad.press_button(*button);
-                        } else if keycode == Keycode::G {
-
-                            cpu.bus.ppu.debug_on = !cpu.bus.ppu.debug_on;
-                            cpu.bus.debug_on = !cpu.bus.debug_on;
-                            cpu.debug_on = !cpu.debug_on;
-                        } else if keycode == Keycode::F2 {
-                            cpu.bus.ppu.current_palette = (cpu.bus.ppu.current_palette + 1) % cpu.bus.ppu.palette_colors.len();
-
-                            self.config.current_palette = cpu.bus.ppu.current_palette;
-
-                            let json = match serde_json::to_string(&self.config) {
-                                Ok(result) => result,
-                                Err(_) => "".to_string()
-                            };
-
-                            if json != "" {
-                                self.config_file.seek(SeekFrom::Start(0)).unwrap();
-                                self.config_file.write_all(json.as_bytes()).unwrap();
-                            }
-                        } else if keycode == Keycode::F4 {
-                            self.show_waveform = !self.show_waveform;
-
-                            if self.show_waveform {
-                                self.waveform_canvas.window_mut().show();
-                            } else {
-                                self.waveform_canvas.window_mut().hide();
-                            }
-                        } else if keycode == Keycode::F5 {
+                        } else if button_idx == ButtonIndex::LeftThumbstick as u8 {
                             Self::create_quick_state(cpu, save_name.to_string());
-                        } else if keycode == Keycode::F7 {
+                        } else if button_idx == ButtonIndex::RightThumbstick as u8 {
                             let dir = Self::get_quick_save_path(save_name.to_string());
 
                             let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
@@ -1277,41 +1613,7 @@ impl Frontend {
 
                             self.wave_consumer = waveform_consumer;
                             self.device.lock().consumer = consumer;
-
-
-                        } else if keycode == Keycode::Escape {
-                            self.display_ui = !self.display_ui;
                         }
-                    }
-                }
-                Event::KeyUp { keycode, .. } => {
-                    if let Some(keycode) = keycode {
-                        if let Some(button) = self.keyboard_map.get(&keycode) {
-                            cpu.bus.joypad.release_button(*button);
-                        }
-                    }
-                }
-                Event::JoyButtonDown { button_idx, .. } => {
-                    if let Some(button) = self.button_map.get(&button_idx) {
-                        self.display_ui = false;
-                        cpu.bus.joypad.press_button(*button);
-                    } else if button_idx == LEFT_THUMBSTICK {
-                        Self::create_quick_state(cpu, save_name.to_string());
-                    } else if button_idx == RIGHT_THUMBSTICK {
-                        let dir = Self::get_quick_save_path(save_name.to_string());
-
-                        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-                        let (producer, consumer) = ringbuffer.split();
-
-                        let waveform_ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
-
-                        let (waveform_producer, waveform_consumer) = waveform_ringbuffer.split();
-
-                        Self::load_state(cpu, dir, rom_bytes, producer, waveform_producer);
-
-                        self.wave_consumer = waveform_consumer;
-                        self.device.lock().consumer = consumer;
                     }
                 }
                 Event::JoyButtonUp { button_idx, .. } => {

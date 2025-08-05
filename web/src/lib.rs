@@ -21,21 +21,12 @@ macro_rules! console_log {
 #[wasm_bindgen]
 pub struct WebEmulator {
     cpu: CPU,
-    joypad_map: HashMap<usize, JoypadButtons>,
+    joypad_map: HashMap<String, JoypadButtons>,
     sample_buffer: Vec<f32>,
     consumer: Caching<Arc<SharedRb<Heap<f32>>>, false, true>,
     is_paused: bool,
     save_state: Vec<u8>
 }
-
-const BUTTON_CROSS: usize = 0;
-const BUTTON_SQUARE: usize = 2;
-const SELECT: usize = 8;
-const START: usize = 9;
-const UP: usize = 12;
-const DOWN: usize = 13;
-const LEFT: usize = 14;
-const RIGHT: usize = 15;
 
 #[wasm_bindgen]
 impl WebEmulator {
@@ -43,15 +34,15 @@ impl WebEmulator {
     pub fn new() -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let joypad_map = HashMap::<usize, JoypadButtons>::from([
-            (BUTTON_CROSS, JoypadButtons::A),
-            (BUTTON_SQUARE, JoypadButtons::B),
-            (SELECT, JoypadButtons::Select),
-            (START, JoypadButtons::Start),
-            (UP, JoypadButtons::Up),
-            (DOWN, JoypadButtons::Down),
-            (LEFT, JoypadButtons::Left),
-            (RIGHT, JoypadButtons::Right)
+        let joypad_map = HashMap::<String, JoypadButtons>::from([
+            ("a".to_string(), JoypadButtons::A),
+            ("b".to_string(), JoypadButtons::B),
+            ("select".to_string(), JoypadButtons::Select),
+            ("start".to_string(), JoypadButtons::Start),
+            ("up".to_string(), JoypadButtons::Up),
+            ("down".to_string(), JoypadButtons::Down),
+            ("left".to_string(), JoypadButtons::Left),
+            ("right".to_string(), JoypadButtons::Right)
         ]);
 
         let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
@@ -213,7 +204,7 @@ impl WebEmulator {
         self.sample_buffer.len()
     }
 
-    pub fn update_input(&mut self, button: usize, pressed: bool) {
+    pub fn update_input(&mut self, button: String, pressed: bool) {
         if pressed {
             self.cpu.bus.joypad.press_button(*self.joypad_map.get(&button).unwrap());
         } else {
