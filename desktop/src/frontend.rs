@@ -955,12 +955,6 @@ impl Frontend {
 
                 let popup_width = ui.content_region_avail()[0];
 
-                // let cursor = ui.cursor_pos();
-
-                // let x = popup_width / 3.0;
-
-                // ui.set_cursor_pos([x, cursor[1]]);
-
                 if let Some(tab_bar) = ui.tab_bar("Controller bindings") {
                     if let Some(tab) = ui.tab_item("Keyboard") {
                         let cursor = ui.cursor_pos();
@@ -1350,6 +1344,14 @@ impl Frontend {
                         if let Some(keycode) = keycode {
                             if let Some(old_keycode) = self.button_to_keycode.get(&button) {
                                 self.keyboard_map.remove(old_keycode);
+
+                                if let Some(old_button) = self.keyboard_map.get(&keycode) {
+                                    let old_button = *old_button;
+                                    let old_keycode = *old_keycode;
+
+                                    self.keyboard_map.insert(old_keycode, old_button);
+                                    self.button_to_keycode.insert(old_button, old_keycode);
+                                }
                             }
 
                             self.keyboard_map.insert(keycode, button);
