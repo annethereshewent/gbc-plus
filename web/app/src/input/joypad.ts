@@ -99,16 +99,35 @@ export class Joypad {
 
     document.addEventListener('keydown', async (e) => {
       if (this.currentKeyInput != null) {
+        if (["Meta", "Escape", "F2", "F4", "F5", "F7", "Alt", "Ctrl"].includes(e.key)) {
+          if (e.key == "Escape") {
+            this.cancelKeyboardMappings()
+          }
+          return
+        }
         e.preventDefault()
+
         this.currentKeyInput.value = e.key.toLowerCase()
         this.currentKeyInput.className = "input is-success key-input"
         this.currentKeyInput.readOnly = true
 
-        this.currentKeyInput = null
+        const nextDiv = this.currentKeyInput.parentElement!.nextElementSibling
+
+        if (nextDiv != null) {
+          const child = nextDiv.children[1] as HTMLInputElement
+
+          if (child != null) {
+            child.focus()
+            this.currentKeyInput = child
+          } else {
+            this.currentKeyInput = null
+          }
+        } else {
+           this.currentKeyInput = null
+        }
       } else {
         const button = this.keyMappings.get(e.key.toLowerCase())
         if (button != null) {
-          console.log("preventing default!")
           e.preventDefault()
           this.keyMap.set(button, true)
         }
@@ -124,12 +143,32 @@ export class Joypad {
     })
   }
 
+  cancelKeyboardMappings() {
+    const keyInputs = document.getElementsByClassName("key-input")
+
+    for (const keyInput of keyInputs) {
+      const keyEl = keyInput as HTMLInputElement
+
+      keyEl.className = "input is-link key-input"
+      keyEl.readOnly = false
+
+      const sibling = keyEl.previousElementSibling as HTMLElement
+
+      const gbButton = sibling.innerText.toLowerCase()
+
+      keyEl.value = this.buttonToKeys.get(gbButton)!
+    }
+
+    const modal = document.getElementById("controller-mappings-modal")!
+
+    modal.style.display = "none"
+    modal.className = "modal hide"
+  }
+
   updateKeyboardMappings(e: Event) {
     e.preventDefault()
 
     const keyInputs = document.getElementsByClassName("key-input")
-
-    console.log(keyInputs.length)
 
     for (const keyInput of keyInputs) {
       const keyEl = keyInput as HTMLInputElement
@@ -171,8 +210,30 @@ export class Joypad {
       }
     }
 
+    const el = document.getElementById("key-mapping-notification")!
+
+    el.style.display = "block"
+
+    let opacity = 1.0
+
+    const interval = setInterval(() => {
+      opacity -= .1
+
+      el.style.opacity = `${opacity}`
+
+      if (opacity <= 0) {
+        el.style.display = "none"
+        clearInterval(interval)
+      }
+    }, 150)
+
     localStorage.setItem("gbc-key-mappings", JSON.stringify(Array.from(this.keyMappings.entries())))
     localStorage.setItem("gbc-button-to-keys", JSON.stringify(Array.from(this.buttonToKeys.entries())))
+
+    const modal = document.getElementById("controller-mappings-modal")!
+
+    modal.style.display = "none"
+    modal.className = "modal hide"
   }
 
   async handleInput() {

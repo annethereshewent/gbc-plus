@@ -1,4 +1,4 @@
-#state-notification, #save-notification, #request-failure-notification {
+#state-notification, #save-notification, #request-failure-notification, #key-mapping-notification {
   display: none;
   width: 70%;
   margin: 40px auto;
@@ -36,8 +36,11 @@
   label {
     width: 100px;
   }
-  button {
-    margin-top: 20px;
+  .button-wrapper {
+    text-align: center;
+    button {
+      margin-top: 20px;
+    }
   }
 }
 .canvas-wrapper {
