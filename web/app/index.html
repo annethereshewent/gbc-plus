@@ -83,16 +83,16 @@
   <div id="emulator">
     <input type="file" id="game-input" class="file-input" accept=".gbc,.gb,.zip">
     <input type="file" id="save-input" class="file-input" accept=".sav">
-    <div>
-      <canvas width="683" height="256" id="waveform-visualizer"></canvas>
+    <div style="width: 100%">
+      <div class="canvas-wrapper">
+        <div style="flex-direction: row">
+          <p id="fps-counter"></p>
+          <canvas width="160" height="144" id="game-canvas"></canvas>
+        </div>
+        <canvas width="683" height="256" id="waveform-visualizer"></canvas>
+      </div>
     </div>
-    <div class="canvas-wrapper">
-      <p id="fps-counter"></p>
-      <canvas width="160" height="144" id="game-canvas" />
-    </div>
-    <div>
-      <canvas width="160" height="144" id="save-state-canvas" style="display: none" />
-    </div>
+    <canvas width="160" height="144" id="save-state-canvas" style="display: none" />
   </div>
   <div id="help-modal" class="modal hide">
     <div class="modal-background"></div>

@@ -33,10 +33,11 @@
   display: block;
 }
 .canvas-wrapper {
-  margin-top: 150px;
-  width: 100%;
+  margin: 150px auto;
   height: 100%;
   text-align: center;
+  display: flex;
+  width: 40%;
   #game-canvas {
     width: 640px;
     height: 576px;
@@ -47,9 +48,8 @@
 #waveform-visualizer {
   width: 683px;
   height: 256px;
-  float: right;
+  margin-left: 40px;
   margin-top: 150px;
-  margin-right: 80px;
   display: none;
 }
 .fa-github {
