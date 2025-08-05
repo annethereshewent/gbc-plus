@@ -1,4 +1,4 @@
-#state-notification, #save-notification, #request-failure-notification, #key-mapping-notification {
+#state-notification, #save-notification, #request-failure-notification {
   display: none;
   width: 70%;
   margin: 40px auto;
@@ -55,7 +55,6 @@
   text-align: center;
   display: flex;
   width: 40%;
-  flex-wrap: nowrap;
   #game-canvas {
     width: 640px;
     height: 576px;

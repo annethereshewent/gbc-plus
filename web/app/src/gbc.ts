@@ -907,32 +907,26 @@ export class GBC {
     el.className = 'modal show'
   }
 
-  showControllerTab() {
-    const formEl = document.getElementById("controller-mappings-form")!
-
-    formEl.style.display = "block"
-
-    const hiddenEl = document.getElementById("keyboard-mappings-form")!
-
-    hiddenEl.style.display = "none"
-
-    document.getElementById("controller-tab")!.className += "is-active"
-
-    document.getElementById("keyboard-tab")!.className = document.getElementById("keyboard-tab")!.className.replace("is-active", "").trim()
+  showKeyboardTab() {
+    this.showTab("keyboard-mappings-form", "controller-mappings-form", "keyboard-tab", "controller-tab")
   }
 
-  showKeyboardTab() {
-    const formEl = document.getElementById("keyboard-mappings-form")!
+  showControllerTab() {
+    this.showTab("controller-mappings-form", "keyboard-mappings-form", "controller-tab", "keyboard-tab")
+  }
+
+  showTab(formElId: string, hiddenElId: string, activeTab: string, hiddenTab: string) {
+    const formEl = document.getElementById(formElId)!
 
     formEl.style.display = "block"
 
-    const hiddenEl = document.getElementById("controller-mappings-form")!
+    const hiddenEl = document.getElementById(hiddenElId)!
 
     hiddenEl.style.display = "none"
 
-    document.getElementById("keyboard-tab")!.className += "is-active"
+    document.getElementById(activeTab)!.className += "is-active"
 
-    document.getElementById("controller-tab")!.className = document.getElementById("controller-tab")!.className.replace("is-active", "").trim()
+    document.getElementById(hiddenTab)!.className = document.getElementById(hiddenTab)!.className.replace("is-active", "").trim()
   }
 
   addEventListeners() {
