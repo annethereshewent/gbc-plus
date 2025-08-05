@@ -271,11 +271,13 @@ export class WebEmulator {
         return ret >>> 0;
     }
     /**
-     * @param {number} button
+     * @param {string} button
      * @param {boolean} pressed
      */
     update_input(button, pressed) {
-        wasm.webemulator_update_input(this.__wbg_ptr, button, pressed);
+        const ptr0 = passStringToWasm0(button, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.webemulator_update_input(this.__wbg_ptr, ptr0, len0, pressed);
     }
 }
 

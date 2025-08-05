@@ -2,8 +2,8 @@ import { WebEmulator } from "../../../pkg/gb_plus_web"
 import { GBC } from "../gbc"
 import { StateManager } from "../saves/state_manager"
 
-const BUTTON_A = 0
-const BUTTON_B = 2
+const BUTTON_CROSS = 0
+const BUTTON_SQUARE = 2
 // const L2 = 6
 // const R2 = 7
 const SELECT = 8
@@ -15,22 +15,32 @@ const DOWN = 13
 const LEFT = 14
 const RIGHT = 15
 
+const BUTTONS_TO_ELEMENTS = new Map([
+  ["a", document.getElementById("a-button")],
+  ["b", document.getElementById("b-button")],
+  ["start", document.getElementById("start")],
+  ["select", document.getElementById("select")],
+  ["up", document.getElementById("up")],
+  ["down", document.getElementById("down")],
+  ["left", document.getElementById("left")],
+  ["right", document.getElementById("right")]
+])
 
 export class Joypad {
   pressedKeys = new Map<number, number>()
   gbc: GBC
-  keyMap = new Map<number, boolean>()
+  keyMap = new Map<string, boolean>()
   stateManager: StateManager|null = null
 
-  keyMappings = new Map<string, number>([
-    ["k", BUTTON_A],
-    ["j", BUTTON_B],
-    ["s", DOWN],
-    ["a", LEFT],
-    ["d", RIGHT],
-    ["w", UP],
-    ["Tab", SELECT],
-    ["Enter", START]
+  keyMappings = new Map<string, string>([
+    ["k", "a"],
+    ["j", "b"],
+    ["s", "down"],
+    ["a", "left"],
+    ["d", "right"],
+    ["w", "up"],
+    ["Tab", "select"],
+    ["Enter", "start"]
   ])
 
   buttonToKeys = new Map<string, string>([
@@ -39,18 +49,20 @@ export class Joypad {
     ["left", "a"],
     ["right", "d"],
     ["select", "tab"],
-    ["enter", "start"]
+    ["enter", "start"],
+    ["b", "j"],
+    ["a", "k"]
   ])
 
-  joypadMappings = new Map<number, number>([
-    [BUTTON_A, BUTTON_A],
-    [BUTTON_B, BUTTON_B],
-    [DOWN, DOWN],
-    [LEFT, LEFT],
-    [RIGHT, RIGHT],
-    [UP, UP],
-    [SELECT, SELECT],
-    [START, START]
+  joypadMappings = new Map<number, string>([
+    [BUTTON_CROSS, "a"],
+    [BUTTON_SQUARE, "b"],
+    [DOWN, "down"],
+    [LEFT, "left"],
+    [RIGHT, "right"],
+    [UP, "up"],
+    [SELECT, "select"],
+    [START, "start"]
   ])
 
   private currentKeyInput: HTMLInputElement|null = null
@@ -99,17 +111,54 @@ export class Joypad {
 
     document.addEventListener('keydown', async (e) => {
       if (this.currentKeyInput != null) {
-        if (["Meta", "Escape", "F2", "F4", "F5", "F7", "Alt", "Ctrl"].includes(e.key)) {
-          if (e.key == "Escape") {
-            this.cancelKeyboardMappings()
-          }
+
+        if (e.key == "Escape") {
+          this.cancelKeyboardMappings()
           return
         }
-        e.preventDefault()
+
+        if (!["Meta", "F2", "F4", "F5", "F7", "Alt"].includes(e.key)) {
+          e.preventDefault()
+        } else {
+          this.currentKeyInput.className = "input is-link key-input"
+          this.currentKeyInput.blur()
+          this.currentKeyInput = null
+          return
+        }
+
+        const sibling = this.currentKeyInput.previousElementSibling as HTMLElement
+
+        const gbButton = sibling.innerText.toLowerCase()
+
+        const oldKeyboardKey = this.currentKeyInput.value.toLowerCase()
+
+        this.keyMappings.delete(oldKeyboardKey)
+
+        const existingButton = this.keyMappings.get(e.key.toLowerCase())
+
+        if (existingButton != null) {
+          const oldMapping = this.buttonToKeys.get(existingButton)!
+
+          this.keyMappings.delete(oldMapping)
+
+          this.keyMappings.set(oldKeyboardKey, existingButton)
+          this.buttonToKeys.set(existingButton, oldKeyboardKey)
+
+          const element = BUTTONS_TO_ELEMENTS.get(existingButton) as HTMLInputElement
+
+          if (element != null) {
+            element.value = oldKeyboardKey
+          }
+        }
+
+        this.keyMappings.set(e.key.toLowerCase(), gbButton.toLowerCase())
+        this.buttonToKeys.set(gbButton.toLowerCase(), e.key.toLowerCase())
+
+        localStorage.setItem('gbc-key-mappings', JSON.stringify(Array.from(this.keyMappings.entries())))
+        localStorage.setItem("gbc-button-to-keys", JSON.stringify(Array.from(this.buttonToKeys.entries())))
 
         this.currentKeyInput.value = e.key.toLowerCase()
         this.currentKeyInput.className = "input is-success key-input"
-        this.currentKeyInput.readOnly = true
 
         const nextDiv = this.currentKeyInput.parentElement!.nextElementSibling
 
@@ -148,87 +197,8 @@ export class Joypad {
 
     for (const keyInput of keyInputs) {
       const keyEl = keyInput as HTMLInputElement
-
       keyEl.className = "input is-link key-input"
-      keyEl.readOnly = false
-
-      const sibling = keyEl.previousElementSibling as HTMLElement
-
-      const gbButton = sibling.innerText.toLowerCase()
-
-      keyEl.value = this.buttonToKeys.get(gbButton)!
     }
-
-    const modal = document.getElementById("controller-mappings-modal")!
-
-    modal.style.display = "none"
-    modal.className = "modal hide"
-  }
-
-  updateKeyboardMappings(e: Event) {
-    e.preventDefault()
-
-    const keyInputs = document.getElementsByClassName("key-input")
-
-    for (const keyInput of keyInputs) {
-      const keyEl = keyInput as HTMLInputElement
-
-      keyEl.readOnly = false
-      keyEl.className = "input is-link key-input"
-
-      const sibling = keyEl.previousElementSibling as HTMLElement
-
-      const gbButton = sibling.innerText
-
-      this.buttonToKeys.set(gbButton.toLowerCase(), keyEl.value)
-
-      switch (gbButton.toLowerCase()) {
-        case 'up':
-          this.keyMappings.set(keyEl.value, UP)
-          break
-        case 'down':
-          this.keyMappings.set(keyEl.value, DOWN)
-          break
-        case 'left':
-          this.keyMappings.set(keyEl.value, LEFT)
-          break
-        case 'right':
-          this.keyMappings.set(keyEl.value, RIGHT)
-          break
-        case 'select':
-          this.keyMappings.set(keyEl.value, SELECT)
-          break
-        case 'start':
-          this.keyMappings.set(keyEl.value, START)
-          break
-        case 'a':
-          this.keyMappings.set(keyEl.value, BUTTON_A)
-          break
-        case 'b':
-          this.keyMappings.set(keyEl.value, BUTTON_B)
-          break
-      }
-    }
-
-    const el = document.getElementById("key-mapping-notification")!
-
-    el.style.display = "block"
-
-    let opacity = 1.0
-
-    const interval = setInterval(() => {
-      opacity -= .1
-
-      el.style.opacity = `${opacity}`
-
-      if (opacity <= 0) {
-        el.style.display = "none"
-        clearInterval(interval)
-      }
-    }, 150)
-
-    localStorage.setItem("gbc-key-mappings", JSON.stringify(Array.from(this.keyMappings.entries())))
-    localStorage.setItem("gbc-button-to-keys", JSON.stringify(Array.from(this.buttonToKeys.entries())))
 
     const modal = document.getElementById("controller-mappings-modal")!
 
@@ -240,14 +210,14 @@ export class Joypad {
     const gamepad = navigator.getGamepads()[0]
 
     if (this.gbc.emulator != null) {
-      this.gbc.emulator.update_input(BUTTON_A, gamepad?.buttons[BUTTON_A].pressed == true || this.keyMap.get(BUTTON_A) == true)
-      this.gbc.emulator.update_input(BUTTON_B, gamepad?.buttons[BUTTON_B].pressed == true || this.keyMap.get(BUTTON_B) == true)
-      this.gbc.emulator.update_input(SELECT, gamepad?.buttons[SELECT].pressed == true || this.keyMap.get(SELECT) == true)
-      this.gbc.emulator.update_input(START, gamepad?.buttons[START].pressed == true || this.keyMap.get(START) == true)
-      this.gbc.emulator.update_input(UP, gamepad?.buttons[UP].pressed == true || this.keyMap.get(UP) == true)
-      this.gbc.emulator.update_input(DOWN, gamepad?.buttons[DOWN].pressed == true || this.keyMap.get(DOWN) == true)
-      this.gbc.emulator.update_input(LEFT, gamepad?.buttons[LEFT].pressed == true || this.keyMap.get(LEFT) == true)
-      this.gbc.emulator.update_input(RIGHT, gamepad?.buttons[RIGHT].pressed == true || this.keyMap.get(RIGHT) == true)
+      this.gbc.emulator.update_input("a", gamepad?.buttons[BUTTON_CROSS].pressed == true || this.keyMap.get("a") == true)
+      this.gbc.emulator.update_input("b", gamepad?.buttons[BUTTON_SQUARE].pressed == true || this.keyMap.get("b") == true)
+      this.gbc.emulator.update_input("select", gamepad?.buttons[SELECT].pressed == true || this.keyMap.get("select") == true)
+      this.gbc.emulator.update_input("start", gamepad?.buttons[START].pressed == true || this.keyMap.get("start") == true)
+      this.gbc.emulator.update_input("up", gamepad?.buttons[UP].pressed == true || this.keyMap.get("up") == true)
+      this.gbc.emulator.update_input("down", gamepad?.buttons[DOWN].pressed == true || this.keyMap.get("down") == true)
+      this.gbc.emulator.update_input("left", gamepad?.buttons[LEFT].pressed == true || this.keyMap.get("left") == true)
+      this.gbc.emulator.update_input("right", gamepad?.buttons[RIGHT].pressed == true || this.keyMap.get("right") == true)
 
       if (gamepad?.buttons[LEFT_STICK].pressed) {
         this.gbc.createSaveState(true)

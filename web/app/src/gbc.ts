@@ -900,6 +900,7 @@ export class GBC {
   }
 
   showControllerMappingsModal() {
+    this.emulator!.set_pause(true)
     const el = document.getElementById("controller-mappings-modal")!
 
     el.style.display = 'block'
@@ -917,6 +918,8 @@ export class GBC {
         closeButton.addEventListener("click", () => {
           this.emulator!.set_pause(false)
           const modals = document.getElementsByClassName("modal")
+
+          this.joypad.cancelKeyboardMappings()
 
           if (modals != null) {
             for (const modal of modals) {
@@ -939,7 +942,6 @@ export class GBC {
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
     document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
-    document.getElementById("keyboard-mappings-form")?.addEventListener("submit", (e) => this.joypad.updateKeyboardMappings(e))
     document.getElementById("controller-mappings")?.addEventListener("click", () => this.showControllerMappingsModal())
     document.getElementById("keyboard-mappings-cancel-button")?.addEventListener("click", () => this.joypad.cancelKeyboardMappings())
 

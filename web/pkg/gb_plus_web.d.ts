@@ -25,7 +25,7 @@ export class WebEmulator {
   is_rtc_dirty(): boolean;
   clear_rtc_dirty(): void;
   get_buffer_len(): number;
-  update_input(button: number, pressed: boolean): void;
+  update_input(button: string, pressed: boolean): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -56,7 +56,7 @@ export interface InitOutput {
   readonly webemulator_is_rtc_dirty: (a: number) => number;
   readonly webemulator_clear_rtc_dirty: (a: number) => void;
   readonly webemulator_get_buffer_len: (a: number) => number;
-  readonly webemulator_update_input: (a: number, b: number, c: number) => void;
+  readonly webemulator_update_input: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
