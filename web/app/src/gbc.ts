@@ -81,7 +81,6 @@ export class GBC {
   private waveVisualizer = new WaveformVisualizer(this.plotCanvas)
   private showWaveform = false
   private updateSaveGame = ""
-  private fullScreen = false
 
   private fps = 0
 
@@ -185,13 +184,13 @@ export class GBC {
   }
 
   toggleFullscreen() {
-    if (!this.fullScreen) {
+    if (document.fullscreenElement == null) {
       document.documentElement.requestFullscreen()
     } else {
       document.exitFullscreen()
     }
+  }
 
-    this.fullScreen = !this.fullScreen
   }
 
   async startGame(data: ArrayBuffer) {
@@ -963,6 +962,8 @@ export class GBC {
     document.onkeydown = (ev) => {
       switch (ev.key) {
         case 'Escape':
+          ev.preventDefault()
+
           this.emulator?.set_pause(false)
           const savesModal = document.getElementById('saves-modal')
 
