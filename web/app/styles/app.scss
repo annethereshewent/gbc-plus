@@ -32,16 +32,21 @@
 .show {
   display: block;
 }
-#keyboard-mappings-form {
-  label {
-    width: 100px;
+#key-mappings {
+  .checkmark {
+    color: green;
+    display: none;
   }
-  .button-wrapper {
+  input {
+    margin-bottom: 20px;
+  }
+  .button-row {
     text-align: center;
-    button {
-      margin-top: 20px;
-    }
+    margin-top: 20px;
   }
+}
+#controller-mappings-form {
+  display: none;
 }
 .canvas-wrapper {
   margin: 150px auto;

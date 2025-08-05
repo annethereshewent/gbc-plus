@@ -176,44 +176,84 @@
           <div class="content">
             <button id="hide-controller-mappings-modal" class="modal-close" aria-label="close">Close</button>
             <div id="key-mappings">
+              <div class="tabs is-centered">
+                <ul>
+                  <li class="is-active" id="keyboard-tab"><a><span class="icon is-small"><i class="fas fa-keyboard"></i></span><span>Keyboard mappings</span></a></li>
+                  <li id="controller-tab"><a><span class="icon is-small"><i class="fas fa-gamepad"></i></span><span>Joypad mappings</span></a></li>
+                </ul>
+              </div>
               <div>
-                <h4>Keyboard mappings</h4>
                 <form id="keyboard-mappings-form">
                   <div class="mapping-section">
                     <div>
                       <label>Up</label>
                       <input id="up" class="input is-link key-input" type="text" value="w"/>
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>Down</label>
                       <input id="down" class="input is-link key-input" type="text" value="s" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>Left</label>
                       <input id="left" class="input is-link key-input" type="text" value="a" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>Right</label>
                       <input id="right" class="input is-link key-input" type="text" value="d" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>Start</label>
                       <input id="start" class="input is-link key-input" type="text" value="enter" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>Select</label>
                       <input id="select" class="input is-link key-input" type="text" value="tab" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>A</label>
                       <input id="a-button" class="input is-link key-input" type="text" value="j" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                     <div>
                       <label>B</label>
                       <input id="b-button" class="input is-link key-input" type="text" value="k" />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
                     </div>
                   </div>
                 </form>
+                <form id="controller-mappings-form">
+                  <div class="mapping-section">
+                    <div>
+                      <label>Start</label>
+                      <input id="joy-start" class="input is-link joy-input" type="text" value="start" readonly />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
+                    </div>
+                    <div>
+                      <label>Select</label>
+                      <input id="joy-select" class="input is-link joy-input" type="text" value="select" readonly />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
+                    </div>
+                    <div>
+                      <label>A</label>
+                      <input id="joy-a" class="input is-link joy-input" type="text" value="cross" readonly />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
+                    </div>
+                    <div>
+                      <label>B</label>
+                      <input id="joy-b" class="input is-link joy-input" type="text" value="square" readonly />
+                      <i class="checkmark fa-solid fa-checkmark"></i>
+                    </div>
+                  </div>
+                </form>
+                <div class="button-row">
+                  <button id="mappings-cancel-button" type="button" class="button is-danger">Close</button>
+                </div>
               </div>
             </div>
           </div>

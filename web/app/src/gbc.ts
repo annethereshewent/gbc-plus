@@ -907,6 +907,34 @@ export class GBC {
     el.className = 'modal show'
   }
 
+  showControllerTab() {
+    const formEl = document.getElementById("controller-mappings-form")!
+
+    formEl.style.display = "block"
+
+    const hiddenEl = document.getElementById("keyboard-mappings-form")!
+
+    hiddenEl.style.display = "none"
+
+    document.getElementById("controller-tab")!.className += "is-active"
+
+    document.getElementById("keyboard-tab")!.className = document.getElementById("keyboard-tab")!.className.replace("is-active", "").trim()
+  }
+
+  showKeyboardTab() {
+    const formEl = document.getElementById("keyboard-mappings-form")!
+
+    formEl.style.display = "block"
+
+    const hiddenEl = document.getElementById("controller-mappings-form")!
+
+    hiddenEl.style.display = "none"
+
+    document.getElementById("keyboard-tab")!.className += "is-active"
+
+    document.getElementById("controller-tab")!.className = document.getElementById("controller-tab")!.className.replace("is-active", "").trim()
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
@@ -919,7 +947,7 @@ export class GBC {
           this.emulator!.set_pause(false)
           const modals = document.getElementsByClassName("modal")
 
-          this.joypad.cancelKeyboardMappings()
+          this.joypad.cancelMappings()
 
           if (modals != null) {
             for (const modal of modals) {
@@ -943,7 +971,9 @@ export class GBC {
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
     document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
     document.getElementById("controller-mappings")?.addEventListener("click", () => this.showControllerMappingsModal())
-    document.getElementById("keyboard-mappings-cancel-button")?.addEventListener("click", () => this.joypad.cancelKeyboardMappings())
+    document.getElementById("mappings-cancel-button")?.addEventListener("click", () => this.joypad.cancelMappings())
+    document.getElementById("keyboard-tab")?.addEventListener("click", () => this.showKeyboardTab())
+    document.getElementById("controller-tab")?.addEventListener("click", () => this.showControllerTab())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {

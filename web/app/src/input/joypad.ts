@@ -2,18 +2,24 @@ import { WebEmulator } from "../../../pkg/gb_plus_web"
 import { GBC } from "../gbc"
 import { StateManager } from "../saves/state_manager"
 
-const BUTTON_CROSS = 0
-const BUTTON_SQUARE = 2
-// const L2 = 6
-// const R2 = 7
-const SELECT = 8
-const START = 9
-const LEFT_STICK = 10
-const RIGHT_STICK = 11
-const UP = 12
-const DOWN = 13
-const LEFT = 14
-const RIGHT = 15
+enum GamepadButtons {
+  Cross = 0,
+  Circle = 1,
+  Square = 2,
+  Triangle = 3,
+  L1 = 4,
+  R1 = 5,
+  L2 = 6,
+  R2 = 7,
+  Select = 8,
+  Start = 9,
+  LeftStick = 10,
+  RightStick = 11,
+  Up = 12,
+  Down = 13,
+  Left = 14,
+  Right = 15
+}
 
 const BUTTONS_TO_ELEMENTS = new Map([
   ["a", document.getElementById("a-button")],
@@ -26,13 +32,50 @@ const BUTTONS_TO_ELEMENTS = new Map([
   ["right", document.getElementById("right")]
 ])
 
+const JOYPAD_ELEMENTS = new Map([
+  ["a", document.getElementById("joy-a")],
+  ["b", document.getElementById("joy-b")],
+  ["select", document.getElementById("joy-select")],
+  ["start", document.getElementById("joy-start")]
+])
+
+const BUTTON_IDS_TO_STRINGS = new Map([
+  [GamepadButtons.Cross, "cross"],
+  [GamepadButtons.Square, "square"],
+  [GamepadButtons.Select, "select"],
+  [GamepadButtons.Start, "start"],
+  [GamepadButtons.Circle, "circle"],
+  [GamepadButtons.Triangle, "triangle"],
+  [GamepadButtons.L1, "l1"],
+  [GamepadButtons.R1, "r1"],
+  [GamepadButtons.L2, "l2"],
+  [GamepadButtons.R2, "r2"],
+  [GamepadButtons.LeftStick, "left stick"],
+  [GamepadButtons.RightStick, "right stick"]
+])
+
+const BUTTON_STRINGS_TO_IDS = new Map([
+  ["cross", GamepadButtons.Cross],
+  ["square", GamepadButtons.Square],
+  ["select", GamepadButtons.Select],
+  ["start", GamepadButtons.Start],
+  ["circle", GamepadButtons.Circle],
+  ["triangle", GamepadButtons.Triangle],
+  ["l1", GamepadButtons.L1],
+  ["r1", GamepadButtons.R1],
+  ["l2", GamepadButtons.L2],
+  ["r2", GamepadButtons.R2],
+  ["left stick", GamepadButtons.LeftStick],
+  ["right stick", GamepadButtons.RightStick]
+])
+
 export class Joypad {
   pressedKeys = new Map<number, number>()
   gbc: GBC
   keyMap = new Map<string, boolean>()
   stateManager: StateManager|null = null
 
-  keyMappings = new Map<string, string>([
+  private keyMappings = new Map<string, string>([
     ["k", "a"],
     ["j", "b"],
     ["s", "down"],
@@ -43,7 +86,7 @@ export class Joypad {
     ["Enter", "start"]
   ])
 
-  buttonToKeys = new Map<string, string>([
+  private buttonToKeys = new Map<string, string>([
     ["up", "w"],
     ["down", "s"],
     ["left", "a"],
@@ -54,26 +97,32 @@ export class Joypad {
     ["a", "k"]
   ])
 
-  joypadMappings = new Map<number, string>([
-    [BUTTON_CROSS, "a"],
-    [BUTTON_SQUARE, "b"],
-    [DOWN, "down"],
-    [LEFT, "left"],
-    [RIGHT, "right"],
-    [UP, "up"],
-    [SELECT, "select"],
-    [START, "start"]
+  private buttonToJoypad = new Map([
+    ["a", GamepadButtons.Cross],
+    ["b", GamepadButtons.Square],
+    ["select", GamepadButtons.Select],
+    ["start", GamepadButtons.Start]
+  ])
+
+  private joypadMappings = new Map([
+    [GamepadButtons.Cross, "a"],
+    [GamepadButtons.Square, "b"],
+    [GamepadButtons.Select, "select"],
+    [GamepadButtons.Start, "start"]
   ])
 
   private currentKeyInput: HTMLInputElement|null = null
+  private currentJoyInput: HTMLInputElement|null = null
+
+  private currentFrame = 0
+
+  private changingJoypadMapping = false
 
   setStateManager(stateManager: StateManager) {
     this.stateManager = stateManager
   }
 
-  constructor(gbc: GBC) {
-    this.gbc = gbc
-
+  initKeyboardMappings() {
     const keyMappings = localStorage.getItem("gbc-key-mappings")
 
     if (keyMappings != null) {
@@ -113,7 +162,7 @@ export class Joypad {
       if (this.currentKeyInput != null) {
 
         if (e.key == "Escape") {
-          this.cancelKeyboardMappings()
+          this.cancelMappings()
           return
         }
 
@@ -160,6 +209,10 @@ export class Joypad {
         this.currentKeyInput.value = e.key.toLowerCase()
         this.currentKeyInput.className = "input is-success key-input"
 
+        const checkmark = this.currentKeyInput.nextElementSibling as HTMLElement
+
+        checkmark.style.display = "inline"
+
         const nextDiv = this.currentKeyInput.parentElement!.nextElementSibling
 
         if (nextDiv != null) {
@@ -192,38 +245,173 @@ export class Joypad {
     })
   }
 
-  cancelKeyboardMappings() {
+  constructor(gbc: GBC) {
+    this.gbc = gbc
+
+    this.initKeyboardMappings()
+    this.initControllerMappings()
+  }
+
+  initControllerMappings() {
+    const joyMappings = localStorage.getItem("gbc-joy-mappings")
+
+    if (joyMappings != null) {
+      this.joypadMappings = new Map(JSON.parse(joyMappings))
+    }
+
+    const buttonToJoypad = localStorage.getItem("gbc-button-to-joypad")
+
+    if (buttonToJoypad != null) {
+      this.buttonToJoypad = new Map(JSON.parse(buttonToJoypad))
+    }
+
+    const joyInputs = document.getElementsByClassName('joy-input')
+
+    for (const joyInput of joyInputs) {
+      const joyEl = joyInput as HTMLInputElement
+
+      const sibling = joyEl.previousElementSibling as HTMLElement
+
+      const gbButton = sibling.innerText.toLowerCase()
+
+      const buttonStr = BUTTON_IDS_TO_STRINGS.get(this.buttonToJoypad.get(gbButton)!)!
+
+      joyEl.value = buttonStr
+
+      joyInput.addEventListener("focus", () => {
+        this.currentJoyInput = joyInput as HTMLInputElement
+
+        this.currentJoyInput.className += " is-warning"
+        this.currentJoyInput.placeholder = "Press button...."
+
+        this.currentFrame = requestAnimationFrame((time) => this.pollInput())
+      })
+    }
+  }
+
+  pollInput() {
+    const gamepad = navigator.getGamepads()[0]
+
+    if (gamepad != null && this.currentJoyInput != null) {
+      for (let buttonIdx = 0; buttonIdx < gamepad.buttons.length; buttonIdx++) {
+        const button = gamepad.buttons[buttonIdx]
+
+        if (button.pressed) {
+          const oldJoyButton = this.currentJoyInput.value
+
+          const oldButtonId = BUTTON_STRINGS_TO_IDS.get(oldJoyButton)!
+
+          this.joypadMappings.delete(oldButtonId)
+
+          const existingButton = this.joypadMappings.get(buttonIdx)
+
+          if (existingButton != null) {
+            const oldMapping = this.buttonToJoypad.get(existingButton)!
+
+            this.joypadMappings.delete(oldMapping)
+
+            this.joypadMappings.set(oldButtonId, existingButton)
+
+            this.buttonToKeys.set(existingButton, oldJoyButton)
+
+            const element = JOYPAD_ELEMENTS.get(existingButton) as HTMLInputElement
+
+            if (element != null) {
+              element.value = oldJoyButton
+            }
+          }
+
+          const buttonStr = BUTTON_IDS_TO_STRINGS.get(buttonIdx)
+
+          if (buttonStr != null) {
+            const sibling = this.currentJoyInput.previousElementSibling as HTMLElement
+
+            const gbButton = sibling.innerText.toLowerCase()
+
+            this.joypadMappings.set(buttonIdx, gbButton)
+            this.buttonToJoypad.set(gbButton, buttonIdx)
+
+            this.currentJoyInput.value = buttonStr
+            this.currentJoyInput.className = "input is-success joy-input"
+
+            const checkmark = this.currentJoyInput.nextElementSibling as HTMLElement
+
+            checkmark.style.display = "inline"
+
+            localStorage.setItem("gbc-joy-mappings", JSON.stringify(Array.from(this.joypadMappings.entries())))
+            localStorage.setItem("gbc-button-to-joypad", JSON.stringify(Array.from(this.buttonToJoypad.entries())))
+
+            const nextDiv = this.currentJoyInput.parentElement!.nextElementSibling
+
+            cancelAnimationFrame(this.currentFrame)
+
+            if (nextDiv != null) {
+              const child = nextDiv.children[1] as HTMLInputElement
+
+              if (child != null) {
+                setTimeout(() => {
+                  child.focus()
+                  this.currentJoyInput = child
+                }, 200)
+              } else {
+                this.currentJoyInput = null
+                cancelAnimationFrame(this.currentFrame)
+              }
+            } else {
+              this.currentJoyInput = null
+              cancelAnimationFrame(this.currentFrame)
+            }
+
+            return
+          }
+        }
+      }
+    }
+    this.currentFrame = requestAnimationFrame((time) => this.pollInput())
+  }
+
+  cancelMappings() {
     const keyInputs = document.getElementsByClassName("key-input")
 
-    for (const keyInput of keyInputs) {
-      const keyEl = keyInput as HTMLInputElement
-      keyEl.className = "input is-link key-input"
-    }
+    this.revertInputs(keyInputs, 'key-input')
+
+    const joyInputs = document.getElementsByClassName("joy-input")
+
+    this.revertInputs(joyInputs, 'joy-input')
 
     const modal = document.getElementById("controller-mappings-modal")!
 
     modal.style.display = "none"
     modal.className = "modal hide"
+
+    cancelAnimationFrame(this.currentFrame)
+  }
+
+  revertInputs(inputs: HTMLCollectionOf<Element>, className: string) {
+    for (const input of inputs) {
+      const inputEl = input as HTMLInputElement
+      inputEl.className = `input is-link ${className}`
+    }
   }
 
   async handleInput() {
     const gamepad = navigator.getGamepads()[0]
 
     if (this.gbc.emulator != null) {
-      this.gbc.emulator.update_input("a", gamepad?.buttons[BUTTON_CROSS].pressed == true || this.keyMap.get("a") == true)
-      this.gbc.emulator.update_input("b", gamepad?.buttons[BUTTON_SQUARE].pressed == true || this.keyMap.get("b") == true)
-      this.gbc.emulator.update_input("select", gamepad?.buttons[SELECT].pressed == true || this.keyMap.get("select") == true)
-      this.gbc.emulator.update_input("start", gamepad?.buttons[START].pressed == true || this.keyMap.get("start") == true)
-      this.gbc.emulator.update_input("up", gamepad?.buttons[UP].pressed == true || this.keyMap.get("up") == true)
-      this.gbc.emulator.update_input("down", gamepad?.buttons[DOWN].pressed == true || this.keyMap.get("down") == true)
-      this.gbc.emulator.update_input("left", gamepad?.buttons[LEFT].pressed == true || this.keyMap.get("left") == true)
-      this.gbc.emulator.update_input("right", gamepad?.buttons[RIGHT].pressed == true || this.keyMap.get("right") == true)
+      this.gbc.emulator.update_input("a", gamepad?.buttons[GamepadButtons.Cross].pressed == true || this.keyMap.get("a") == true)
+      this.gbc.emulator.update_input("b", gamepad?.buttons[GamepadButtons.Square].pressed == true || this.keyMap.get("b") == true)
+      this.gbc.emulator.update_input("select", gamepad?.buttons[GamepadButtons.Select].pressed == true || this.keyMap.get("select") == true)
+      this.gbc.emulator.update_input("start", gamepad?.buttons[GamepadButtons.Start].pressed == true || this.keyMap.get("start") == true)
+      this.gbc.emulator.update_input("up", gamepad?.buttons[GamepadButtons.Up].pressed == true || this.keyMap.get("up") == true)
+      this.gbc.emulator.update_input("down", gamepad?.buttons[GamepadButtons.Down].pressed == true || this.keyMap.get("down") == true)
+      this.gbc.emulator.update_input("left", gamepad?.buttons[GamepadButtons.Left].pressed == true || this.keyMap.get("left") == true)
+      this.gbc.emulator.update_input("right", gamepad?.buttons[GamepadButtons.Right].pressed == true || this.keyMap.get("right") == true)
 
-      if (gamepad?.buttons[LEFT_STICK].pressed) {
+      if (gamepad?.buttons[GamepadButtons.LeftStick].pressed) {
         this.gbc.createSaveState(true)
       }
 
-      if (gamepad?.buttons[RIGHT_STICK].pressed) {
+      if (gamepad?.buttons[GamepadButtons.RightStick].pressed) {
         const compressed = await this.gbc.db.loadSaveState(this.gbc.gameName)
 
         if (compressed != null) {
