@@ -191,8 +191,6 @@ export class GBC {
     }
   }
 
-  }
-
   async startGame(data: ArrayBuffer) {
     clearInterval(this.rtcInterval)
     if (this.frameNumber != -1) {
