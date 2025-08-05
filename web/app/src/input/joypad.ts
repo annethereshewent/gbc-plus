@@ -414,14 +414,20 @@ export class Joypad {
     const gamepad = navigator.getGamepads()[0]
 
     if (this.gbc.emulator != null) {
+      const isGoingLeft = (gamepad?.axes[0] ?? 0) <= -0.5
+      const isGoingRight = (gamepad?.axes[0] ?? 0) >= 0.5
+
+      const isGoingUp = (gamepad?.axes[1] ?? 0) <= -0.5
+      const isGoingDown = (gamepad?.axes[1] ?? 0) >= 0.5
+
       this.gbc.emulator.update_input("a", gamepad?.buttons[this.buttonToJoypad.get("a") ?? GamepadButtons.Cross].pressed == true || this.keyMap.get("a") == true)
       this.gbc.emulator.update_input("b", gamepad?.buttons[this.buttonToJoypad.get("b") ?? GamepadButtons.Square].pressed == true || this.keyMap.get("b") == true)
       this.gbc.emulator.update_input("select", gamepad?.buttons[this.buttonToJoypad.get("select") ?? GamepadButtons.Select].pressed == true || this.keyMap.get("select") == true)
       this.gbc.emulator.update_input("start", gamepad?.buttons[this.buttonToJoypad.get("start") ?? GamepadButtons.Start].pressed == true || this.keyMap.get("start") == true)
-      this.gbc.emulator.update_input("up", gamepad?.buttons[GamepadButtons.Up].pressed == true || this.keyMap.get("up") == true)
-      this.gbc.emulator.update_input("down", gamepad?.buttons[GamepadButtons.Down].pressed == true || this.keyMap.get("down") == true)
-      this.gbc.emulator.update_input("left", gamepad?.buttons[GamepadButtons.Left].pressed == true || this.keyMap.get("left") == true)
-      this.gbc.emulator.update_input("right", gamepad?.buttons[GamepadButtons.Right].pressed == true || this.keyMap.get("right") == true)
+      this.gbc.emulator.update_input("up", gamepad?.buttons[GamepadButtons.Up].pressed == true || isGoingUp || this.keyMap.get("up") == true)
+      this.gbc.emulator.update_input("down", gamepad?.buttons[GamepadButtons.Down].pressed == true || isGoingDown || this.keyMap.get("down") == true)
+      this.gbc.emulator.update_input("left", gamepad?.buttons[GamepadButtons.Left].pressed == true || isGoingLeft || this.keyMap.get("left") == true)
+      this.gbc.emulator.update_input("right", gamepad?.buttons[GamepadButtons.Right].pressed == true || isGoingRight || this.keyMap.get("right") == true)
 
       if (gamepad?.buttons[GamepadButtons.LeftStick].pressed) {
         this.gbc.createSaveState(true)
