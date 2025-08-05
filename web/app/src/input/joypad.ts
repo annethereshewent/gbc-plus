@@ -140,22 +140,22 @@ export class Joypad {
     for (const keyInput of keyInputs) {
       const keyEl = keyInput as HTMLInputElement
 
-      const sibling = keyEl.previousElementSibling as HTMLElement
+      const gbButton = this.getGbButton(keyInput as HTMLInputElement)
 
-      const gbButton = sibling.innerText.toLowerCase()
+      if (gbButton != null) {
+        const key = this.buttonToKeys.get(gbButton)
 
-      const key = this.buttonToKeys.get(gbButton)
+         if (key != null) {
+          keyEl.value = key
+        }
 
-      if (key != null) {
-        keyEl.value = key
+        keyInput.addEventListener("focus", (e) => {
+          this.currentKeyInput = keyEl
+          this.currentKeyInput.className += " is-warning"
+
+          this.currentKeyInput.placeholder = "Enter key..."
+        })
       }
-
-      keyInput.addEventListener("focus", (e) => {
-        this.currentKeyInput = keyEl
-        this.currentKeyInput.className += " is-warning"
-
-        this.currentKeyInput.placeholder = "Enter key..."
-      })
     }
 
     document.addEventListener('keydown', async (e) => {
@@ -175,9 +175,11 @@ export class Joypad {
           return
         }
 
-        const sibling = this.currentKeyInput.previousElementSibling as HTMLElement
+        const gbButton = this.getGbButton(this.currentKeyInput)
 
-        const gbButton = sibling.innerText.toLowerCase()
+        if (gbButton == null) {
+          return
+        }
 
         const oldKeyboardKey = this.currentKeyInput.value.toLowerCase()
 
@@ -213,20 +215,10 @@ export class Joypad {
 
         checkmark.style.display = "inline"
 
-        const nextDiv = this.currentKeyInput.parentElement!.nextElementSibling
-
-        if (nextDiv != null) {
-          const child = nextDiv.children[1] as HTMLInputElement
-
-          if (child != null) {
-            child.focus()
-            this.currentKeyInput = child
-          } else {
-            this.currentKeyInput = null
-          }
-        } else {
-           this.currentKeyInput = null
-        }
+        this.focusNextInput(this.currentKeyInput, (child) => {
+          child.focus()
+          this.currentKeyInput = child
+        })
       } else {
         const button = this.keyMappings.get(e.key.toLowerCase())
         if (button != null) {
@@ -270,9 +262,11 @@ export class Joypad {
     for (const joyInput of joyInputs) {
       const joyEl = joyInput as HTMLInputElement
 
-      const sibling = joyEl.previousElementSibling as HTMLElement
+      const gbButton = this.getGbButton(joyEl)
 
-      const gbButton = sibling.innerText.toLowerCase()
+      if (gbButton == null) {
+        return
+      }
 
       const buttonStr = BUTTON_IDS_TO_STRINGS.get(this.buttonToJoypad.get(gbButton)!)
 
@@ -289,6 +283,17 @@ export class Joypad {
         this.currentFrame = requestAnimationFrame((time) => this.pollInput())
       })
     }
+  }
+
+  getGbButton(keyInput: HTMLInputElement) {
+    const sibling =
+      keyInput.parentElement?.parentElement?.previousElementSibling as HTMLElement|undefined
+
+    if (sibling != null) {
+      return sibling.innerText.toLowerCase()
+    }
+
+    return null
   }
 
   pollInput() {
@@ -327,9 +332,11 @@ export class Joypad {
           const buttonStr = BUTTON_IDS_TO_STRINGS.get(buttonIdx)
 
           if (buttonStr != null) {
-            const sibling = this.currentJoyInput.previousElementSibling as HTMLElement
+            const gbButton = this.getGbButton(this.currentJoyInput)
 
-            const gbButton = sibling.innerText.toLowerCase()
+            if (gbButton == null) {
+              return
+            }
 
             this.joypadMappings.set(buttonIdx, gbButton)
             this.buttonToJoypad.set(gbButton, buttonIdx)
@@ -344,26 +351,14 @@ export class Joypad {
             localStorage.setItem("gbc-joy-mappings", JSON.stringify(Array.from(this.joypadMappings.entries())))
             localStorage.setItem("gbc-button-to-joypad", JSON.stringify(Array.from(this.buttonToJoypad.entries())))
 
-            const nextDiv = this.currentJoyInput.parentElement!.nextElementSibling
-
-            cancelAnimationFrame(this.currentFrame)
-
-            if (nextDiv != null) {
-              const child = nextDiv.children[1] as HTMLInputElement
-
-              if (child != null) {
+            this.focusNextInput(this.currentJoyInput, (child) => {
                 setTimeout(() => {
                   child.focus()
                   this.currentJoyInput = child
                 }, 200)
-              } else {
-                this.currentJoyInput = null
-                cancelAnimationFrame(this.currentFrame)
-              }
-            } else {
-              this.currentJoyInput = null
-              cancelAnimationFrame(this.currentFrame)
-            }
+            })
+
+            cancelAnimationFrame(this.currentFrame)
 
             return
           }
@@ -373,14 +368,26 @@ export class Joypad {
     this.currentFrame = requestAnimationFrame((time) => this.pollInput())
   }
 
+  focusNextInput(input: HTMLInputElement|null, callback: (child: HTMLInputElement) => void) {
+    const nextDiv =
+      input?.parentElement?.parentElement?.parentElement?.nextElementSibling
+
+    if (nextDiv != null) {
+      const child = nextDiv.children[1]?.children[0]?.children[0] as HTMLInputElement
+
+      if (child != null) {
+        callback(child)
+      } else {
+        input = null
+      }
+    } else {
+      input = null
+    }
+  }
+
   cancelMappings() {
-    const keyInputs = document.getElementsByClassName("key-input")
-
-    this.revertInputs(keyInputs, 'key-input')
-
-    const joyInputs = document.getElementsByClassName("joy-input")
-
-    this.revertInputs(joyInputs, 'joy-input')
+    this.revertInputs('key-input')
+    this.revertInputs('joy-input')
 
     const modal = document.getElementById("controller-mappings-modal")
 
@@ -389,10 +396,14 @@ export class Joypad {
       modal.className = "modal hide"
     }
 
+    this.gbc.emulator!.set_pause(false)
+
     cancelAnimationFrame(this.currentFrame)
   }
 
-  revertInputs(inputs: HTMLCollectionOf<Element>, className: string) {
+  revertInputs(className: string) {
+    const inputs = document.getElementsByClassName(className)
+
     for (const input of inputs) {
       const inputEl = input as HTMLInputElement
       inputEl.className = `input is-link ${className}`
@@ -403,10 +414,10 @@ export class Joypad {
     const gamepad = navigator.getGamepads()[0]
 
     if (this.gbc.emulator != null) {
-      this.gbc.emulator.update_input("a", gamepad?.buttons[GamepadButtons.Cross].pressed == true || this.keyMap.get("a") == true)
-      this.gbc.emulator.update_input("b", gamepad?.buttons[GamepadButtons.Square].pressed == true || this.keyMap.get("b") == true)
-      this.gbc.emulator.update_input("select", gamepad?.buttons[GamepadButtons.Select].pressed == true || this.keyMap.get("select") == true)
-      this.gbc.emulator.update_input("start", gamepad?.buttons[GamepadButtons.Start].pressed == true || this.keyMap.get("start") == true)
+      this.gbc.emulator.update_input("a", gamepad?.buttons[this.buttonToJoypad.get("a") ?? GamepadButtons.Cross].pressed == true || this.keyMap.get("a") == true)
+      this.gbc.emulator.update_input("b", gamepad?.buttons[this.buttonToJoypad.get("b") ?? GamepadButtons.Square].pressed == true || this.keyMap.get("b") == true)
+      this.gbc.emulator.update_input("select", gamepad?.buttons[this.buttonToJoypad.get("select") ?? GamepadButtons.Select].pressed == true || this.keyMap.get("select") == true)
+      this.gbc.emulator.update_input("start", gamepad?.buttons[this.buttonToJoypad.get("start") ?? GamepadButtons.Start].pressed == true || this.keyMap.get("start") == true)
       this.gbc.emulator.update_input("up", gamepad?.buttons[GamepadButtons.Up].pressed == true || this.keyMap.get("up") == true)
       this.gbc.emulator.update_input("down", gamepad?.buttons[GamepadButtons.Down].pressed == true || this.keyMap.get("down") == true)
       this.gbc.emulator.update_input("left", gamepad?.buttons[GamepadButtons.Left].pressed == true || this.keyMap.get("left") == true)
