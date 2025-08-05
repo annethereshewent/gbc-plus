@@ -30,6 +30,8 @@ const RIGHT: usize = 15;
 // const LEFT_TRIGGER: usize = 16;
 // const RIGHT_TRIGGER: usize = 17;
 
+const NUM_SAMPLES: usize = 8192 * 2;
+
 #[swift_bridge::bridge]
 mod ffi {
     extern "Rust" {
@@ -140,7 +142,7 @@ impl GBCMobileEmulator {
             (RIGHT, JoypadButtons::Right)
         ]);
 
-        let ringbuffer = HeapRb::<f32>::new(4096 * 2);
+        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
 
         let (producer, consumer) = ringbuffer.split();
 
@@ -180,7 +182,7 @@ impl GBCMobileEmulator {
         let decompressed = zstd::decode_all(&*data).unwrap();
         self.cpu.load_save_state(&decompressed);
 
-        let ringbuffer = HeapRb::<f32>::new(4096 * 2);
+        let ringbuffer = HeapRb::<f32>::new(NUM_SAMPLES);
 
         let (producer, consumer) = ringbuffer.split();
 
