@@ -28,8 +28,8 @@ pub struct WebEmulator {
     save_state: Vec<u8>
 }
 
-const BUTTON_CROSS: usize = 0;
-const BUTTON_SQUARE: usize = 2;
+const BUTTON_A: usize = 0;
+const BUTTON_B: usize = 2;
 const SELECT: usize = 8;
 const START: usize = 9;
 const UP: usize = 12;

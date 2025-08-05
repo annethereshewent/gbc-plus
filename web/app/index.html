@@ -25,7 +25,7 @@
             <button id="cloud-logged-in" class="button is-danger">
               <i class="fa-solid fa-cloud"></i>
               Log out of Google
-            </span>
+
             <button id="upload-save" class="button is-warning">
               <i class="fa-solid fa-upload"></i>
               Upload local save
@@ -41,6 +41,7 @@
           <div class="navbar-dropdown">
             <a id="dmg-color-palettes-item" class="navbar-item">DMG color palettes [F2]</a>
             <a id="waveform-visualizer-button" class="navbar-item">Waveform visualizer [F4]</a>
+            <a id="controller-mappings" class="navbar-item">Controller mappings</a>
           </div>
         </div>
         <div class="navbar-item has-dropdown is-hoverable">
@@ -83,16 +84,14 @@
   <div id="emulator">
     <input type="file" id="game-input" class="file-input" accept=".gbc,.gb,.zip">
     <input type="file" id="save-input" class="file-input" accept=".sav">
-    <div style="width: 100%">
-      <div class="canvas-wrapper">
-        <div style="flex-direction: row">
-          <p id="fps-counter"></p>
-          <canvas width="160" height="144" id="game-canvas"></canvas>
-        </div>
-        <canvas width="683" height="256" id="waveform-visualizer"></canvas>
+    <div class="canvas-wrapper">
+      <div>
+        <p id="fps-counter"></p>
+        <canvas width="160" height="144" id="game-canvas"></canvas>
       </div>
+      <canvas width="683" height="256" id="waveform-visualizer"></canvas>
     </div>
-    <canvas width="160" height="144" id="save-state-canvas" style="display: none" />
+    <canvas width="160" height="144" id="save-state-canvas" style="display: none"></canvas>
   </div>
   <div id="help-modal" class="modal hide">
     <div class="modal-background"></div>
@@ -160,6 +159,61 @@
           <div class="content">
             <button id="hide-saves-modal" class="modal-close" aria-label="close">Close</button>
             <div id="saves-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="controller-mappings-modal" class="modal hide">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="card">
+        <header class="card-header">
+          <h3 class="card-header-title">Controller mappings</h3>
+        </header>
+        <div class="card-content">
+          <div class="content">
+            <button id="hide-controller-mappings-modal" class="modal-close" aria-label="close">Close</button>
+            <div id="key-mappings">
+              <div>
+                <h4>Keyboard mappings</h4>
+                <form id="keyboard-mappings-form">
+                  <div>
+                    <label>Up</label>
+                    <input class="input is-link key-input" type="text" value="w"/>
+                  </div>
+                  <div>
+                    <label>Down</label>
+                    <input class="input is-link key-input" type="text" value="s" />
+                  </div>
+                  <div>
+                    <label>Left</label>
+                    <input class="input is-link key-input" type="text" value="a" />
+                  </div>
+                  <div>
+                    <label>Right</label>
+                    <input class="input is-link key-input" type="text" value="d" />
+                  </div>
+                   <div>
+                    <label>Start</label>
+                    <input class="input is-link key-input" type="text" value="enter" />
+                  </div>
+                   <div>
+                    <label>Select</label>
+                    <input class="input is-link key-input" type="text" value="tab" />
+                  </div>
+                   <div>
+                    <label>A</label>
+                    <input class="input is-link key-input" type="text" value="j" />
+                  </div>
+                   <div>
+                    <label>B</label>
+                    <input class="input is-link key-input" type="text" value="k" />
+                  </div>
+                  <button class="button is-link" type="submit">Save changes</button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -32,12 +32,21 @@
 .show {
   display: block;
 }
+#keyboard-mappings-form {
+  label {
+    width: 100px;
+  }
+  button {
+    margin-top: 20px;
+  }
+}
 .canvas-wrapper {
   margin: 150px auto;
   height: 100%;
   text-align: center;
   display: flex;
   width: 40%;
+  flex-wrap: nowrap;
   #game-canvas {
     width: 640px;
     height: 576px;

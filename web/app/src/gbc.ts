@@ -899,6 +899,13 @@ export class GBC {
     }
   }
 
+  showControllerMappingsModal() {
+    const el = document.getElementById("controller-mappings-modal")!
+
+    el.style.display = 'block'
+    el.className = 'modal show'
+  }
+
   addEventListeners() {
     const loadGame = document.getElementById('game-button')
     const gameInput = document.getElementById('game-input')
@@ -932,6 +939,8 @@ export class GBC {
     document.getElementById('hide-palettes-modal')?.addEventListener("click", () => this.hidePalettesModal())
     document.getElementById("save-input")?.addEventListener("change", (e) => this.handleSaveChange(e))
     document.getElementById("upload-save")?.addEventListener("click", () => this.uploadSave())
+    document.getElementById("keyboard-mappings-form")?.addEventListener("submit", (e) => this.joypad.updateKeyboardMappings(e))
+    document.getElementById("controller-mappings")?.addEventListener("click", () => this.showControllerMappingsModal())
 
     if (loadGame != null && gameInput != null) {
       gameInput.onchange = (ev) => {
@@ -963,32 +972,13 @@ export class GBC {
           ev.preventDefault()
 
           this.emulator?.set_pause(false)
-          const savesModal = document.getElementById('saves-modal')
 
-          if (savesModal != null) {
-            savesModal.className = 'modal hide'
-            savesModal.style.display = 'none'
-          }
+          const modals = document.getElementsByClassName('modal')
 
-          const helpModal = document.getElementById('help-modal')!
-
-          if (helpModal != null) {
-            helpModal.className = 'modal hide'
-            helpModal.style.display = 'none'
-          }
-
-          const statesModal = document.getElementById('states-modal')
-
-          if (statesModal != null) {
-            statesModal.className = 'modal hide'
-            statesModal.style.display = 'none'
-          }
-
-          const palettesModal = document.getElementById('color-palettes-modal')
-
-          if (palettesModal != null) {
-            palettesModal.className = 'modal hide'
-            palettesModal.style.display = 'none'
+          for (const modal of modals) {
+            const modalEl = modal as HTMLElement
+            modalEl.className = 'modal hide'
+            modalEl.style.display = 'none'
           }
 
           break
