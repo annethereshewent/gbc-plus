@@ -54,6 +54,7 @@ use gbc_plus::cpu::{
 };
 use imgui_sdl2_support::SdlPlatform;
 use native_dialog::FileDialog;
+use num_enum::TryFromPrimitive;
 use ringbuf::{
     storage::Heap, traits::{
         Consumer,
@@ -84,7 +85,8 @@ use zip::ZipArchive;
 
 use crate::cloud_service::CloudService;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, TryFromPrimitive, Serialize, Deserialize)]
+#[repr(u8)]
 enum ButtonIndex {
     Cross = 0,
     Circle = 1,
@@ -115,28 +117,6 @@ impl ButtonIndex {
         }
 
         val
-    }
-
-    pub fn to_index(val: u8) -> Self {
-        match val {
-            0 => ButtonIndex::Cross,
-            1 => ButtonIndex::Circle,
-            2 => ButtonIndex::Square,
-            3 => ButtonIndex::Triangle,
-            4 => ButtonIndex::Select,
-            5 => ButtonIndex::Home,
-            6 => ButtonIndex::Start,
-            7 => ButtonIndex::LeftThumbstick,
-            8 => ButtonIndex::RightThumbstick,
-            9 => ButtonIndex::L1,
-            10 => ButtonIndex::R1,
-            11 => ButtonIndex::Up,
-            12 => ButtonIndex::Down,
-            13 => ButtonIndex::Left,
-            14 => ButtonIndex::Right,
-            15 => ButtonIndex::Touchpad,
-            _ => panic!("invalid value given to to_index: {val}")
-        }
     }
 }
 
@@ -176,13 +156,21 @@ const JOY_ACTIONS: [&str; 4] = [
 
 #[derive(Serialize, Deserialize)]
 struct EmuConfig {
-    current_palette: usize
+    current_palette: usize,
+    button_map: HashMap<u8, JoypadButtons>,
+    button_to_keys: HashMap<JoypadButtons, String>,
+    button_to_index: HashMap<JoypadButtons, ButtonIndex>,
+    keyboard_map: HashMap<String, JoypadButtons>,
 }
 
 impl EmuConfig {
     pub fn new() -> Self {
         Self {
-            current_palette: 1
+            current_palette: 1,
+            button_map: HashMap::new(),
+            keyboard_map: HashMap::new(),
+            button_to_index: HashMap::new(),
+            button_to_keys: HashMap::new()
         }
     }
 }
@@ -499,7 +487,7 @@ impl Frontend {
 
         let event_pump = sdl_context.event_pump().unwrap();
 
-        let button_map = HashMap::from([
+        let mut button_map = HashMap::from([
             (ButtonIndex::Cross as u8, JoypadButtons::A),
             (ButtonIndex::Square as u8, JoypadButtons::B),
             (ButtonIndex::Select as u8, JoypadButtons::Select),
@@ -510,7 +498,30 @@ impl Frontend {
             (ButtonIndex::Right as u8, JoypadButtons::Right)
         ]);
 
-        let keyboard_map = HashMap::from([
+        let mut button_to_index = HashMap::from([
+            (JoypadButtons::Up, ButtonIndex::Up),
+            (JoypadButtons::Down, ButtonIndex::Down),
+            (JoypadButtons::Left, ButtonIndex::Left),
+            (JoypadButtons::Right, ButtonIndex::Right),
+            (JoypadButtons::Select, ButtonIndex::Select),
+            (JoypadButtons::Start, ButtonIndex::Start),
+            (JoypadButtons::A, ButtonIndex::Cross),
+            (JoypadButtons::B, ButtonIndex::Square)
+
+        ]);
+
+        let mut button_to_keys = HashMap::from([
+            (JoypadButtons::Up, Keycode::W),
+            (JoypadButtons::Down, Keycode::S),
+            (JoypadButtons::Left, Keycode::A),
+            (JoypadButtons::Right, Keycode::D),
+            (JoypadButtons::Select, Keycode::Tab),
+            (JoypadButtons::Start, Keycode::Return),
+            (JoypadButtons::A, Keycode::K),
+            (JoypadButtons::B, Keycode::J)
+        ]);
+
+        let mut keyboard_map = HashMap::from([
             (Keycode::W, JoypadButtons::Up),
             (Keycode::S, JoypadButtons::Down),
             (Keycode::A, JoypadButtons::Left),
@@ -530,11 +541,11 @@ impl Frontend {
         config_path.push("config.json");
 
         let mut config_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(&config_path)
-                .unwrap();
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&config_path)
+            .unwrap();
 
         let mut str: String = "".to_string();
 
@@ -547,6 +558,24 @@ impl Frontend {
         match serde_json::from_str(&str) {
             Ok(config_json) => config = config_json,
             Err(_) => ()
+        }
+
+        if config.button_map.len() == 8 {
+            button_map = config.button_map.clone();
+            button_to_index = config.button_to_index.clone();
+
+        }
+        if config.keyboard_map.len() == 8 {
+            let mut keyboard_map_clone = HashMap::<Keycode, JoypadButtons>::new();
+            let mut button_to_keys_clone = HashMap::<JoypadButtons, Keycode>::new();
+
+            for (key, value) in config.keyboard_map.clone() {
+                keyboard_map_clone.insert(Keycode::from_name(&key).unwrap(), value);
+                button_to_keys_clone.insert(value, Keycode::from_name(&key).unwrap());
+            }
+
+            keyboard_map = keyboard_map_clone;
+            button_to_keys = button_to_keys_clone;
         }
 
         cpu.bus.ppu.set_dmg_palette(config.current_palette);
@@ -591,27 +620,8 @@ impl Frontend {
                 ("A".to_string(), JoypadButtons::A),
                 ("B".to_string(), JoypadButtons::B)
             ]),
-            button_to_keycode: HashMap::from([
-                (JoypadButtons::Up, Keycode::W),
-                (JoypadButtons::Down, Keycode::S),
-                (JoypadButtons::Left, Keycode::A),
-                (JoypadButtons::Right, Keycode::D),
-                (JoypadButtons::Select, Keycode::Tab),
-                (JoypadButtons::Start, Keycode::Return),
-                (JoypadButtons::A, Keycode::K),
-                (JoypadButtons::B, Keycode::J)
-            ]),
-            button_to_index: HashMap::from([
-                (JoypadButtons::Up, ButtonIndex::Up),
-                (JoypadButtons::Down, ButtonIndex::Down),
-                (JoypadButtons::Left, ButtonIndex::Left),
-                (JoypadButtons::Right, ButtonIndex::Right),
-                (JoypadButtons::Select, ButtonIndex::Select),
-                (JoypadButtons::Start, ButtonIndex::Start),
-                (JoypadButtons::A, ButtonIndex::Cross),
-                (JoypadButtons::B, ButtonIndex::Square)
-
-            ]),
+            button_to_keycode: button_to_keys,
+            button_to_index,
             current_input: None,
             current_action: None,
             current_joy_input: None
@@ -973,15 +983,7 @@ impl Frontend {
 
                         self.config.current_palette = i;
 
-                        let json = match serde_json::to_string(&self.config) {
-                            Ok(result) => result,
-                            Err(_) => "".to_string()
-                        };
-
-                        if json != "" {
-                            self.config_file.seek(SeekFrom::Start(0)).unwrap();
-                            self.config_file.write_all(json.as_bytes()).unwrap();
-                        }
+                        Self::write_config_file(&self.config, &mut self.config_file);
 
                         self.show_palette_picker_popup = false;
                         ui.close_current_popup();
@@ -1415,6 +1417,18 @@ impl Frontend {
         dir
     }
 
+    fn write_config_file(config: &EmuConfig, config_file: &mut File) {
+        let json = match serde_json::to_string(config) {
+            Ok(result) => result,
+            Err(_) => "".to_string()
+        };
+
+        if json != "" {
+            config_file.seek(SeekFrom::Start(0)).unwrap();
+            config_file.write_all(json.as_bytes()).unwrap();
+        }
+    }
+
     pub fn handle_events(&mut self, cpu: &mut CPU, logged_in: bool, save_name: &str, rom_bytes: &[u8]) {
         for event in self.event_pump.poll_iter() {
             self.platform.handle_event(&mut self.imgui, &event);
@@ -1463,6 +1477,24 @@ impl Frontend {
                                     self.current_action = None;
                                 }
                             }
+
+                            let mut keyboard_map = HashMap::<String, JoypadButtons>::new();
+
+                            for (key, value) in self.keyboard_map.iter() {
+                                keyboard_map.insert(Keycode::name(*key), *value);
+                            }
+
+                            self.config.keyboard_map = keyboard_map;
+
+                            let mut button_to_keys = HashMap::<JoypadButtons, String>::new();
+
+                            for (key, value) in self.keyboard_map.iter() {
+                                button_to_keys.insert(*value, Keycode::name(*key));
+                            }
+
+                            self.config.button_to_keys = button_to_keys;
+
+                            Self::write_config_file(&self.config, &mut self.config_file);
                         }
                     } else {
                         if let Some(keycode) = keycode {
@@ -1479,15 +1511,8 @@ impl Frontend {
 
                                 self.config.current_palette = cpu.bus.ppu.current_palette;
 
-                                let json = match serde_json::to_string(&self.config) {
-                                    Ok(result) => result,
-                                    Err(_) => "".to_string()
-                                };
-
-                                if json != "" {
-                                    self.config_file.seek(SeekFrom::Start(0)).unwrap();
-                                    self.config_file.write_all(json.as_bytes()).unwrap();
-                                }
+                                // fuck you......... "cannot borrow self as mutable more than once" SHUT THE FUCK UP
+                                Self::write_config_file(&self.config, &mut self.config_file);
                             } else if keycode == Keycode::F4 {
                                 self.show_waveform = !self.show_waveform;
 
@@ -1544,7 +1569,12 @@ impl Frontend {
                         }
 
                         self.button_map.insert(button_idx, current_input);
-                        self.button_to_index.insert(current_input, ButtonIndex::to_index(button_idx));
+                        self.button_to_index
+                            .insert(
+                                current_input,
+                                ButtonIndex::try_from(button_idx)
+                                    .unwrap_or_else(|_| panic!("unknown button given: {button_idx}"))
+                            );
 
                         if let Some(current_action) = &mut self.current_action {
                             *current_action += 1;
@@ -1557,6 +1587,11 @@ impl Frontend {
                                 self.current_action = None;
                             }
                         }
+
+                        self.config.button_map = self.button_map.clone();
+                        self.config.button_to_index = self.button_to_index.clone();
+
+                        Self::write_config_file(&self.config, &mut self.config_file);
                     } else {
                         if let Some(button) = self.button_map.get(&button_idx) {
                             self.display_ui = false;
