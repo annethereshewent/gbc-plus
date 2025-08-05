@@ -82,8 +82,8 @@ export class Joypad {
     ["a", "left"],
     ["d", "right"],
     ["w", "up"],
-    ["Tab", "select"],
-    ["Enter", "start"]
+    ["tab", "select"],
+    ["enter", "start"]
   ])
 
   private buttonToKeys = new Map<string, string>([
@@ -92,7 +92,7 @@ export class Joypad {
     ["left", "a"],
     ["right", "d"],
     ["select", "tab"],
-    ["enter", "start"],
+    ["start", "enter"],
     ["b", "j"],
     ["a", "k"]
   ])
@@ -160,7 +160,6 @@ export class Joypad {
 
     document.addEventListener('keydown', async (e) => {
       if (this.currentKeyInput != null) {
-
         if (e.key == "Escape") {
           this.cancelMappings()
           return
@@ -388,6 +387,9 @@ export class Joypad {
   cancelMappings() {
     this.revertInputs('key-input')
     this.revertInputs('joy-input')
+
+    this.currentJoyInput = null
+    this.currentKeyInput = null
 
     const modal = document.getElementById("controller-mappings-modal")
 
