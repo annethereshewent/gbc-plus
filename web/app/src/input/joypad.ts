@@ -274,9 +274,11 @@ export class Joypad {
 
       const gbButton = sibling.innerText.toLowerCase()
 
-      const buttonStr = BUTTON_IDS_TO_STRINGS.get(this.buttonToJoypad.get(gbButton)!)!
+      const buttonStr = BUTTON_IDS_TO_STRINGS.get(this.buttonToJoypad.get(gbButton)!)
 
-      joyEl.value = buttonStr
+      if (buttonStr != null) {
+        joyEl.value = buttonStr
+      }
 
       joyInput.addEventListener("focus", () => {
         this.currentJoyInput = joyInput as HTMLInputElement
@@ -299,25 +301,26 @@ export class Joypad {
         if (button.pressed) {
           const oldJoyButton = this.currentJoyInput.value
 
-          const oldButtonId = BUTTON_STRINGS_TO_IDS.get(oldJoyButton)!
+          const oldButtonId = BUTTON_STRINGS_TO_IDS.get(oldJoyButton)
 
-          this.joypadMappings.delete(oldButtonId)
+          if (oldButtonId != null) {
+            this.joypadMappings.delete(oldButtonId)
 
-          const existingButton = this.joypadMappings.get(buttonIdx)
+            const existingButton = this.joypadMappings.get(buttonIdx)
 
-          if (existingButton != null) {
-            const oldMapping = this.buttonToJoypad.get(existingButton)!
+            if (existingButton != null) {
+              const oldMapping = this.buttonToJoypad.get(existingButton)!
 
-            this.joypadMappings.delete(oldMapping)
+              this.joypadMappings.delete(oldMapping)
 
-            this.joypadMappings.set(oldButtonId, existingButton)
+              this.joypadMappings.set(oldButtonId, existingButton)
+              this.buttonToJoypad.set(existingButton, oldButtonId)
 
-            this.buttonToKeys.set(existingButton, oldJoyButton)
+              const element = JOYPAD_ELEMENTS.get(existingButton) as HTMLInputElement
 
-            const element = JOYPAD_ELEMENTS.get(existingButton) as HTMLInputElement
-
-            if (element != null) {
-              element.value = oldJoyButton
+              if (element != null) {
+                element.value = oldJoyButton
+              }
             }
           }
 
@@ -379,10 +382,12 @@ export class Joypad {
 
     this.revertInputs(joyInputs, 'joy-input')
 
-    const modal = document.getElementById("controller-mappings-modal")!
+    const modal = document.getElementById("controller-mappings-modal")
 
-    modal.style.display = "none"
-    modal.className = "modal hide"
+    if (modal != null) {
+      modal.style.display = "none"
+      modal.className = "modal hide"
+    }
 
     cancelAnimationFrame(this.currentFrame)
   }
