@@ -35,7 +35,7 @@ These are the defaults for keyboard and joypad:
 - **Right**: D
 - **B button**: J
 - **A button**: K
-- **Select**: Shift
+- **Select**: Tab
 - **Start**: Enter
 
 Hotkeys:
