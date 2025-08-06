@@ -1424,6 +1424,7 @@ impl Frontend {
         };
 
         if json != "" {
+            config_file.set_len(0).unwrap();
             config_file.seek(SeekFrom::Start(0)).unwrap();
             config_file.write_all(json.as_bytes()).unwrap();
         }
