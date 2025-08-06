@@ -160,6 +160,7 @@ impl MBC3 {
         if let Some(file) = &mut self.rtc_file {
             match serde_json::to_string::<RtcFile>(&rtc_json) {
                 Ok(result) => {
+                    file.set_len(0).unwrap();
                     file.seek(SeekFrom::Start(0)).unwrap();
                     file.write_all(result.as_bytes()).unwrap();
                 }
