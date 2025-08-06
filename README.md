@@ -4,11 +4,12 @@
 
 This is a Gameboy Color emulator written in Rust with ports for desktop, web, and iOS! Currently has a great compatibility rate, with features such as:
 
-- Cloud saves
+- Cloud saves, including storing rtc files in the cloud
 - Controller support
 - Save states and save management
 - Palette picker for DMG titles
 - Waveform visualizer on desktop and web
+- Custom controller bindings for keyboard and joypad
 
 Coming soon:
 
