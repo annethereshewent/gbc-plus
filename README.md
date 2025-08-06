@@ -12,7 +12,6 @@ This is a Gameboy Color emulator written in Rust with ports for desktop, web, an
 
 Coming soon:
 
-- Fixed RTC support (currently busted)
 - SGB support for borders
 - MBC 2 and 6 support
 
@@ -24,7 +23,11 @@ iOS version can be found here in the <a href="https://github.com/annethereshewen
 
 ## Controls
 
-Keyboard:
+Controls can now be customized via the "misc" menu on desktop and web. 
+
+These are the defaults for keyboard and joypad:
+
+### Keyboard:
 
 - **Up**: W
 - **Down**: S
@@ -43,7 +46,7 @@ Hotkeys:
 - **Waveform toggle**: F4
 
 
-Controller (tested on PS5 controller, Xbox controllers should also work)
+### Controller (tested on PS5 controller, Xbox controllers should also work)
 
 - **Up, down, left, right**: Control pad
 - **B button**: Square/X
