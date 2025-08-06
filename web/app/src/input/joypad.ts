@@ -223,6 +223,21 @@ export class Joypad {
         if (button != null) {
           e.preventDefault()
           this.keyMap.set(button, true)
+        } else {
+          switch (e.key) {
+            case 'F5':
+              e.preventDefault()
+              this.gbc.createSaveState(true)
+              break
+            case 'F7':
+              e.preventDefault()
+              const compressed = await this.gbc.db.loadSaveState(this.gbc.gameName)
+
+              if (compressed != null) {
+                this.gbc.loadSaveState(compressed)
+              }
+              break
+          }
         }
       }
     })
