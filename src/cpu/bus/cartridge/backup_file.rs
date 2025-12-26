@@ -68,7 +68,6 @@ impl BackupFile {
         self.dirty_writes.insert(address as u16);
         self.ram[address] = value;
 
-
         if self.dirty_reads.contains(&(address as u16)) {
             if self.is_desktop {
                 self.last_updated = SystemTime::now()

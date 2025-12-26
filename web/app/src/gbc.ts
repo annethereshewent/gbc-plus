@@ -210,10 +210,17 @@ export class GBC {
         this.fetchRtc()
       }
 
-      const saveBuffer =
-        this.cloudService.loggedIn.value ?
-        (await this.cloudService.getFile(this.saveName.value)).data :
-        new Uint8Array(JSON.parse(localStorage.getItem(this.saveName.value) || "null"))
+      let saveBuffer: Uint8Array|null = null
+
+      if (this.cloudService.loggedIn.value) {
+        saveBuffer = (await this.cloudService.getFile(this.saveName.value)).data as Uint8Array|null
+      } else {
+        const arrayJson = JSON.parse(localStorage.getItem(this.saveName.value) || "null")
+
+        if (arrayJson != null) {
+          saveBuffer = new Uint8Array(arrayJson)
+        }
+      }
 
       if (saveBuffer != null) {
         this.emulator.load_save(saveBuffer as Uint8Array)

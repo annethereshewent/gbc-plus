@@ -1,3 +1,7 @@
+[workspace]
+members = ["desktop", "web", "mobile"]
+resolver = "2"
+
 [package]
 name = "gbc-plus"
 version = "0.1.0"
