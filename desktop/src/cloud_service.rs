@@ -24,12 +24,12 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use tiny_http::Server;
 
-const CLIENT_ID: &str = "353451169812-8rpe4r0mt3rr2108nsgq8ctsukoo8fr7.apps.googleusercontent.com";
+const CLIENT_ID: &str = "353451169812-gf5j4nmiosovv7sendcanjmmcumoq0dl.apps.googleusercontent.com";
 
 // according to google, since you can't keep secrets in desktop apps, keeping it in the source could should be ok.
 // furthermore, google treats client secrets in native apps as extensions of the client ID, and not really a secret,
 // and things like incremental login will not work with desktop apps, which is what the secret is used for on web
-const CLIENT_SECRET: &str = "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";
+const CLIENT_SECRET: &str = "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";
 
 const BASE_LOGIN_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 

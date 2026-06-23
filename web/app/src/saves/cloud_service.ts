@@ -13,7 +13,7 @@ export interface RtcJson {
 }
 
 const BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-const CLIENT_ID = "353451169812-e707dk5s0qkjq400mrcpjndn6e1smpiv.apps.googleusercontent.com"
+const CLIENT_ID = "353451169812-khtanjkfi98eh2bgcldmqt22g47og1ef.apps.googleusercontent.com"
 
 export class CloudService {
   private accessToken: string = ""
