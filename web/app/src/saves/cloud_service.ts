@@ -14,6 +14,7 @@ export interface RtcJson {
 
 const BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 const CLIENT_ID = "353451169812-khtanjkfi98eh2bgcldmqt22g47og1ef.apps.googleusercontent.com"
+const TOKEN_EXPIRY_BUFFER_MS = 10000
 
 export class CloudService {
   private accessToken: string = ""
@@ -178,7 +179,7 @@ export class CloudService {
 
     return new Promise((resolve, reject) => {
       const gbcExpires = parseInt(localStorage.getItem("gbc_access_expires") || "-1")
-      if (gbcExpires != null && (Date.now() >= gbcExpires || gbcExpires == -1)) {
+      if (gbcExpires != null && (Date.now() >= (gbcExpires - TOKEN_EXPIRY_BUFFER_MS) || gbcExpires == -1)) {
         // refresh tokens as they're expired
         window.addEventListener("message", async (e) => {
           if (e.data == "authFinished") {
@@ -195,7 +196,7 @@ export class CloudService {
     })
   }
 
-  async cloudRequest(request: () => Promise<Response>, returnBuffer: boolean = false): Promise<any> {
+  async cloudRequest(request: () => Promise<Response>, returnBuffer: boolean = false, attemptAgain: boolean = true): Promise<any> {
     return new Promise(async (resolve, reject) => {
       await this.refreshTokensIfNeeded()
 
@@ -207,23 +208,35 @@ export class CloudService {
         resolve(data)
       } else if (response.status == 401) {
 
-        this.logout()
+        if (attemptAgain) {
+          const result = await this.cloudRequest(request, returnBuffer, false)
 
-        const notification = document.getElementById("request-failure-notification")!
+          resolve(result)
+        } else {
+          this.logout()
 
-        notification.style.display = "block"
+          const notification = document.getElementById("request-failure-notification")!
 
-        let opacity = 1.0
+          notification.style.display = "block"
 
-        let interval = setInterval(() => {
-          opacity -= 0.05
-          notification.style.opacity = `${opacity}`
+          let opacity = 1.0
 
-          if (opacity <= 0) {
-            clearInterval(interval)
-          }
-        }, 100)
+          let interval = setInterval(() => {
+            opacity -= 0.05
+            notification.style.opacity = `${opacity}`
 
+            if (opacity <= 0) {
+              clearInterval(interval)
+            }
+          }, 100)
+
+          resolve(null)
+        }
+      } else if (response.status == 404) {
+        const data = await response.json()
+        resolve(data)
+      } else {
+        // 204 or other response
         resolve(null)
       }
     })
